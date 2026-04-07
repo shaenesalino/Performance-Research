@@ -359,9 +359,100 @@ body {
 
 .filter-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 0.9fr) minmax(160px, 0.8fr) auto;
   gap: 16px;
   align-items: end;
+}
+
+.filter-advanced {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-option {
+  position: relative;
+}
+
+.metric-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition), transform var(--transition);
+  min-height: 48px;
+}
+
+.metric-pill:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.metric-option input:checked + .metric-pill {
+  border-color: var(--primary);
+  background: #f7fdfe;
+  box-shadow: 0 0 0 3px rgba(42,173,187,0.12);
+}
+
+.metric-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.metric-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.metric-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.metric-note {
+  font-size: 10px;
+  color: var(--text-light);
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.chart-card.single-chart-card {
+  padding-bottom: 28px;
+}
+
+.chart-container.tall { height: 360px; }
+
+.empty-state {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border);
+  padding: 28px;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .field-group { display: flex; flex-direction: column; gap: 6px; }
@@ -736,6 +827,7 @@ tbody tr:last-child td { border-bottom: none; }
   .charts-grid { grid-template-columns: 1fr; }
   .filter-row { grid-template-columns: 1fr 1fr; }
   .filter-row .btn-generate { grid-column: span 2; justify-content: center; }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .upload-card-inner { flex-direction: column; text-align: center; }
   .upload-cta { margin-left: 0; align-items: center; }
   .header-inner { padding: 0 20px; }
@@ -745,6 +837,7 @@ tbody tr:last-child td { border-bottom: none; }
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .filter-row { grid-template-columns: 1fr; }
   .filter-row .btn-generate { grid-column: span 1; }
+  .metric-grid { grid-template-columns: 1fr; }
   .kpi-value { font-size: 22px; }
 }
 
@@ -814,6 +907,13 @@ tbody tr:last-child td { border-bottom: none; }
               <option value="U">Unit</option>
             </select>
           </div>
+          <div class="field-group">
+            <label class="field-label" for="viewModeSelect">View Mode</label>
+            <select class="field-select" id="viewModeSelect">
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
           <button class="btn-generate" id="generateBtn" type="button">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -821,6 +921,13 @@ tbody tr:last-child td { border-bottom: none; }
             </svg>
             Generate Report
           </button>
+        </div>
+
+        <div class="filter-advanced">
+          <div class="field-group">
+            <label class="field-label">Metrics to Compare</label>
+            <div class="metric-grid" id="metricGrid"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -844,59 +951,15 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="kpi-grid" id="kpiGrid"></div>
 
       <div class="section-heading">Trend Analysis</div>
-      <div class="charts-grid">
-        <div class="chart-card">
-          <div class="chart-header">
-            <div>
-              <div class="chart-title">Median Price Trend</div>
-              <div class="chart-desc">12-month vs 3-month median</div>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#2aadbb"></span> 12M Median</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#0a6266"></span> 3M Median</span>
-            </div>
+      <div class="chart-card single-chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Selected Metrics Trend</div>
+            <div class="chart-desc" id="chartDescription">Compare selected metrics over time</div>
           </div>
-          <div class="chart-container"><canvas id="chartPrice"></canvas></div>
+          <div class="chart-legend" id="chartLegend"></div>
         </div>
-        <div class="chart-card">
-          <div class="chart-header">
-            <div>
-              <div class="chart-title">Sales Volume</div>
-              <div class="chart-desc">12-month vs 1-month sales count</div>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#2aadbb"></span> 12M Sales</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#b2e8ec"></span> 1M Sales</span>
-            </div>
-          </div>
-          <div class="chart-container"><canvas id="chartSales"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-header">
-            <div>
-              <div class="chart-title">Listings Trend</div>
-              <div class="chart-desc">12-month vs 1-month listing count</div>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#2aadbb"></span> 12M Listings</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#b2e8ec"></span> 1M Listings</span>
-            </div>
-          </div>
-          <div class="chart-container"><canvas id="chartListings"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-header">
-            <div>
-              <div class="chart-title">Rent &amp; Days on Market</div>
-              <div class="chart-desc">Dual-axis: asking rent vs market days</div>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#2aadbb"></span> Median Rent</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span> Days on Market</span>
-            </div>
-          </div>
-          <div class="chart-container"><canvas id="chartRentDOM"></canvas></div>
-        </div>
+        <div class="chart-container tall"><canvas id="chartCustom"></canvas></div>
       </div>
 
       <div class="section-heading">Historical Data</div>
@@ -943,9 +1006,11 @@ tbody tr:last-child td { border-bottom: none; }
 // STATE
 // ----------------------------------------------------------------
 const State = {
-  rawData:      [],
-  filteredData: [],
-  charts:       {},
+  rawData:         [],
+  filteredData:    [],
+  charts:          {},
+  currentView:     'monthly',
+  selectedMetrics: [],
 };
 
 // ----------------------------------------------------------------
@@ -1005,18 +1070,36 @@ function formatDate(v) {
 }
 
 // ----------------------------------------------------------------
-// CHART DEFAULTS
+// METRIC CONFIG + CHART DEFAULTS
 // ----------------------------------------------------------------
 const CC = {
   primary: '#2aadbb',
   accent:  '#0a6266',
   light:   '#b2e8ec',
   amber:   '#f59e0b',
+  plum:    '#8b5cf6',
+  coral:   '#ef4444',
+  mint:    '#10b981',
+  slate:   '#64748b',
 };
+
+const METRIC_DEFS = [
+  { key: 'medPrice12', label: 'Median Price (12M)', shortLabel: 'Median Price', note: 'Snapshot', type: 'currency', color: CC.primary, primary: true, sub: '12-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'medPrice3', label: 'Median Price (3M)', shortLabel: 'Median Price 3M', note: 'Recent', type: 'currency', color: CC.accent, sub: '3-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'sales12', label: 'Sales (12M)', shortLabel: 'Sales', note: 'Rolling total', type: 'count', color: CC.plum, sub: '12-month total', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+  { key: 'sales1', label: 'Sales (1M)', shortLabel: 'Sales 1M', note: 'Recent month', type: 'count', color: CC.coral, sub: '1-month total', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+  { key: 'listings12', label: 'Listings (12M)', shortLabel: 'Listings', note: 'Market supply', type: 'count', color: CC.mint, sub: '12-month count', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>` },
+  { key: 'listings1', label: 'Listings (1M)', shortLabel: 'Listings 1M', note: 'Active month', type: 'count', color: CC.light, sub: '1-month count', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>` },
+  { key: 'medRent', label: 'Median Rent', shortLabel: 'Median Rent', note: 'Per week', type: 'currency', color: CC.amber, sub: '12-month / week', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { key: 'dom', label: 'Days on Market', shortLabel: 'DOM', note: 'Median days', type: 'days', color: CC.slate, sub: 'median', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>` },
+];
+
+const DEFAULT_METRICS = ['medPrice12', 'sales12', 'medRent'];
 
 const CHART_BASE = {
   responsive: true,
   maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
   plugins: {
     legend: { display: false },
     tooltip: {
@@ -1032,7 +1115,7 @@ const CHART_BASE = {
   scales: {
     x: {
       grid: { color: '#dff4f6' },
-      ticks: { color: '#8aadb2', font: { size: 10, family: "'DM Sans',sans-serif" }, maxTicksLimit: 8 },
+      ticks: { color: '#8aadb2', font: { size: 10, family: "'DM Sans',sans-serif" }, maxTicksLimit: 10 },
       border: { display: false },
     },
     y: {
@@ -1048,218 +1131,182 @@ function destroyChart(key) {
 }
 
 function gradient(ctx, hex, a0 = 0.18, a1 = 0) {
-  const g = ctx.createLinearGradient(0, 0, 0, 240);
+  const g = ctx.createLinearGradient(0, 0, 0, 320);
   const r = parseInt(hex.slice(1,3),16), gr = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   g.addColorStop(0, `rgba(${r},${gr},${b},${a0})`);
   g.addColorStop(1, `rgba(${r},${gr},${b},${a1})`);
   return g;
 }
 
-// ----------------------------------------------------------------
-// RENDER CHARTS
-// ----------------------------------------------------------------
-function renderCharts(data) {
-  const labels = data.map(d => d.monthEnd ? formatDate(d.monthEnd) : '—');
-  const v = key => data.map(d => d[key]);
-
-  // 1. PRICE
-  destroyChart('price');
-  {
-    const ctx = document.getElementById('chartPrice').getContext('2d');
-    State.charts.price = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: '12M Median',
-            data: v('medPrice12'),
-            borderColor: CC.primary,
-            backgroundColor: gradient(ctx, '#2aadbb'),
-            borderWidth: 2.5,
-            pointRadius: 3, pointHoverRadius: 6,
-            tension: 0.4, fill: true, spanGaps: true,
-          },
-          {
-            label: '3M Median',
-            data: v('medPrice3'),
-            borderColor: CC.accent,
-            backgroundColor: 'transparent',
-            borderWidth: 2, borderDash: [5,3],
-            pointRadius: 2, pointHoverRadius: 5,
-            tension: 0.4, fill: false, spanGaps: true,
-          },
-        ],
-      },
-      options: {
-        ...CHART_BASE,
-        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
-          callbacks: { label: c => ' ' + c.dataset.label + ': ' + formatCurrency(c.raw) }
-        }},
-        scales: { ...CHART_BASE.scales, y: { ...CHART_BASE.scales.y,
-          ticks: { ...CHART_BASE.scales.y.ticks,
-            callback: v => v >= 1e6 ? '$'+(v/1e6).toFixed(1)+'M' : '$'+(v/1000).toFixed(0)+'K'
-          }
-        }},
-      },
-    });
-  }
-
-  // 2. SALES
-  destroyChart('sales');
-  {
-    const ctx = document.getElementById('chartSales').getContext('2d');
-    State.charts.sales = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: '12M Sales', data: v('sales12'), backgroundColor: CC.primary, borderRadius: 4, borderSkipped: false },
-          { label: '1M Sales',  data: v('sales1'),  backgroundColor: CC.light,   borderRadius: 4, borderSkipped: false },
-        ],
-      },
-      options: {
-        ...CHART_BASE,
-        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
-          callbacks: { label: c => ' ' + c.dataset.label + ': ' + formatNumber(c.raw) }
-        }},
-      },
-    });
-  }
-
-  // 3. LISTINGS
-  destroyChart('listings');
-  {
-    const ctx = document.getElementById('chartListings').getContext('2d');
-    State.charts.listings = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: '12M Listings', data: v('listings12'),
-            borderColor: CC.primary,
-            backgroundColor: gradient(ctx, '#2aadbb', 0.14),
-            borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6,
-            tension: 0.4, fill: true, spanGaps: true,
-          },
-          {
-            label: '1M Listings', data: v('listings1'),
-            borderColor: CC.light, backgroundColor: 'transparent',
-            borderWidth: 2, pointRadius: 2, pointHoverRadius: 5,
-            tension: 0.4, fill: false, spanGaps: true,
-          },
-        ],
-      },
-      options: {
-        ...CHART_BASE,
-        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
-          callbacks: { label: c => ' ' + c.dataset.label + ': ' + formatNumber(c.raw) }
-        }},
-      },
-    });
-  }
-
-  // 4. RENT + DOM
-  destroyChart('rentdom');
-  {
-    const ctx = document.getElementById('chartRentDOM').getContext('2d');
-    State.charts.rentdom = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Median Rent', data: v('medRent'),
-            borderColor: CC.primary,
-            backgroundColor: gradient(ctx, '#2aadbb', 0.14),
-            borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6,
-            tension: 0.4, fill: true, yAxisID: 'yRent', spanGaps: true,
-          },
-          {
-            label: 'Days on Market', data: v('dom'),
-            borderColor: CC.amber, backgroundColor: 'transparent',
-            borderWidth: 2, borderDash: [5,3],
-            pointRadius: 2, pointHoverRadius: 5,
-            tension: 0.4, fill: false, yAxisID: 'yDOM', spanGaps: true,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
-          callbacks: { label: c => c.dataset.yAxisID === 'yRent'
-            ? ' Median Rent: ' + formatCurrency(c.raw) + '/wk'
-            : ' Days on Market: ' + c.raw
-          }
-        }},
-        scales: {
-          x: CHART_BASE.scales.x,
-          yRent: {
-            type: 'linear', position: 'left',
-            grid: { color: '#dff4f6' },
-            ticks: { color: CC.primary, font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => '$'+v },
-            border: { display: false },
-          },
-          yDOM: {
-            type: 'linear', position: 'right',
-            grid: { drawOnChartArea: false },
-            ticks: { color: CC.amber, font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => v+'d' },
-            border: { display: false },
-          },
-        },
-      },
-    });
-  }
+function getMetricDef(key) {
+  return METRIC_DEFS.find(m => m.key === key);
 }
 
-// ----------------------------------------------------------------
-// RENDER KPI CARDS
-// ----------------------------------------------------------------
-const KPI_DEFS = [
-  {
-    key: 'medPrice12', label: 'Median Price', sub: '12-month',
-    format: v => formatCurrency(v), primary: true,
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-  },
-  {
-    key: 'medRent', label: 'Median Rent', sub: '12-month / week',
-    format: v => { const n = safeNum(v); return n == null ? '—' : formatCurrency(n) + '/wk'; },
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
-  },
-  {
-    key: 'sales12', label: 'Sales', sub: '12-month total',
-    format: v => formatNumber(v),
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
-  },
-  {
-    key: 'listings1', label: 'Listings', sub: '1-month count',
-    format: v => formatNumber(v),
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
-  },
-  {
-    key: 'rentalList12', label: 'Rental Listings', sub: '12-month count',
-    format: v => formatNumber(v),
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-  },
-  {
-    key: 'dom', label: 'Days on Market', sub: 'median',
-    format: v => { const n = safeNum(v); return n == null ? '—' : Math.round(n) + 'd'; },
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
-  },
-];
+function renderMetricSelector() {
+  const metricGrid = document.getElementById('metricGrid');
+  metricGrid.innerHTML = METRIC_DEFS.map(metric => `
+    <label class="metric-option">
+      <input type="checkbox" class="metric-checkbox" value="${metric.key}" ${DEFAULT_METRICS.includes(metric.key) ? 'checked' : ''}>
+      <span class="metric-pill">
+        <span class="metric-swatch" style="background:${metric.color}"></span>
+        <span class="metric-copy">
+          <span class="metric-name">${metric.label}</span>
+          <span class="metric-note">${metric.note}</span>
+        </span>
+      </span>
+    </label>
+  `).join('');
+}
 
-function renderKPIs(data) {
+function getSelectedMetricKeys() {
+  const selected = [...document.querySelectorAll('.metric-checkbox:checked')].map(el => el.value);
+  return selected.length ? selected : [...DEFAULT_METRICS];
+}
+
+function formatMetricValue(metric, value) {
+  const n = safeNum(value);
+  if (n == null) return '—';
+  if (metric.type === 'currency') return formatCurrency(n);
+  if (metric.type === 'days') return Math.round(n) + 'd';
+  return formatNumber(n);
+}
+
+function formatAxisTick(metricType, value) {
+  const n = safeNum(value);
+  if (n == null) return '';
+  if (metricType === 'currency') {
+    if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+    if (Math.abs(n) >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+    return '$' + n;
+  }
+  if (metricType === 'days') return Math.round(n) + 'd';
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+  return formatNumber(n);
+}
+
+function transformDataByView(data, viewMode) {
+  if (viewMode !== 'yearly') return data;
+  const byYear = new Map();
+  for (const row of data) {
+    if (!row.monthEnd) continue;
+    const year = row.monthEnd.getFullYear();
+    const existing = byYear.get(year);
+    const isDecember = row.monthEnd.getMonth() === 11;
+    const existingIsDecember = existing?.monthEnd?.getMonth?.() === 11;
+    if (!existing) {
+      byYear.set(year, row);
+      continue;
+    }
+    if (isDecember && !existingIsDecember) {
+      byYear.set(year, row);
+      continue;
+    }
+    if ((isDecember && existingIsDecember) || (!isDecember && !existingIsDecember)) {
+      if (row.monthEnd > existing.monthEnd) byYear.set(year, row);
+    }
+  }
+  return [...byYear.values()].sort((a, b) => a.monthEnd - b.monthEnd);
+}
+
+function getPeriodLabel(date, viewMode) {
+  if (!date) return '—';
+  if (viewMode === 'yearly') return String(date.getFullYear());
+  return formatDate(date);
+}
+
+function renderLegend(metricKeys) {
+  const legend = document.getElementById('chartLegend');
+  legend.innerHTML = metricKeys.map(key => {
+    const metric = getMetricDef(key);
+    return `<span class="legend-item"><span class="legend-dot" style="background:${metric.color}"></span> ${metric.shortLabel}</span>`;
+  }).join('');
+}
+
+function renderCharts(data, metricKeys, viewMode) {
+  destroyChart('custom');
+
+  const labels = data.map(d => getPeriodLabel(d.monthEnd, viewMode));
+  const ctx = document.getElementById('chartCustom').getContext('2d');
+  const selectedMetrics = metricKeys.map(getMetricDef).filter(Boolean);
+  const usesCurrency = selectedMetrics.some(m => m.type === 'currency');
+  const usesNonCurrency = selectedMetrics.some(m => m.type !== 'currency');
+
+  const datasets = selectedMetrics.map((metric, idx) => ({
+    label: metric.label,
+    data: data.map(d => safeNum(d[metric.key])),
+    borderColor: metric.color,
+    backgroundColor: idx === 0 ? gradient(ctx, metric.color, 0.16, 0.02) : 'transparent',
+    borderWidth: 2.5,
+    pointRadius: 2.5,
+    pointHoverRadius: 5,
+    tension: 0.35,
+    fill: idx === 0,
+    spanGaps: true,
+    yAxisID: usesCurrency && usesNonCurrency ? (metric.type === 'currency' ? 'yCurrency' : 'yAlt') : 'y',
+  }));
+
+  const scales = usesCurrency && usesNonCurrency ? {
+    x: CHART_BASE.scales.x,
+    yCurrency: {
+      type: 'linear', position: 'left',
+      grid: { color: '#dff4f6' },
+      ticks: { color: CC.primary, font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => formatAxisTick('currency', v) },
+      border: { display: false },
+    },
+    yAlt: {
+      type: 'linear', position: 'right',
+      grid: { drawOnChartArea: false },
+      ticks: { color: '#8aadb2', font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => formatAxisTick('count', v) },
+      border: { display: false },
+    },
+  } : {
+    ...CHART_BASE.scales,
+    y: {
+      ...CHART_BASE.scales.y,
+      ticks: {
+        ...CHART_BASE.scales.y.ticks,
+        callback: v => formatAxisTick(selectedMetrics[0]?.type || 'count', v),
+      },
+    },
+  };
+
+  State.charts.custom = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      ...CHART_BASE,
+      plugins: {
+        ...CHART_BASE.plugins,
+        tooltip: {
+          ...CHART_BASE.plugins.tooltip,
+          callbacks: {
+            label: c => {
+              const metric = getMetricDef(selectedMetrics[c.datasetIndex]?.key || metricKeys[c.datasetIndex]);
+              return ' ' + c.dataset.label + ': ' + formatMetricValue(metric, c.raw);
+            }
+          }
+        }
+      },
+      scales,
+    },
+  });
+
+  renderLegend(metricKeys);
+  document.getElementById('chartDescription').textContent = `${viewMode === 'yearly' ? 'Yearly' : 'Monthly'} comparison for ${selectedMetrics.length} selected metric${selectedMetrics.length !== 1 ? 's' : ''}`;
+}
+
+function renderKPIs(data, metricKeys, viewMode) {
   const latest = data[data.length - 1];
   if (!latest) return;
+  const selectedMetrics = metricKeys.map(getMetricDef).filter(Boolean);
 
-  document.getElementById('kpiGrid').innerHTML = KPI_DEFS.map(k => `
-    <div class="kpi-card${k.primary ? ' primary-kpi' : ''}">
-      <div class="kpi-icon">${k.icon}</div>
-      <div class="kpi-label">${k.label}</div>
-      <div class="kpi-value">${k.format(latest[k.key])}</div>
-      <div class="kpi-sub">${k.sub}</div>
+  document.getElementById('kpiGrid').innerHTML = selectedMetrics.map((metric, index) => `
+    <div class="kpi-card${index === 0 ? ' primary-kpi' : ''}">
+      <div class="kpi-icon">${metric.icon}</div>
+      <div class="kpi-label">${metric.shortLabel}</div>
+      <div class="kpi-value">${formatMetricValue(metric, latest[metric.key])}</div>
+      <div class="kpi-sub">${metric.sub} · ${viewMode === 'yearly' ? 'year-end snapshot' : 'latest point'}</div>
     </div>
   `).join('');
 }
@@ -1268,7 +1315,7 @@ function renderKPIs(data) {
 // RENDER TABLE
 // ----------------------------------------------------------------
 const TABLE_COLS = [
-  { label: 'Period',         render: r => `<span class="td-date">${formatDate(r.monthEnd)}</span>` },
+  { label: 'Period',         render: r => `<span class="td-date">${getPeriodLabel(r.monthEnd, State.currentView || 'monthly')}</span>` },
   { label: 'LGA',            render: r => r.lga },
   { label: 'Type',           render: r => {
     const cls = r.propType === 'H' ? 'house' : r.propType === 'U' ? 'unit' : '';
@@ -1335,11 +1382,12 @@ function showStatus(text, sub = '', type = 'loading') {
 // GENERATE REPORT
 // ----------------------------------------------------------------
 function generateReport() {
-  const lgaEl    = document.getElementById('lgaSelect');
+  const lgaEl = document.getElementById('lgaSelect');
   const propType = document.getElementById('typeSelect').value;
-  console.log('generateReport called — LGA:', lgaEl.value, '| type:', propType, '| rawData rows:', State.rawData.length);
+  const viewMode = document.getElementById('viewModeSelect').value;
+  const metricKeys = getSelectedMetricKeys();
+  console.log('generateReport called — LGA:', lgaEl.value, '| type:', propType, '| view:', viewMode, '| metrics:', metricKeys, '| rawData rows:', State.rawData.length);
 
-  // Auto-select first LGA if none chosen
   let lga = lgaEl.value;
   if (!lga && lgaEl.options.length > 1) {
     lgaEl.selectedIndex = 1;
@@ -1352,9 +1400,7 @@ function generateReport() {
   }
 
   const filtered = filterData(State.rawData, lga, propType);
-
   if (filtered.length === 0) {
-    // Debug: log what we actually have so we can diagnose mismatches
     const sample = State.rawData.slice(0, 3).map(r => `lga="${r.lga}" type="${r.propType}"`).join(', ');
     console.warn('generateReport: no rows matched. LGA=' + lga + ' type=' + propType + '. Sample rows: ' + sample);
     showStatus(
@@ -1365,30 +1411,39 @@ function generateReport() {
     return;
   }
 
-  State.filteredData = filtered;
+  const transformed = transformDataByView(filtered, viewMode);
+  if (transformed.length === 0) {
+    showStatus('No transformed data available for that selection.', '', 'error');
+    return;
+  }
+
+  State.filteredData = transformed;
+  State.currentView = viewMode;
+  State.selectedMetrics = metricKeys;
 
   const typeLabel = propType === 'H' ? 'Houses' : propType === 'U' ? 'Units' : 'All Properties';
-  const first = filtered[0];
-  const last  = filtered[filtered.length - 1];
+  const viewLabel = viewMode === 'yearly' ? 'Yearly' : 'Monthly';
+  const first = transformed[0];
+  const last  = transformed[transformed.length - 1];
 
-  document.getElementById('reportTitle').textContent    = lga;
-  document.getElementById('reportSubtitle').textContent = typeLabel + ' · ' + filtered.length + ' data points';
+  document.getElementById('reportTitle').textContent = lga;
+  document.getElementById('reportSubtitle').textContent = `${typeLabel} · ${viewLabel} · ${transformed.length} data points`;
   document.getElementById('reportMeta').innerHTML = [
-    propType     ? `<span class="meta-chip">${typeLabel}</span>` : '',
-    first?.monthEnd ? `<span class="meta-chip">${formatDate(first.monthEnd)}</span>` : '',
+    `<span class="meta-chip">${typeLabel}</span>`,
+    `<span class="meta-chip">${viewLabel}</span>`,
+    first?.monthEnd ? `<span class="meta-chip">${getPeriodLabel(first.monthEnd, viewMode)}</span>` : '',
     `<span class="meta-chip">→</span>`,
-    last?.monthEnd  ? `<span class="meta-chip">${formatDate(last.monthEnd)}</span>` : '',
-    `<span class="meta-chip">${filtered.length} records</span>`,
+    last?.monthEnd ? `<span class="meta-chip">${getPeriodLabel(last.monthEnd, viewMode)}</span>` : '',
+    `<span class="meta-chip">${metricKeys.length} metric${metricKeys.length !== 1 ? 's' : ''}</span>`,
   ].filter(Boolean).join('');
 
-  renderKPIs(filtered);
-  renderCharts(filtered);
-  renderTable(filtered);
+  renderKPIs(transformed, metricKeys, viewMode);
+  renderCharts(transformed, metricKeys, viewMode);
+  renderTable(transformed);
 
   const reportEl = document.getElementById('reportSection');
-  // Remove and re-add to re-trigger the fadeUp animation
   reportEl.classList.remove('visible');
-  void reportEl.offsetWidth; // force reflow
+  void reportEl.offsetWidth;
   reportEl.classList.add('visible');
 
   requestAnimationFrame(() => {
@@ -1398,6 +1453,7 @@ function generateReport() {
 
 // ----------------------------------------------------------------
 // SUPABASE CONFIG
+
 // ----------------------------------------------------------------
 const SUPABASE_URL    = 'https://dcfmpwnpvhjowuaxqyti.supabase.co';
 const SUPABASE_KEY    = 'sb_publishable_puo-y2CEjOxnA1hrdrZ9VQ_Z8RYHhdU';
@@ -1526,6 +1582,8 @@ function tryRestore() {
 (function init() {
   const generateBtn = document.getElementById('generateBtn');
   generateBtn.addEventListener('click', generateReport);
+  renderMetricSelector();
+  State.selectedMetrics = [...DEFAULT_METRICS];
 
   async function autoFetch() {
     // Try sessionStorage cache first (avoids re-fetching on page refresh)
