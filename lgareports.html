@@ -846,23 +846,22 @@ tbody tr:last-child td { border-bottom: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+.header-inner { justify-content: center; }
+.header-logo { height: 36px; object-fit: contain; }
 </style>
 </head>
 <body>
 <div class="app-wrapper">
 
   <!-- HEADER -->
-  <header class="site-header">
-    <div class="header-inner">
-      <a href="#" class="logo">
-        <span class="logo-mark">PropAnalytics</span>
-        <span class="logo-tag">Real Estate Intelligence</span>
-      </a>
-      <div class="header-meta">
-        <span class="header-badge">Client-Side · No Backend</span>
-      </div>
-    </div>
-  </header>
+  
+<header class="site-header">
+  <div class="header-inner">
+    <img src="logo.png" alt="PropAnalytics Logo" class="header-logo">
+  </div>
+</header>
+
 
   <!-- MAIN -->
   <main class="main-content">
