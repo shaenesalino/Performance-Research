@@ -108,6 +108,17 @@ body {
 
 .header-meta { display: flex; align-items: center; gap: 8px; }
 
+.header-inner-logo-only {
+  justify-content: center;
+}
+
+.header-logo {
+  height: 38px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
 .header-badge {
   background: rgba(255,255,255,0.12);
   color: rgba(255,255,255,0.8);
@@ -846,22 +857,17 @@ tbody tr:last-child td { border-bottom: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
-
-.header-inner { justify-content: center; }
-.header-logo { height: 36px; object-fit: contain; }
 </style>
 </head>
 <body>
 <div class="app-wrapper">
 
   <!-- HEADER -->
-  
-<header class="site-header">
-  <div class="header-inner">
-    <img src="logo.png" alt="PropAnalytics Logo" class="header-logo">
-  </div>
-</header>
-
+  <header class="site-header">
+    <div class="header-inner header-inner-logo-only">
+      <img src="logo.png" alt="PropAnalytics Logo" class="header-logo">
+    </div>
+  </header>
 
   <!-- MAIN -->
   <main class="main-content">
