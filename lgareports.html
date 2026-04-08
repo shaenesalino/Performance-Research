@@ -2392,6 +2392,200 @@ tbody tr:last-child td { border-bottom: none; }
   word-break: break-word !important;
 }
 
+
+/* ============================================================
+   LGA SEARCHABLE COMBO
+   ============================================================ */
+.lga-combo {
+  position: relative;
+}
+.lga-search-input {
+  width: 100%;
+  height: 46px;
+  min-height: 46px;
+  padding: 0 36px 0 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: #f7fbfc;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  /* show a dropdown arrow via bg image */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235c7b80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.lga-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(42,173,187,0.12);
+  cursor: text;
+}
+.lga-search-input.has-value {
+  background-image: none;
+  padding-right: 34px;
+}
+.lga-clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--border);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+  transition: background var(--transition);
+}
+.lga-clear-btn:hover { background: var(--border); color: var(--accent); }
+.lga-combo.has-value .lga-clear-btn { display: flex; }
+
+.lga-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 200;
+}
+.lga-dropdown.open { display: block; }
+.lga-option {
+  padding: 9px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+.lga-option:last-child { border-bottom: none; }
+.lga-option:hover, .lga-option.active { background: var(--bg-subtle); color: var(--accent); }
+.lga-option.selected { font-weight: 600; color: var(--accent); }
+.lga-option-empty {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-light);
+  font-style: italic;
+}
+.lga-option mark {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ============================================================
+   CUSTOM SELECT COMBO (State, Timeframe, Aggregation)
+   ============================================================ */
+.custom-select-combo {
+  position: relative;
+}
+.custom-select-trigger {
+  appearance: none;
+  background: #f7fbfc;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 0 40px 0 14px;
+  height: 46px;
+  min-height: 46px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235c7b80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.custom-select-trigger:hover {
+  border-color: var(--primary);
+}
+.custom-select-combo.open .custom-select-trigger {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(42,173,187,0.12);
+}
+.custom-select-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 200;
+}
+.custom-select-combo.open .custom-select-dropdown { display: block; }
+.custom-select-option {
+  padding: 9px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+.custom-select-option:last-child { border-bottom: none; }
+.custom-select-option:hover { background: var(--bg-subtle); color: var(--accent); }
+.custom-select-option.selected {
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+/* ============================================================
+   METRIC SEARCH (inside multi-check-panel)
+   ============================================================ */
+.metric-search-wrap {
+  padding: 6px 6px 8px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 8px;
+}
+.metric-search-input {
+  width: 100%;
+  padding: 7px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-subtle);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.metric-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(42,173,187,0.12);
+}
+.metric-search-input::placeholder { color: var(--text-light); }
+.metric-options-list { /* just a wrapper for JS filtering */ }
 </style>
 </head>
 <body>
@@ -2429,24 +2623,36 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="hero-config-grid-custom">
             <div class="hero-config-row-2">
               <div class="field-group">
-                <label class="field-label" for="stateSelect">STATE</label>
-                <select class="field-select" id="stateSelect">
+                <label class="field-label">STATE</label>
+                <div class="custom-select-combo" id="stateCombo" data-select-id="stateSelect">
+                  <button type="button" class="custom-select-trigger" id="stateSelectTrigger">All States</button>
+                  <div class="custom-select-dropdown" id="stateSelectDropdown"></div>
+                </div>
+                <select id="stateSelect" style="display:none;">
                   <option value="">All States</option>
                 </select>
               </div>
 
               <div class="field-group">
-                <label class="field-label" for="lgaSelect">LGA / REGION</label>
-                <select class="field-select" id="lgaSelect">
-                  <option value="">— Select LGA —</option>
-                </select>
+                <label class="field-label" for="lgaSearch">LGA / REGION</label>
+                <div class="lga-combo" id="lgaCombo">
+                  <input type="text" class="field-input lga-search-input" id="lgaSearch"
+                    placeholder="Search or select LGA…" autocomplete="off" spellcheck="false">
+                  <div class="lga-dropdown" id="lgaDropdown"></div>
+                </div>
+                <!-- hidden select keeps the rest of the app working unchanged -->
+                <select id="lgaSelect" style="display:none;"></select>
               </div>
             </div>
 
             <div class="hero-config-row-2">
               <div class="field-group">
-                <label class="field-label" for="timeframeSelect">TIMEFRAME</label>
-                <select class="field-select" id="timeframeSelect">
+                <label class="field-label">TIMEFRAME</label>
+                <div class="custom-select-combo" id="timeframeCombo" data-select-id="timeframeSelect">
+                  <button type="button" class="custom-select-trigger" id="timeframeSelectTrigger">MAX</button>
+                  <div class="custom-select-dropdown" id="timeframeSelectDropdown"></div>
+                </div>
+                <select id="timeframeSelect" style="display:none;">
                   <option value="max">MAX</option>
                   <option value="30y">30 years</option>
                   <option value="25y">25 years</option>
@@ -2459,8 +2665,12 @@ tbody tr:last-child td { border-bottom: none; }
               </div>
 
               <div class="field-group">
-                <label class="field-label" for="aggregationSelect">AGGREGATION</label>
-                <select class="field-select" id="aggregationSelect">
+                <label class="field-label">AGGREGATION</label>
+                <div class="custom-select-combo" id="aggregationCombo" data-select-id="aggregationSelect">
+                  <button type="button" class="custom-select-trigger" id="aggregationSelectTrigger">Monthly</button>
+                  <div class="custom-select-dropdown" id="aggregationSelectDropdown"></div>
+                </div>
+                <select id="aggregationSelect" style="display:none;">
                   <option value="monthly">Monthly</option>
                   <option value="yearly">Yearly</option>
                 </select>
@@ -3142,7 +3352,12 @@ function addCustomChart(config = {}) {
         <div class="multi-check-dropdown" id="metricDropdown_${id}">
           <button type="button" class="multi-check-trigger" id="metricTrigger_${id}">${getMetricSummaryText(selectedMetrics)}</button>
           <div class="multi-check-panel">
-            ${getMetricAxisOptionsHtml(selectedMetrics, axisMap)}
+            <div class="metric-search-wrap">
+              <input type="text" class="metric-search-input" placeholder="Search metrics…" autocomplete="off">
+            </div>
+            <div class="metric-options-list">
+              ${getMetricAxisOptionsHtml(selectedMetrics, axisMap)}
+            </div>
           </div>
         </div>
       </div>
@@ -3181,6 +3396,21 @@ function addCustomChart(config = {}) {
   card.querySelectorAll('.metric-axis-checkbox').forEach(cb => {
     cb.addEventListener('change', () => { refreshMetricSummary(id); renderOneCustomChart(id); });
   });
+
+  // Metric search filter
+  const metricSearchInput = card.querySelector('.metric-search-input');
+  const metricOptionsList = card.querySelector('.metric-options-list');
+  if (metricSearchInput && metricOptionsList) {
+    metricSearchInput.addEventListener('input', () => {
+      const q = metricSearchInput.value.trim().toLowerCase();
+      card.querySelectorAll('.metric-axis-option').forEach(opt => {
+        const name = opt.querySelector('.metric-axis-name')?.textContent?.toLowerCase() || '';
+        opt.style.display = (!q || name.includes(q)) ? '' : 'none';
+      });
+    });
+    // Prevent dropdown close when clicking search input
+    metricSearchInput.addEventListener('click', e => e.stopPropagation());
+  }
   card.querySelectorAll('[data-axis-btn]').forEach(btn => {
     btn.addEventListener('click', () => {
       const metricKey = btn.dataset.axisBtn;
@@ -3548,11 +3778,16 @@ function populateFilters(data) {
     states.map(s => `<option value="${encodeHtml(s)}">${encodeHtml(s)}</option>`).join('');
 
   populateLgaOptions(data, stateSelect.value);
+  // Rebuild state custom combo after options are populated
+  if (typeof _stateCS !== 'undefined' && _stateCS) _stateCS.rebuild();
 }
+
+// All LGAs available for current state filter (used by combo)
+let _lgaList = [];
 
 function populateLgaOptions(data, selectedState = '') {
   const lgaSelect = document.getElementById('lgaSelect');
-  const lgas = [...new Set(
+  _lgaList = [...new Set(
     data
       .filter(r => !selectedState || r.state === selectedState)
       .map(r => r.lga)
@@ -3561,7 +3796,16 @@ function populateLgaOptions(data, selectedState = '') {
 
   lgaSelect.innerHTML =
     '<option value="">— Select LGA —</option>' +
-    lgas.map(l => `<option value="${encodeHtml(l)}">${encodeHtml(l)}</option>`).join('');
+    _lgaList.map(l => `<option value="${encodeHtml(l)}">${encodeHtml(l)}</option>`).join('');
+
+  // Reset combo input when list changes
+  const searchInput = document.getElementById('lgaSearch');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.placeholder = `Search or select LGA… (${_lgaList.length})`;
+    document.getElementById('lgaCombo')?.classList.remove('has-value');
+  }
+  closeLgaDropdown();
 }
 
 function encodeHtml(s) {
@@ -4128,12 +4372,217 @@ function downloadReportPDF() {
   }, 150);
 }
 
+
+// ----------------------------------------------------------------
+// LGA SEARCHABLE COMBO LOGIC
+// ----------------------------------------------------------------
+let _lgaActiveIdx = -1;
+
+function buildLgaDropdown(query) {
+  const dropdown = document.getElementById('lgaDropdown');
+  const lgaSelect = document.getElementById('lgaSelect');
+  if (!dropdown) return;
+
+  const q = (query || '').trim().toLowerCase();
+  const filtered = q
+    ? _lgaList.filter(l => l.toLowerCase().includes(q))
+    : _lgaList;
+
+  _lgaActiveIdx = -1;
+
+  if (filtered.length === 0) {
+    dropdown.innerHTML = `<div class="lga-option-empty">No LGAs match "${query}"</div>`;
+    dropdown.classList.add('open');
+    return;
+  }
+
+  const currentVal = lgaSelect.value;
+  dropdown.innerHTML = filtered.map(l => {
+    const isSelected = l === currentVal ? ' selected' : '';
+    if (q) {
+      // Highlight matching substring
+      const idx = l.toLowerCase().indexOf(q);
+      const hi = encodeHtml(l.slice(0, idx))
+               + '<mark>' + encodeHtml(l.slice(idx, idx + q.length)) + '</mark>'
+               + encodeHtml(l.slice(idx + q.length));
+      return `<div class="lga-option${isSelected}" data-value="${encodeHtml(l)}">${hi}</div>`;
+    }
+    return `<div class="lga-option${isSelected}" data-value="${encodeHtml(l)}">${encodeHtml(l)}</div>`;
+  }).join('');
+
+  dropdown.classList.add('open');
+}
+
+function selectLgaOption(value, label) {
+  const lgaSelect = document.getElementById('lgaSelect');
+  const searchInput = document.getElementById('lgaSearch');
+  const combo = document.getElementById('lgaCombo');
+
+  lgaSelect.value = value;
+  if (searchInput) searchInput.value = label;
+  if (combo) combo.classList.toggle('has-value', !!value);
+  closeLgaDropdown();
+}
+
+function closeLgaDropdown() {
+  const dropdown = document.getElementById('lgaDropdown');
+  if (dropdown) dropdown.classList.remove('open');
+  _lgaActiveIdx = -1;
+}
+
+function initLgaCombo() {
+  const searchInput = document.getElementById('lgaSearch');
+  const dropdown    = document.getElementById('lgaDropdown');
+  const combo       = document.getElementById('lgaCombo');
+  if (!searchInput || !dropdown) return;
+
+  // Open dropdown on focus / click
+  searchInput.addEventListener('focus', () => buildLgaDropdown(searchInput.value));
+  searchInput.addEventListener('click', () => buildLgaDropdown(searchInput.value));
+
+  // Filter as user types
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    combo.classList.toggle('has-value', !!q);
+    buildLgaDropdown(q);
+  });
+
+  // Keyboard navigation
+  searchInput.addEventListener('keydown', (e) => {
+    const items = dropdown.querySelectorAll('.lga-option');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _lgaActiveIdx = Math.min(_lgaActiveIdx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _lgaActiveIdx = Math.max(_lgaActiveIdx - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (_lgaActiveIdx >= 0 && items[_lgaActiveIdx]) {
+        const v = items[_lgaActiveIdx].dataset.value;
+        selectLgaOption(v, v);
+      }
+      return;
+    } else if (e.key === 'Escape') {
+      closeLgaDropdown();
+      searchInput.blur();
+      return;
+    } else {
+      return;
+    }
+    items.forEach((el, i) => el.classList.toggle('active', i === _lgaActiveIdx));
+    if (items[_lgaActiveIdx]) items[_lgaActiveIdx].scrollIntoView({ block: 'nearest' });
+  });
+
+  // Click on option
+  dropdown.addEventListener('mousedown', (e) => {
+    e.preventDefault(); // prevent input blur before click fires
+    const opt = e.target.closest('.lga-option');
+    if (!opt) return;
+    const v = opt.dataset.value;
+    selectLgaOption(v, v);
+  });
+
+  // Close when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!combo.contains(e.target)) closeLgaDropdown();
+  });
+}
+
+
+// ----------------------------------------------------------------
+// CUSTOM SELECT COMBO (State, Timeframe, Aggregation)
+// ----------------------------------------------------------------
+class CustomSelect {
+  constructor(comboId, selectId) {
+    this.combo    = document.getElementById(comboId);
+    this.select   = document.getElementById(selectId);
+    this.trigger  = this.combo?.querySelector('.custom-select-trigger');
+    this.dropdown = this.combo?.querySelector('.custom-select-dropdown');
+    if (!this.combo || !this.select || !this.trigger || !this.dropdown) return;
+    this._build();
+    this._bind();
+  }
+
+  // Build dropdown options from the hidden <select>
+  _build() {
+    const opts = [...this.select.options];
+    this.dropdown.innerHTML = opts.map(o => {
+      const sel = o.value === this.select.value ? ' selected' : '';
+      return `<div class="custom-select-option${sel}" data-value="${o.value}">${o.text}</div>`;
+    }).join('');
+    this.trigger.textContent = this.select.options[this.select.selectedIndex]?.text || '';
+  }
+
+  // Rebuild (call after select options change, e.g. after state list populates)
+  rebuild() { this._build(); }
+
+  _bind() {
+    // Toggle open
+    this.trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Close all other custom selects
+      document.querySelectorAll('.custom-select-combo.open').forEach(el => {
+        if (el !== this.combo) el.classList.remove('open');
+      });
+      this.combo.classList.toggle('open');
+    });
+
+    // Click option
+    this.dropdown.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const opt = e.target.closest('.custom-select-option');
+      if (!opt) return;
+      this._select(opt.dataset.value, opt.textContent);
+      // Fire change event on hidden select so existing listeners fire
+      this.select.dispatchEvent(new Event('change'));
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!this.combo.contains(e.target)) this.combo.classList.remove('open');
+    });
+
+    // Keyboard
+    this.trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.combo.classList.toggle('open'); }
+      if (e.key === 'Escape') this.combo.classList.remove('open');
+    });
+  }
+
+  _select(value, text) {
+    this.select.value = value;
+    this.trigger.textContent = text;
+    this.combo.classList.remove('open');
+    this.dropdown.querySelectorAll('.custom-select-option').forEach(o => {
+      o.classList.toggle('selected', o.dataset.value === value);
+    });
+  }
+
+  // Set selected value programmatically
+  setValue(value) {
+    const opt = this.dropdown.querySelector(`[data-value="${value}"]`);
+    if (opt) this._select(value, opt.textContent);
+  }
+}
+
+let _stateCS, _timeframeCS, _aggregationCS;
+
+function initCustomSelects() {
+  _stateCS       = new CustomSelect('stateCombo',       'stateSelect');
+  _timeframeCS   = new CustomSelect('timeframeCombo',   'timeframeSelect');
+  _aggregationCS = new CustomSelect('aggregationCombo', 'aggregationSelect');
+}
+
 // ----------------------------------------------------------------
 // INIT — auto-fetch on page load
 // ----------------------------------------------------------------
 (function init() {
   const generateBtn = document.getElementById('generateBtn');
   generateBtn.addEventListener('click', generateReport);
+  initLgaCombo();
+  initCustomSelects();
 
   const addChartBtn = document.getElementById('addChartBtn');
   if (addChartBtn) addChartBtn.addEventListener('click', () => addCustomChart());
