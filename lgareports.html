@@ -481,8 +481,8 @@ body {
 /* ============================================================
    FILTER SECTION
    ============================================================ */
-.filter-section { display: none; margin-top: 48px; }
-.filter-section.visible { display: block; }
+.filter-section { display: none !important; margin-top: 0 !important; }
+.filter-section.visible { display: none !important; }
 
 .filter-card {
   background: var(--bg-card);
@@ -1993,7 +1993,15 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width:700px){ .snapshot-grid{grid-template-columns:1fr;} .default-charts-grid .chart-container{height:280px;} .custom-chart-card .chart-container.tall{height:300px;} }
 
 
-/* final alignment refinements */
+/* Safe final polish */
+.hero.hero-slim.hero-split{
+  padding-bottom: 0 !important;
+}
+.report-section{
+  display: none;
+  margin-top: 0 !important;
+  width: 100%;
+}
 .report-content-wrap{
   max-width: 1320px;
   margin: 0 auto;
@@ -2008,42 +2016,235 @@ tbody tr:last-child td { border-bottom: none; }
   margin-left: auto;
   margin-right: auto;
 }
+.snapshot-grid{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.snapshot-card{
+  padding: 18px 20px;
+}
+.snapshot-split{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.snapshot-split > div + div{
+  border-left: 1px solid var(--border-light);
+  padding-left: 18px;
+}
+.default-charts-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+.default-charts-grid .chart-card{
+  padding: 22px 24px 18px;
+}
+.default-charts-grid .chart-container{
+  height: 320px !important;
+}
+.custom-charts-container{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  margin-bottom: 16px;
+}
 .custom-charts-toolbar{
-  margin-top: 8px;
-  margin-bottom: 20px;
+  display: flex;
+  justify-content: flex-start;
+  margin: 8px auto 20px;
+}
+.custom-chart-card{
+  padding: 20px 22px 18px;
+}
+.custom-chart-card .chart-container.tall{
+  height: 340px !important;
+}
+.custom-chart-header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
 }
 .custom-chart-header-left{
-  display:none;
+  display: none !important;
 }
-.chart-title[contenteditable="true"],
-.chart-desc[contenteditable="true"]{
+.custom-chart-actions{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.custom-chart-controls{
+  display: grid;
+  grid-template-columns: minmax(300px, 1.4fr) 220px;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+.chart-title.editable-chart-text,
+.chart-desc.editable-chart-text{
   padding-left: 8px;
   padding-right: 8px;
-  min-height: 28px;
-  display: inline-block;
+  border-radius: 6px;
 }
-.chart-desc[contenteditable="true"]{
-  display:block;
-  min-height: 24px;
+.chart-title.editable-chart-text[contenteditable="true"]:focus,
+.chart-desc.editable-chart-text[contenteditable="true"]:focus{
+  background: #f7fbfc;
+  box-shadow: inset 0 0 0 1px var(--border);
+  outline: none;
+}
+.chart-title.is-empty:before,
+.chart-desc.is-empty:before{
+  color: var(--text-light);
+  content: attr(data-placeholder);
+}
+.chart-legend-inline{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+.chart-legend-inline .legend-item{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.chart-legend-inline .legend-dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.site-footer{
+  margin-top: auto;
+  border-top: 1px solid var(--border-light);
+  padding: 24px 32px 28px;
+  background: var(--bg-card);
 }
 .footer-disclaimer{
-  max-width: 1320px;
+  max-width: 760px;
   margin: 0 auto;
   width: 100%;
 }
+.footer-text{
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 14px;
+}
+.footer-head{
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
 .footer-body{
-  display: block;
   width: 100%;
-  max-width: 1320px;
+  max-width: 760px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-light);
   white-space: normal !important;
-  overflow-wrap: break-word !important;
   word-break: normal !important;
+  overflow-wrap: break-word !important;
 }
-
-
 .footer-body p{
-  margin:0;
+  margin: 0;
 }
+@media (max-width: 1200px){
+  .snapshot-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px){
+  .custom-chart-controls{
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px){
+  .snapshot-grid{
+    grid-template-columns: 1fr;
+  }
+  .default-charts-grid .chart-container{
+    height: 280px !important;
+  }
+  .custom-chart-card .chart-container.tall{
+    height: 300px !important;
+  }
+}
+
+
+/* REAL GAP FIX: remove intermediary sections and tighten flow */
+.main-content{
+  padding-bottom: 40px !important;
+}
+.hero,
+.hero.hero-slim,
+.hero.hero-slim.hero-split{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+.hero-copy-panel,
+.region-selection-card{
+  margin-bottom: 0 !important;
+}
+.report-section{
+  display: none;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+.report-section.visible{
+  display: block;
+  margin-top: 0 !important;
+  animation: none !important;
+}
+.report-content-wrap{
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+.report-header{
+  display: block !important;
+  margin-top: 0 !important;
+  margin-bottom: 18px !important;
+}
+.report-title{
+  margin: 0 0 6px 0 !important;
+}
+.report-subtitle{
+  display: none !important;
+}
+.report-meta{
+  display: flex;
+  justify-content: flex-start !important;
+  gap: 8px;
+  margin-top: 0 !important;
+}
+.chart-legend-inline{
+  justify-content: center !important;
+  text-align: center;
+}
+.site-footer{
+  padding-top: 24px !important;
+}
+.footer-disclaimer{
+  max-width: 760px !important;
+}
+.footer-body,
+.footer-body p{
+  max-width: 760px !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
 </style>
 </head>
 <body>
@@ -2131,26 +2332,6 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </section>
 
-    <!-- STATUS BAR (auto-fetch on load) -->
-    <section class="upload-section">
-      <div class="status-bar" id="statusBar">
-        <div class="status-dot" id="statusDot"></div>
-        <span class="status-text" id="statusText">Connecting to database…</span>
-        <span class="status-sub" id="statusSub"></span>
-      </div>
-    </section>
-
-    
-<!-- FILTERS -->
-    <section class="filter-section visible" id="filterSection">
-      <select id="typeSelect" style="display:none"><option value="">All Types</option></select>
-      
-        </div>
-      </div>
-    </section>
-
-    <!-- REPORT -->
-
     <section class="report-section" id="reportSection">
       <div class="report-content-wrap">
 
@@ -2173,6 +2354,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div>
               <div class="chart-title">Median House Price vs Median Unit Price</div>
               <div class="chart-desc">Compare median price levels over time</div>
+              <div class="chart-legend-inline" id="legendHUPrice"></div>
             </div>
           </div>
           <div class="chart-container"><canvas id="chartHUPrice"></canvas></div>
@@ -2183,6 +2365,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div>
               <div class="chart-title">MHP YoY % Change vs MUP YoY % Change</div>
               <div class="chart-desc">Year-over-year price movement comparison</div>
+              <div class="chart-legend-inline" id="legendHUYoY"></div>
             </div>
           </div>
           <div class="chart-container"><canvas id="chartHUYoY"></canvas></div>
@@ -2193,6 +2376,7 @@ tbody tr:last-child td { border-bottom: none; }
             <div>
               <div class="chart-title">Median House & Unit Price vs % Difference</div>
               <div class="chart-desc">Unit price divided by house price</div>
+              <div class="chart-legend-inline" id="legendHUDiff"></div>
             </div>
           </div>
           <div class="chart-container"><canvas id="chartHUDiff"></canvas></div>
@@ -2550,6 +2734,15 @@ function renderSnapshotCards(houseData, unitData) {
   ].join('');
 }
 
+
+function setLegend(elId, items) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = items.map(item => `
+    <span class="legend-item"><span class="legend-dot" style="background:${item.color}"></span>${item.label}</span>
+  `).join('');
+}
+
 function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
   destroyChart('huPrice');
   destroyChart('huYoY');
@@ -2719,7 +2912,7 @@ function addCustomChart(config = {}) {
   card.innerHTML = `
     <div class="custom-chart-header">
       <div class="custom-chart-header-left" id="customHeaderLeft_${id}"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="custom-chart-actions">
         <button class="custom-chart-save" type="button" data-save-chart="${id}">Save</button>
         <button class="custom-chart-edit" type="button" data-edit-chart="${id}" style="display:none;">Edit</button>
         <button class="custom-chart-remove" type="button" data-remove-chart="${id}">Remove</button>
@@ -2748,8 +2941,9 @@ function addCustomChart(config = {}) {
     <div class="chart-card" style="padding:0;border:none;box-shadow:none;background:transparent;">
       <div class="chart-header">
         <div>
-          <div class="chart-title is-empty editable-chart-text" contenteditable="true" data-placeholder="Chart title" id="customChartTitle_${id}">${chartTitle}</div>
-          <div class="chart-desc is-empty editable-chart-text" contenteditable="true" data-placeholder="Chart description" id="customChartDesc_${id}">${chartDescription}</div>
+          <div class="chart-title is-empty editable-chart-text" contenteditable="false" data-placeholder="Chart title" id="customChartTitle_${id}">${chartTitle}</div>
+          <div class="chart-desc is-empty editable-chart-text" contenteditable="false" data-placeholder="Chart description" id="customChartDesc_${id}">${chartDescription}</div>
+          <div class="chart-legend-inline" id="customLegend_${id}"></div>
         </div>
       </div>
       <div class="chart-container tall"><canvas id="customChartCanvas_${id}"></canvas></div>
@@ -2785,6 +2979,7 @@ function addCustomChart(config = {}) {
   const titleEl = card.querySelector(`#customChartTitle_${id}`);
   const descEl = card.querySelector(`#customChartDesc_${id}`);
   [titleEl, descEl].forEach(el => {
+    el.setAttribute('contenteditable', 'true');
     updateEditablePlaceholder(el);
     el.addEventListener('input', () => updateEditablePlaceholder(el));
   });
@@ -2800,11 +2995,18 @@ function saveCustomChart(id) {
   const controls = document.getElementById(`customControls_${id}`);
   if (controls) controls.style.display = 'none';
 
-
   const titleEl = document.getElementById(`customChartTitle_${id}`);
   const descEl = document.getElementById(`customChartDesc_${id}`);
-  if (titleEl && /^Chart\s+\d+$/i.test(titleEl.textContent.trim())) { titleEl.textContent = ''; updateEditablePlaceholder(titleEl); }
-  if (descEl && /^Custom comparison chart$/i.test(descEl.textContent.trim())) { descEl.textContent = ''; updateEditablePlaceholder(descEl); }
+  if (titleEl && /^Chart\s+\d+$/i.test(titleEl.textContent.trim())) {
+    titleEl.textContent = '';
+    updateEditablePlaceholder(titleEl);
+  }
+  if (descEl && /^Custom comparison chart$/i.test(descEl.textContent.trim())) {
+    descEl.textContent = '';
+    updateEditablePlaceholder(descEl);
+  }
+  if (titleEl) titleEl.setAttribute('contenteditable', 'false');
+  if (descEl) descEl.setAttribute('contenteditable', 'false');
 
   const saveBtn = card.querySelector(`[data-save-chart="${id}"]`);
   const editBtn = card.querySelector(`[data-edit-chart="${id}"]`);
@@ -2820,6 +3022,10 @@ function editCustomChart(id) {
   const controls = document.getElementById(`customControls_${id}`);
   if (controls) controls.style.display = '';
 
+  const titleEl = document.getElementById(`customChartTitle_${id}`);
+  const descEl = document.getElementById(`customChartDesc_${id}`);
+  if (titleEl) titleEl.setAttribute('contenteditable', 'true');
+  if (descEl) descEl.setAttribute('contenteditable', 'true');
 
   const saveBtn = card.querySelector(`[data-save-chart="${id}"]`);
   const editBtn = card.querySelector(`[data-edit-chart="${id}"]`);
@@ -2856,6 +3062,8 @@ function renderOneCustomChart(id) {
   const ctx = canvas.getContext('2d');
   const leftMetrics = selectedMetrics.filter(m => (axisMap[m.key] || 'left') === 'left');
   const rightMetrics = selectedMetrics.filter(m => (axisMap[m.key] || 'left') === 'right');
+
+  setLegend(`customLegend_${id}`, selectedMetrics.map(m => ({ label: m.label, color: m.color })));
 
   const datasets = selectedMetrics.map((metric, idx) => {
     const side = axisMap[metric.key] || 'left';
@@ -2900,6 +3108,7 @@ function renderOneCustomChart(id) {
         yLeft: {
           type: 'linear',
           position: 'left',
+          title: { display: leftMetrics.length > 0, text: leftMetrics.map(m => m.shortLabel).join(' / ') },
           title: { display: leftMetrics.length > 0, text: metricAxisLabel(selectedMetrics, axisMap, 'left') },
           grid: { color: '#dff4f6' },
           ticks: { color: '#8aadb2', font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => formatAxisTick(leftType, v) },
@@ -2909,6 +3118,7 @@ function renderOneCustomChart(id) {
           type: 'linear',
           position: 'right',
           display: rightMetrics.length > 0,
+          title: { display: rightMetrics.length > 0, text: rightMetrics.map(m => m.shortLabel).join(' / ') },
           title: { display: rightMetrics.length > 0, text: metricAxisLabel(selectedMetrics, axisMap, 'right') },
           grid: { drawOnChartArea: false },
           ticks: { color: CC.accent, font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => formatAxisTick(rightType, v) },
@@ -3151,19 +3361,17 @@ function generateReport() {
   State.currentView = viewMode;
   State.selectedMetrics = metricKeys;
 
-  const viewLabel = viewMode === 'yearly' ? 'Yearly' : 'Monthly';
   const first = transformed[0];
   const last  = transformed[transformed.length - 1];
+  const firstLabel = first?.monthEnd ? getPeriodLabel(first.monthEnd, viewMode) : '';
+  const lastLabel  = last?.monthEnd ? getPeriodLabel(last.monthEnd, viewMode) : '';
+  const dateRangeLabel = firstLabel && lastLabel ? `${firstLabel} – ${lastLabel}` : '';
 
-  document.getElementById('reportTitle').textContent = lga;
-  document.getElementById('reportSubtitle').textContent = `${state ? state + ' · ' : ''}${viewLabel} · ${transformed.length} data points`;
+  document.getElementById('reportTitle').textContent = `${lga}${state ? ', ' + state : ''}`;
+  document.getElementById('reportSubtitle').textContent = '';
   document.getElementById('reportMeta').innerHTML = [
-    state ? `<span class="meta-chip">${state}</span>` : '',
-    `<span class="meta-chip">${viewLabel}</span>`,
-    first?.monthEnd ? `<span class="meta-chip">${getPeriodLabel(first.monthEnd, viewMode)}</span>` : '',
-    `<span class="meta-chip">→</span>`,
-    last?.monthEnd ? `<span class="meta-chip">${getPeriodLabel(last.monthEnd, viewMode)}</span>` : '',
-    `<span class="meta-chip">${metricKeys.length} metric${metricKeys.length !== 1 ? 's' : ''}</span>`,
+    dateRangeLabel ? `<span class="meta-chip">${dateRangeLabel}</span>` : '',
+    `<span class="meta-chip">${viewMode === 'yearly' ? 'Yearly' : 'Monthly'}</span>`
   ].filter(Boolean).join('');
 
   renderSnapshotCards(transformedHouse, transformedUnit);
@@ -3174,13 +3382,7 @@ function generateReport() {
   reportEl.classList.remove('visible');
   void reportEl.offsetWidth;
   reportEl.classList.add('visible');
-
-  requestAnimationFrame(() => {
-    setTimeout(() => reportEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  });
-}
-
-// ----------------------------------------------------------------
+}// ----------------------------------------------------------------
 // SUPABASE CONFIG
 
 // ----------------------------------------------------------------
@@ -3348,7 +3550,6 @@ function tryRestore() {
             'success'
           );
           populateFilters(State.rawData);
-          document.getElementById('filterSection').classList.add('visible');
           const note = document.getElementById('configRecordsNote');
           if (note) note.textContent = `${State.rawData.length.toLocaleString()} records loaded`;
           document.getElementById('configRecordsNote').textContent =
@@ -3386,7 +3587,6 @@ function tryRestore() {
       updateHeroStats(rows);
 
       populateFilters(rows);
-      document.getElementById('filterSection').classList.add('visible');
       const note = document.getElementById('configRecordsNote');
       if (note) note.textContent = `${rows.length.toLocaleString()} records loaded`;
       document.getElementById('reportSection').classList.remove('visible');
