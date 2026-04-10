@@ -844,6 +844,13 @@ body {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
+  transition: opacity 0.2s;
+}
+.legend-toggle {
+  user-select: none;
+}
+.legend-toggle:hover {
+  color: var(--accent);
 }
 
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -1634,6 +1641,19 @@ tbody tr:last-child td { border-bottom: none; }
   display:grid;
   grid-template-columns: 1fr 1fr;
   gap:14px;
+}
+.snapshot-split-3{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap:0;
+}
+.snapshot-split-3 > div {
+  padding: 0 14px;
+  border-left: 1px solid var(--border-light);
+}
+.snapshot-split-3 > div:first-child {
+  padding-left: 0;
+  border-left: none;
 }
 .snapshot-mini-label{
   font-size: 11px;
@@ -2715,64 +2735,242 @@ tbody tr:last-child td { border-bottom: none; }
         <div class="chart-card">
           <div class="chart-header">
             <div>
-              <div class="chart-title">Median House Price vs Median Unit Price</div>
-              <div class="chart-desc">Compare median price levels over time</div>
+              <div class="chart-title">Median Price Comparison</div>
+              <div class="chart-desc">Price (3M) bars with unit/house price ratio line</div>
             </div>
             <div class="chart-download-wrap">
               <button class="btn-chart-download" type="button" title="Download chart">
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </button>
               <div class="chart-download-menu">
-                <button type="button" onclick="downloadChartPNG('chartHUPrice','Median_House_vs_Unit_Price',true)">PNG</button>
-                <button type="button" onclick="downloadChartPNG('chartHUPrice','Median_House_vs_Unit_Price',false)">JPG</button>
-                <button type="button" onclick="downloadChartData('huPrice','Median_House_vs_Unit_Price')">CSV</button>
+                <button type="button" onclick="downloadChartPNG('chartDC1','DC1_Median_Price',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC1','DC1_Median_Price',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc1','DC1_Median_Price')">CSV</button>
               </div>
             </div>
           </div>
-          <div class="chart-legend-inline" id="legendHUPrice" style="justify-content:center;margin-bottom:14px;"></div>
-          <div class="chart-container"><canvas id="chartHUPrice"></canvas></div>
+          <div class="chart-legend-inline" id="legendDC1" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC1"></canvas></div>
         </div>
-
         <div class="chart-card">
           <div class="chart-header">
             <div>
-              <div class="chart-title">MHP YoY % Change vs MUP YoY % Change</div>
-              <div class="chart-desc">Year-over-year price movement comparison</div>
+              <div class="chart-title">Year-on-Year Price Movement</div>
+              <div class="chart-desc">MoM % (monthly) or YoY % (yearly) price change</div>
             </div>
             <div class="chart-download-wrap">
               <button class="btn-chart-download" type="button" title="Download chart">
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </button>
               <div class="chart-download-menu">
-                <button type="button" onclick="downloadChartPNG('chartHUYoY','MHP_MUP_YoY_Change',true)">PNG</button>
-                <button type="button" onclick="downloadChartPNG('chartHUYoY','MHP_MUP_YoY_Change',false)">JPG</button>
-                <button type="button" onclick="downloadChartData('huYoY','MHP_MUP_YoY_Change')">CSV</button>
+                <button type="button" onclick="downloadChartPNG('chartDC2','DC2_YoY_Price',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC2','DC2_YoY_Price',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc2','DC2_YoY_Price')">CSV</button>
               </div>
             </div>
           </div>
-          <div class="chart-legend-inline" id="legendHUYoY" style="justify-content:center;margin-bottom:14px;"></div>
-          <div class="chart-container"><canvas id="chartHUYoY"></canvas></div>
+          <div class="chart-legend-inline" id="legendDC2" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC2"></canvas></div>
         </div>
-
         <div class="chart-card">
           <div class="chart-header">
             <div>
-              <div class="chart-title">Median House & Unit Price vs % Difference</div>
-              <div class="chart-desc">Unit price divided by house price</div>
+              <div class="chart-title">House Affordability</div>
+              <div class="chart-desc">Median house price (bar) with affordability index</div>
             </div>
             <div class="chart-download-wrap">
               <button class="btn-chart-download" type="button" title="Download chart">
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </button>
               <div class="chart-download-menu">
-                <button type="button" onclick="downloadChartPNG('chartHUDiff','House_Unit_Price_Diff',true)">PNG</button>
-                <button type="button" onclick="downloadChartPNG('chartHUDiff','House_Unit_Price_Diff',false)">JPG</button>
-                <button type="button" onclick="downloadChartData('huDiff','House_Unit_Price_Diff')">CSV</button>
+                <button type="button" onclick="downloadChartPNG('chartDC3','DC3_House_Afford',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC3','DC3_House_Afford',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc3','DC3_House_Afford')">CSV</button>
               </div>
             </div>
           </div>
-          <div class="chart-legend-inline" id="legendHUDiff" style="justify-content:center;margin-bottom:14px;"></div>
-          <div class="chart-container"><canvas id="chartHUDiff"></canvas></div>
+          <div class="chart-legend-inline" id="legendDC3" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC3"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Unit Affordability</div>
+              <div class="chart-desc">Median unit price (bar) with affordability index</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC4','DC4_Unit_Afford',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC4','DC4_Unit_Afford',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc4','DC4_Unit_Afford')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC4" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC4"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Lending</div>
+              <div class="chart-desc">Median price vs owner-occupier &amp; investor lending</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC5','DC5_Lending',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC5','DC5_Lending',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc5','DC5_Lending')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC5" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC5"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Listings vs Days on Market</div>
+              <div class="chart-desc">Listings 12M (bars) and DOM 12M (lines)</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC6','DC6_Listings_DOM',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC6','DC6_Listings_DOM',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc6','DC6_Listings_DOM')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC6" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC6"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Median Asking Rent</div>
+              <div class="chart-desc">Weekly median rent — House and Unit</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC7','DC7_Rent',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC7','DC7_Rent',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc7','DC7_Rent')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC7" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC7"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Population Growth</div>
+              <div class="chart-desc">Annual growth % — LGA, capital city and state</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC8','DC8_Pop_Growth',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC8','DC8_Pop_Growth',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc8','DC8_Pop_Growth')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC8" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC8"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Dwelling Sales</div>
+              <div class="chart-desc">Sales 12M — House, Unit and combined total</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC9','DC9_Sales',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC9','DC9_Sales',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc9','DC9_Sales')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC9" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC9"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Price to Income</div>
+              <div class="chart-desc">Price-to-income multiple — House and Unit</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC10','DC10_PTI',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC10','DC10_PTI',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc10','DC10_PTI')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC10" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC10"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Rent to Income &amp; Affordability</div>
+              <div class="chart-desc">Rent-to-income and affordability index</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC11','DC11_RTI',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC11','DC11_RTI',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc11','DC11_RTI')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC11" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC11"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Gross Yield</div>
+              <div class="chart-desc">Gross yield (House &amp; Unit) vs cash rate &amp; bank rate</div>
+            </div>
+            <div class="chart-download-wrap">
+              <button class="btn-chart-download" type="button" title="Download chart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <div class="chart-download-menu">
+                <button type="button" onclick="downloadChartPNG('chartDC12','DC12_GrossYield',true)">PNG</button>
+                <button type="button" onclick="downloadChartPNG('chartDC12','DC12_GrossYield',false)">JPG</button>
+                <button type="button" onclick="downloadChartData('dc12','DC12_GrossYield')">CSV</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-legend-inline" id="legendDC12" style="justify-content:center;margin-bottom:14px;"></div>
+          <div class="chart-container"><canvas id="chartDC12"></canvas></div>
         </div>
       </div>
 
@@ -2813,6 +3011,8 @@ const State = {
   filteredData:    [],
   filteredHouse:   [],
   filteredUnit:    [],
+  populationData:  [],   // rows from population_data table
+  nationalData:    [],   // rows from national_state_data table
   charts:          {},
   currentView:     'monthly',
   selectedMetrics: [],
@@ -2892,12 +3092,29 @@ const CC = {
 const METRIC_DEFS = [
   { key: 'medPrice12', label: 'Median Price (12M)', shortLabel: 'Median Price', note: 'Snapshot', type: 'currency', color: CC.primary, primary: true, sub: '12-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
   { key: 'medPrice3', label: 'Median Price (3M)', shortLabel: 'Median Price 3M', note: 'Recent', type: 'currency', color: CC.accent, sub: '3-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'pct25',     label: 'P25 Price (12M)',   shortLabel: 'P25 Price',      note: 'Lower quartile', type: 'currency', color: CC.mint,  sub: '25th percentile', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'pct75',     label: 'P75 Price (12M)',   shortLabel: 'P75 Price',      note: 'Upper quartile', type: 'currency', color: CC.plum,  sub: '75th percentile', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'momMedianPriceChange', label: 'MoM Price Change (%)', shortLabel: 'MoM Chg', note: 'Month-on-month', type: 'pct', color: CC.amber, sub: 'median price', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>` },
+  { key: 'yoyMedianPriceChange', label: 'YoY Price Change (%)', shortLabel: 'YoY Chg', note: 'Year-on-year',   type: 'pct', color: CC.coral, sub: 'median price', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>` },
+  { key: 'affordabilityIndex12', label: 'Affordability Index (12M)', shortLabel: 'Afford. (12M)', note: 'Ratio', type: 'ratio', color: CC.slate, sub: '12-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>` },
+  { key: 'affordabilityIndex3',  label: 'Affordability Index (3M)',  shortLabel: 'Afford. (3M)',  note: 'Ratio', type: 'ratio', color: CC.light, sub: '3-month',  icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>` },
+  { key: 'price12mToIncome',  label: 'Price-to-Income (12M)', shortLabel: 'PTI (12M)', note: 'Multiple', type: 'ratio', color: CC.amber, sub: '12-month price', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { key: 'price3mToIncome',   label: 'Price-to-Income (3M)',  shortLabel: 'PTI (3M)',  note: 'Multiple', type: 'ratio', color: CC.plum,  sub: '3-month price',  icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { key: 'rent12mToIncome',   label: 'Rent-to-Income (12M)',  shortLabel: 'RTI (12M)', note: 'Multiple', type: 'ratio', color: CC.mint,  sub: 'rental burden',  icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
   { key: 'sales12', label: 'Sales (12M)', shortLabel: 'Sales', note: 'Rolling total', type: 'count', color: CC.plum, sub: '12-month total', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
   { key: 'sales1', label: 'Sales (1M)', shortLabel: 'Sales 1M', note: 'Recent month', type: 'count', color: CC.coral, sub: '1-month total', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+  { key: 'totalProperties', label: 'Total Properties', shortLabel: 'Total Props', note: 'Stock count', type: 'count', color: CC.slate, sub: 'total stock', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>` },
   { key: 'listings12', label: 'Listings (12M)', shortLabel: 'Listings', note: 'Market supply', type: 'count', color: CC.mint, sub: '12-month count', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>` },
   { key: 'listings1', label: 'Listings (1M)', shortLabel: 'Listings 1M', note: 'Active month', type: 'count', color: CC.light, sub: '1-month count', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>` },
+  { key: 'rentalList12', label: 'Rental Listings (12M)', shortLabel: 'Rental Listings', note: 'Rental supply', type: 'count', color: CC.amber, sub: '12-month count', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>` },
   { key: 'medRent', label: 'Median Rent', shortLabel: 'Median Rent', note: 'Per week', type: 'currency', color: CC.amber, sub: '12-month / week', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
   { key: 'dom', label: 'Days on Market', shortLabel: 'DOM', note: 'Median days', type: 'days', color: CC.slate, sub: 'median', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>` },
+  // National/state metrics (joined at render time from State.nationalData)
+  { key: 'cashRate',             label: 'Cash Rate (%)',          shortLabel: 'Cash Rate',    note: 'RBA rate',        type: 'pct',   color: CC.coral,  sub: 'national', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { key: 'bankRate',             label: 'Bank Rate (%)',          shortLabel: 'Bank Rate',    note: 'Standard rate',   type: 'pct',   color: CC.plum,   sub: 'national', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { key: 'medianIncome',         label: 'Median Income ($)',      shortLabel: 'Med. Income',  note: 'Annual',          type: 'currency', color: CC.mint, sub: 'annual income', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
+  { key: 'lendingOwnerOccupier', label: 'Lending – Owner Occ. ($)', shortLabel: 'OO Lending', note: 'Finance value',  type: 'currency', color: CC.primary, sub: 'owner-occupier', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'lendingInvestor',      label: 'Lending – Investor ($)', shortLabel: 'Inv. Lending', note: 'Finance value',  type: 'currency', color: CC.accent, sub: 'investor',       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
 ];
 
 const DEFAULT_METRICS = ['medPrice12', 'sales12', 'medRent'];
@@ -2977,7 +3194,9 @@ function formatMetricValue(metric, value) {
   const n = safeNum(value);
   if (n == null) return '—';
   if (metric.type === 'currency') return formatCurrency(n);
-  if (metric.type === 'days') return Math.round(n) + 'd';
+  if (metric.type === 'days')     return Math.round(n) + 'd';
+  if (metric.type === 'pct')      return n.toFixed(2) + '%';
+  if (metric.type === 'ratio')    return n.toFixed(2) + 'x';
   return formatNumber(n);
 }
 
@@ -2989,7 +3208,9 @@ function formatAxisTick(metricType, value) {
     if (Math.abs(n) >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
     return '$' + n;
   }
-  if (metricType === 'days') return Math.round(n) + 'd';
+  if (metricType === 'days')  return Math.round(n) + 'd';
+  if (metricType === 'pct')   return n.toFixed(1) + '%';
+  if (metricType === 'ratio') return n.toFixed(1) + 'x';
   if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + 'M';
   if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(0) + 'K';
   return formatNumber(n);
@@ -3099,140 +3320,832 @@ function calculateYoYMap(data, key, viewMode) {
   return out;
 }
 
-function renderSnapshotCards(houseData, unitData) {
+function renderSnapshotCards(houseData, unitData, lga, state) {
   const latestHouse = houseData.length ? houseData[houseData.length - 1] : null;
   const latestUnit  = unitData.length ? unitData[unitData.length - 1] : null;
   const grid = document.getElementById('snapshotGrid');
 
-  const dualValueCard = (label, houseValue, unitValue, subHouse = 'House', subUnit = 'Unit') => `
+  // Population
+  const popRow = getLatestPopulation(lga, state);
+
+  // National/state (rates, income)
+  const natRow = getLatestNationalState(state);
+
+  // ── CAGR: computed from full unfiltered data (all Dec records) ──────────
+  // For each property type, find the oldest and newest December month_end rows
+  function computeDecCAGR(propType) {
+    const allRows = filterData(State.rawData, state, lga, propType)
+      .filter(r => r.monthEnd && r.monthEnd.getMonth() === 11 && safeNum(r.medPrice12) != null)
+      .sort((a, b) => a.monthEnd - b.monthEnd);
+    if (allRows.length < 2) return null;
+    const oldest = allRows[0];
+    const newest = allRows[allRows.length - 1];
+    const years  = newest.monthEnd.getFullYear() - oldest.monthEnd.getFullYear();
+    if (years <= 0) return null;
+    return (Math.pow(newest.medPrice12 / oldest.medPrice12, 1 / years) - 1) * 100;
+  }
+  const cagrHouse = computeDecCAGR('H');
+  const cagrUnit  = computeDecCAGR('U');
+
+  // Full unfiltered Dec series for CAGR sub-label (year range)
+  function cagrYearRange(propType) {
+    const rows = filterData(State.rawData, state, lga, propType)
+      .filter(r => r.monthEnd && r.monthEnd.getMonth() === 11 && safeNum(r.medPrice12) != null)
+      .sort((a, b) => a.monthEnd - b.monthEnd);
+    if (rows.length < 2) return '';
+    return `${rows[0].monthEnd.getFullYear()} – ${rows[rows.length - 1].monthEnd.getFullYear()}`;
+  }
+  const cagrRangeHouse = cagrYearRange('H');
+  const cagrRangeUnit  = cagrYearRange('U');
+
+  // ── Gross Yield: (annual rent / price) × 100 ─────────────────────────────
+  // medRent is weekly → annualise × 52
+  function grossYield(row) {
+    const price = safeNum(row?.medPrice12);
+    const rent  = safeNum(row?.medRent);
+    if (!price || !rent || price === 0) return null;
+    return ((rent * 52) / price) * 100;
+  }
+  const yieldHouse = grossYield(latestHouse);
+  const yieldUnit  = grossYield(latestUnit);
+
+  // ── Lookups ───────────────────────────────────────────────────────────────
+  const CAPITAL_CITY = {
+    'NSW': 'Greater Sydney',  'VIC': 'Greater Melbourne', 'QLD': 'Greater Brisbane',
+    'SA':  'Greater Adelaide', 'WA': 'Greater Perth',     'TAS': 'Greater Hobart',
+    'ACT': 'Canberra',         'NT': 'Darwin',
+  };
+  const STATE_NAMES = {
+    'NSW': 'New South Wales',          'VIC': 'Victoria',        'QLD': 'Queensland',
+    'SA':  'South Australia',          'WA':  'Western Australia','TAS': 'Tasmania',
+    'ACT': 'Australian Capital Territory', 'NT': 'Northern Territory',
+  };
+
+  const popRowState  = popRow?.state || state;
+  const lgaLabel     = lga || 'LGA';
+  const capitalLabel = CAPITAL_CITY[popRowState] || (popRowState ? `${popRowState} Capital` : 'Capital City');
+  const stateLabel   = STATE_NAMES[popRowState]  || popRowState || 'State';
+
+  // ── Format helpers ────────────────────────────────────────────────────────
+  const fmtPct    = v => v != null ? Number(v).toFixed(2) + '%' : '—';
+  const fmtGrowth = v => v != null ? (Number(v) >= 0 ? '+' : '') + Number(v).toFixed(2) + '%' : '—';
+  const fmtCAGR   = v => v != null ? (Number(v) >= 0 ? '+' : '') + Number(v).toFixed(1) + '% p.a.' : '—';
+  const fmtYield  = v => v != null ? Number(v).toFixed(2) + '%' : '—';
+  const fmtDom    = v => safeNum(v) != null ? Math.round(Number(v)) + ' days' : '—';
+  const fmtRentWk = v => safeNum(v) != null ? formatCurrency(v) + '/wk' : '—';
+
+  // ── Card templates ────────────────────────────────────────────────────────
+  const dualCard = (label, hVal, uVal, hSub = 'House', uSub = 'Unit') => `
     <div class="snapshot-card">
       <div class="snapshot-label">${label}</div>
       <div class="snapshot-split">
+        <div><div class="snapshot-value">${hVal}</div><div class="snapshot-mini-label">${hSub}</div></div>
+        <div><div class="snapshot-value">${uVal}</div><div class="snapshot-mini-label">${uSub}</div></div>
+      </div>
+    </div>`;
+
+  const triCard = (label, v1, s1, v2, s2, v3, s3) => `
+    <div class="snapshot-card">
+      <div class="snapshot-label">${label}</div>
+      <div class="snapshot-split-3">
+        <div><div class="snapshot-value">${v1}</div><div class="snapshot-mini-label">${s1}</div></div>
+        <div><div class="snapshot-value">${v2}</div><div class="snapshot-mini-label">${s2}</div></div>
+        <div><div class="snapshot-value">${v3}</div><div class="snapshot-mini-label">${s3}</div></div>
+      </div>
+    </div>`;
+
+  // ── Population values ────────────────────────────────────────────────────
+  const lgaPopVal   = popRow?.lgaPopulation         != null ? Number(popRow.lgaPopulation).toLocaleString()         : '—';
+  const capPopVal   = popRow?.capitalCityPopulation != null ? Number(popRow.capitalCityPopulation).toLocaleString() : '—';
+  const statePopVal = popRow?.statePopulation       != null ? Number(popRow.statePopulation).toLocaleString()       : '—';
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  grid.innerHTML = [
+
+    // 1. Macro rates + state median income
+    `<div class="snapshot-card">
+      <div class="snapshot-label">Rates &amp; Income</div>
+      <div class="snapshot-split-3">
+        <div><div class="snapshot-value">${fmtPct(natRow?.bankRate)}</div><div class="snapshot-mini-label">Bank Rate</div></div>
+        <div><div class="snapshot-value">${fmtPct(natRow?.cashRate)}</div><div class="snapshot-mini-label">Cash Rate</div></div>
+        <div><div class="snapshot-value">${natRow?.medianIncome != null ? formatCurrency(natRow.medianIncome) : '—'}</div><div class="snapshot-mini-label">State Med. Income</div></div>
+      </div>
+    </div>`,
+
+    // 2. Median Price 12M Long-Term CAGR
+    `<div class="snapshot-card">
+      <div class="snapshot-label">Median Price 12M — Long-Term CAGR</div>
+      <div class="snapshot-split">
         <div>
-          <div class="snapshot-value">${houseValue}</div>
-          <div class="snapshot-mini-label">${subHouse}</div>
+          <div class="snapshot-value">${fmtCAGR(cagrHouse)}</div>
+          <div class="snapshot-mini-label">House${cagrRangeHouse ? ' · ' + cagrRangeHouse : ''}</div>
         </div>
         <div>
-          <div class="snapshot-value">${unitValue}</div>
-          <div class="snapshot-mini-label">${subUnit}</div>
+          <div class="snapshot-value">${fmtCAGR(cagrUnit)}</div>
+          <div class="snapshot-mini-label">Unit${cagrRangeUnit ? ' · ' + cagrRangeUnit : ''}</div>
         </div>
       </div>
-    </div>
-  `;
-
-  grid.innerHTML = [
-    `<div class="snapshot-card">
-      <div class="snapshot-label">Population</div>
-      <div class="snapshot-value">—</div>
-      <div class="snapshot-sub">To be added</div>
     </div>`,
-    dualValueCard('Median Price', formatCurrency(latestHouse?.medPrice12), formatCurrency(latestUnit?.medPrice12)),
-    dualValueCard('Median Days on Market', safeNum(latestHouse?.dom) != null ? Math.round(latestHouse.dom) + 'd' : '—', safeNum(latestUnit?.dom) != null ? Math.round(latestUnit.dom) + 'd' : '—'),
-    dualValueCard('Median Asking Rent', safeNum(latestHouse?.medRent) != null ? formatCurrency(latestHouse.medRent) + '/wk' : '—', safeNum(latestUnit?.medRent) != null ? formatCurrency(latestUnit.medRent) + '/wk' : '—'),
+
+    // 3. Median Price 3M
+    dualCard('Median Price (3M)',
+      formatCurrency(latestHouse?.medPrice3),
+      formatCurrency(latestUnit?.medPrice3)),
+
+    // 4. Median Asking Rent 12M
+    dualCard('Median Asking Rent (12M)',
+      fmtRentWk(latestHouse?.medRent),
+      fmtRentWk(latestUnit?.medRent)),
+
+    // 5. Listings 12M
+    dualCard('Listings (12M)',
+      formatNumber(latestHouse?.listings12),
+      formatNumber(latestUnit?.listings12)),
+
+    // 6. Rental Listings 12M
+    dualCard('Rental Listings (12M)',
+      formatNumber(latestHouse?.rentalList12),
+      formatNumber(latestUnit?.rentalList12)),
+
+    // 7. Median Days on Market
+    dualCard('Median Days on Market',
+      fmtDom(latestHouse?.dom),
+      fmtDom(latestUnit?.dom)),
+
+    // 8. Gross Yield
+    dualCard('Gross Yield',
+      fmtYield(yieldHouse),
+      fmtYield(yieldUnit)),
+
+    // 9. Population
+    triCard('Population',
+      lgaPopVal,   lgaLabel,
+      capPopVal,   capitalLabel,
+      statePopVal, stateLabel),
+
+    // 10. YoY Population Growth
+    triCard('YoY Pop. Growth',
+      fmtGrowth(popRow?.lgaPopGrowth),         lgaLabel,
+      fmtGrowth(popRow?.capitalCityPopGrowth), capitalLabel,
+      fmtGrowth(popRow?.statePopGrowth),       stateLabel),
+
   ].join('');
 }
 
 
-function setLegend(elId, items) {
+function setLegend(elId, items, chartKey) {
   const el = document.getElementById(elId);
   if (!el) return;
-  el.innerHTML = items.map(item => `
-    <span class="legend-item"><span class="legend-dot" style="background:${item.color}"></span>${item.label}</span>
+  el.innerHTML = items.map((item, i) => `
+    <span class="legend-item legend-toggle" data-legend-el="${elId}" data-legend-idx="${i}" style="cursor:pointer;">
+      <span class="legend-dot" style="background:${item.color}"></span>${item.label}
+    </span>
   `).join('');
+
+  // Bind click handlers — toggle the dataset visibility on the associated chart
+  el.querySelectorAll('.legend-toggle').forEach(span => {
+    span.addEventListener('click', () => {
+      const idx = parseInt(span.dataset.legendIdx, 10);
+      // Find the chart — look in State.charts for the key matching this legend element
+      const chart = (function findChart() {
+        for (const [k, ch] of Object.entries(State.charts)) {
+          if (!ch || !ch.canvas) continue;
+          // The canvas container's chart-card should contain this legend element
+          const card = ch.canvas.closest('.chart-card, .custom-chart-card, .report-section');
+          if (card && card.contains(el)) return ch;
+        }
+        // Fallback: use provided chartKey
+        return chartKey ? State.charts[chartKey] : null;
+      })();
+      if (!chart) return;
+      const ds = chart.data.datasets[idx];
+      if (!ds) return;
+      const hidden = chart.getDatasetMeta(idx).hidden;
+      chart.getDatasetMeta(idx).hidden = !hidden;
+      chart.update();
+      span.style.opacity = !hidden ? '0.35' : '1';
+    });
+  });
 }
 
 function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
-  destroyChart('huPrice');
-  destroyChart('huYoY');
-  destroyChart('huDiff');
+  // Destroy all 12 default charts
+  ['dc1','dc2','dc3','dc4','dc5','dc6','dc7','dc8','dc9','dc10','dc11','dc12']
+    .forEach(k => destroyChart(k));
 
-  const housePriceMap = buildSeriesMap(houseData, 'medPrice12', viewMode);
-  const unitPriceMap = buildSeriesMap(unitData, 'medPrice12', viewMode);
-  const yoyHouseMap = calculateYoYMap(houseData, 'medPrice12', viewMode);
-  const yoyUnitMap = calculateYoYMap(unitData, 'medPrice12', viewMode);
-
-  const labelKeys = sortPeriodKeys(new Set([
-    ...housePriceMap.keys(),
-    ...unitPriceMap.keys(),
-    ...yoyHouseMap.keys(),
-    ...yoyUnitMap.keys()
-  ]), viewMode);
-
-  const labels = labelKeys.map(k => viewMode === 'yearly' ? k : k.replace('-', '/'));
-  const housePrices = labelKeys.map(k => housePriceMap.get(k) ?? null);
-  const unitPrices = labelKeys.map(k => unitPriceMap.get(k) ?? null);
-  const houseYoY   = labelKeys.map(k => yoyHouseMap.get(k) ?? null);
-  const unitYoY    = labelKeys.map(k => yoyUnitMap.get(k) ?? null);
-  const pctDiff    = labelKeys.map((k, i) => {
-    const h = housePrices[i], u = unitPrices[i];
-    if (h == null || u == null || h === 0) return null;
-    return (u / h) * 100;
+  // ── Shared chart-scale helpers ──────────────────────────────────────────
+  const TICK   = (type, v) => formatAxisTick(type, v);
+  const scaleL = (title, type) => ({
+    type:'linear', position:'left',
+    title:{ display:!!title, text:title },
+    grid:{ color:'#dff4f6' },
+    ticks:{ color:'#8aadb2', font:{ size:10, family:"'DM Sans',sans-serif" }, callback: v => TICK(type,v) },
+    border:{ display:false },
+  });
+  const scaleR = (title, type, color) => ({
+    type:'linear', position:'right',
+    title:{ display:!!title, text:title },
+    grid:{ drawOnChartArea:false },
+    ticks:{ color: color||CC.accent, font:{ size:10, family:"'DM Sans',sans-serif" }, callback: v => TICK(type,v) },
+    border:{ display:false },
+  });
+  const baseOpts = (tooltipCb, leftTitle, leftType, rightTitle, rightType, rightColor) => ({
+    responsive:true, maintainAspectRatio:false,
+    interaction:{ mode:'index', intersect:false },
+    plugins:{ ...CHART_BASE.plugins, legend:{ display:false },
+      tooltip:{ ...CHART_BASE.plugins.tooltip, callbacks:{ label: tooltipCb } } },
+    scales:{
+      x: CHART_BASE.scales.x,
+      yLeft:  scaleL(leftTitle,  leftType),
+      yRight: scaleR(rightTitle, rightType, rightColor),
+    },
   });
 
-  {
-    const ctx = document.getElementById('chartHUPrice').getContext('2d');
-    State.charts.huPrice = new Chart(ctx, {
-      type: 'line',
-      data: { labels, datasets: [
-        { label: 'Median House Price', data: housePrices, borderColor: CC.primary, backgroundColor: gradient(ctx, CC.primary, 0.14, 0.02), borderWidth: 2.5, pointRadius: 2.5, pointStyle: 'circle', tension: 0.35, fill: true, spanGaps: true },
-        { label: 'Median Unit Price', data: unitPrices, borderColor: CC.accent, backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 2.5, pointStyle: 'circle', tension: 0.35, fill: false, spanGaps: true }
-      ]},
-      options: {
-        ...CHART_BASE,
-        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: { label: c => ` ${c.dataset.label}: ${formatCurrency(c.raw)}` } } },
-        scales: { ...CHART_BASE.scales, y: { ...CHART_BASE.scales.y, title: { display: true, text: 'Median Price ($)' }, ticks: { ...CHART_BASE.scales.y.ticks, callback: v => formatAxisTick('currency', v) } } }
-      }
-    });
-    setLegend('legendHUPrice', [
-      { label: 'Median House Price', color: CC.primary },
-      { label: 'Median Unit Price', color: CC.accent },
-    ]);
-  }
+  const lineDs = (label, data, color, yAxis, fill=false, ctx=null) => ({
+    type:'line', label, data,
+    borderColor:color,
+    backgroundColor: fill && ctx ? gradient(ctx, color, 0.14, 0.02) : 'transparent',
+    borderWidth:2.5, pointRadius:2.5, tension:0.35, fill, spanGaps:true, yAxisID:yAxis,
+  });
+  const barDs = (label, data, color, yAxis) => ({
+    type:'bar', label, data,
+    backgroundColor: color + '99', borderColor:color, borderWidth:1.2,
+    borderRadius:3, borderSkipped:false, yAxisID:yAxis,
+  });
 
-  {
-    const ctx = document.getElementById('chartHUYoY').getContext('2d');
-    State.charts.huYoY = new Chart(ctx, {
-      type: 'line',
-      data: { labels, datasets: [
-        { label: 'MHP YoY %', data: houseYoY, borderColor: CC.primary, backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 2.5, pointStyle: 'circle', tension: 0.35, spanGaps: true },
-        { label: 'MUP YoY %', data: unitYoY, borderColor: CC.accent, backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 2.5, pointStyle: 'circle', tension: 0.35, spanGaps: true }
-      ]},
-      options: {
-        ...CHART_BASE,
-        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: { label: c => ` ${c.dataset.label}: ${safeNum(c.raw) != null ? c.raw.toFixed(1) + '%' : '—'}` } } },
-        scales: { ...CHART_BASE.scales, y: { ...CHART_BASE.scales.y, title: { display: true, text: 'YoY Change (%)' }, ticks: { ...CHART_BASE.scales.y.ticks, callback: v => `${v}%` } } }
-      }
-    });
-    setLegend('legendHUYoY', [
-      { label: 'MHP YoY %', color: CC.primary },
-      { label: 'MUP YoY %', color: CC.accent },
-    ]);
-  }
-
-  {
-    const ctx = document.getElementById('chartHUDiff').getContext('2d');
-    State.charts.huDiff = new Chart(ctx, {
-      data: { labels, datasets: [
-        { type: 'line', label: 'Median House Price', data: housePrices, borderColor: CC.primary, backgroundColor: 'transparent', borderWidth: 2.2, pointRadius: 2.5, pointStyle: 'circle', tension: 0.35, yAxisID: 'yPrice', spanGaps: true },
-        { type: 'line', label: 'Median Unit Price', data: unitPrices, borderColor: CC.accent, backgroundColor: 'transparent', borderWidth: 2.2, pointRadius: 2.5, pointStyle: 'circle', tension: 0.35, yAxisID: 'yPrice', spanGaps: true },
-        { type: 'bar', label: 'Unit ÷ House Price %', data: pctDiff, backgroundColor: 'rgba(245,158,11,0.35)', borderColor: CC.amber, borderWidth: 1.2, yAxisID: 'yPct', borderRadius: 4 }
-      ]},
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: { label: c => c.dataset.yAxisID === 'yPct' ? ` ${c.dataset.label}: ${safeNum(c.raw) != null ? c.raw.toFixed(1) + '%' : '—'}` : ` ${c.dataset.label}: ${formatCurrency(c.raw)}` } } },
-        scales: {
-          x: CHART_BASE.scales.x,
-          yPrice: { type: 'linear', position: 'left', title: { display: true, text: 'Median Price ($)' }, grid: { color: '#dff4f6' }, ticks: { color: '#8aadb2', font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => formatAxisTick('currency', v) }, border: { display: false } },
-          yPct: { type: 'linear', position: 'right', title: { display: true, text: 'Unit ÷ House Price (%)' }, grid: { drawOnChartArea: false }, ticks: { color: CC.amber, font: { size: 10, family: "'DM Sans',sans-serif" }, callback: v => `${v}%` }, border: { display: false } }
+  // ── "December series" builder ─────────────────────────────────────────────
+  // For yearly view: use December row if available, else latest month of that year.
+  // For the latest year: always use the latest available row (not Dec).
+  // Returns { labelKeys, getVal(row, field) }
+  function buildYearlySeries(data) {
+    if (!data.length) return { labelKeys:[], rows:[] };
+    const byYear = new Map();
+    for (const r of data) {
+      if (!r.monthEnd) continue;
+      const yr = r.monthEnd.getFullYear();
+      const existing = byYear.get(yr);
+      if (!existing) { byYear.set(yr, r); continue; }
+      const isDecExisting = existing.monthEnd.getMonth() === 11;
+      const isDecNew      = r.monthEnd.getMonth() === 11;
+      // Latest year → keep latest month
+      // Other years → prefer December
+      const latestYear = Math.max(...[...byYear.keys()].concat(yr));
+      if (yr === latestYear) {
+        if (r.monthEnd > existing.monthEnd) byYear.set(yr, r);
+      } else {
+        if (isDecNew && !isDecExisting) byYear.set(yr, r);
+        else if ((isDecNew && isDecExisting) || (!isDecNew && !isDecExisting)) {
+          if (r.monthEnd > existing.monthEnd) byYear.set(yr, r);
         }
       }
+    }
+    const labelKeys = [...byYear.keys()].sort((a,b)=>a-b).map(String);
+    const rows      = labelKeys.map(k => byYear.get(Number(k)));
+    return { labelKeys, rows };
+  }
+
+  // Determine latest year across both house and unit
+  function latestYearOf(data) {
+    let m = null;
+    for (const r of data) { if (r.monthEnd && (!m || r.monthEnd > m)) m = r.monthEnd; }
+    return m ? m.getFullYear() : null;
+  }
+
+  // For monthly view: price field uses medPrice3; for yearly: latest-year→medPrice3, else medPrice12 Dec
+  function priceField(row, viewMode, latestYear) {
+    if (viewMode === 'monthly') return safeNum(row.medPrice3);
+    return (row.monthEnd && row.monthEnd.getFullYear() === latestYear)
+      ? safeNum(row.medPrice3) : safeNum(row.medPrice12);
+  }
+
+  // ── Build series (monthly or yearly) ────────────────────────────────────
+  function buildSeries(hRows, uRows, fields, viewMode) {
+    // fields = array of { hKey, uKey } — may be undefined if single-side
+    if (viewMode === 'monthly') {
+      const allKeys = sortPeriodKeys(new Set([
+        ...hRows.map(r=>getPeriodKey(r.monthEnd,'monthly')),
+        ...uRows.map(r=>getPeriodKey(r.monthEnd,'monthly')),
+      ]), 'monthly');
+      const hMap = new Map(hRows.map(r=>[getPeriodKey(r.monthEnd,'monthly'), r]));
+      const uMap = new Map(uRows.map(r=>[getPeriodKey(r.monthEnd,'monthly'), r]));
+      const labels = allKeys.map(k => k.replace('-','/'));
+      return { labels, hMap, uMap, allKeys, hRows, uRows };
+    } else {
+      const { labelKeys:hKeys, rows:hYRows } = buildYearlySeries(hRows);
+      const { labelKeys:uKeys, rows:uYRows } = buildYearlySeries(uRows);
+      const allKeys = [...new Set([...hKeys,...uKeys])].sort();
+      const hMap = new Map(hYRows.map((r,i)=>[hKeys[i],r]));
+      const uMap = new Map(uYRows.map((r,i)=>[uKeys[i],r]));
+      return { labels:allKeys, hMap, uMap, allKeys, hRows:hYRows, uRows:uYRows };
+    }
+  }
+
+  const { labels:lbl, hMap, uMap, allKeys } = buildSeries(houseData, unitData, [], viewMode);
+  const latestYr = Math.max(latestYearOf(houseData)||0, latestYearOf(unitData)||0) || null;
+
+  // ── 1. MEDIAN PRICE COMPARISON ───────────────────────────────────────────
+  {
+    const ctx = document.getElementById('chartDC1').getContext('2d');
+    const hPrices = allKeys.map(k => { const r=hMap.get(k); return r ? priceField(r,viewMode,latestYr) : null; });
+    const uPrices = allKeys.map(k => { const r=uMap.get(k); return r ? priceField(r,viewMode,latestYr) : null; });
+    const ratio   = allKeys.map((_,i) => {
+      const h=hPrices[i], u=uPrices[i];
+      return (h&&u&&h!==0) ? (u/h)*100 : null;
     });
-    setLegend('legendHUDiff', [
-      { label: 'Median House Price', color: CC.primary },
-      { label: 'Median Unit Price', color: CC.accent },
-      { label: 'Unit ÷ House Price %', color: CC.amber },
+    State.charts.dc1 = new Chart(ctx, {
+      data:{ labels:lbl, datasets:[
+        { ...barDs('House Price (3M)', hPrices, CC.primary, 'yLeft') },
+        { ...barDs('Unit Price (3M)',  uPrices, CC.accent,  'yLeft') },
+        { ...lineDs('Unit/House Ratio (%)', ratio, CC.amber, 'yRight') },
+      ]},
+      options: baseOpts(
+        c => c.dataset.yAxisID==='yRight'
+          ? ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(1)+'%':'—'}`
+          : ` ${c.dataset.label}: ${formatCurrency(c.raw)}`,
+        'Median Price ($)', 'currency', 'Unit/House (%)', 'pct', CC.amber
+      ),
+    });
+    setLegend('legendDC1',[
+      {label:'House Price (3M)', color:CC.primary},
+      {label:'Unit Price (3M)',  color:CC.accent},
+      {label:'Unit/House Ratio', color:CC.amber},
+    ]);
+  }
+
+  // ── 2. YEAR-ON-YEAR PRICE MOVEMENT ──────────────────────────────────────
+  {
+    const ctx = document.getElementById('chartDC2').getContext('2d');
+    let hChg, uChg;
+    if (viewMode === 'monthly') {
+      // MoM % based on medPrice3
+      hChg = allKeys.map((k,i) => {
+        if (i===0) return null;
+        const cur = hMap.get(k); const prev = hMap.get(allKeys[i-1]);
+        const c=safeNum(cur?.medPrice3), p=safeNum(prev?.medPrice3);
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      });
+      uChg = allKeys.map((k,i) => {
+        if (i===0) return null;
+        const cur = uMap.get(k); const prev = uMap.get(allKeys[i-1]);
+        const c=safeNum(cur?.medPrice3), p=safeNum(prev?.medPrice3);
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      });
+    } else {
+      // YoY % based on medPrice12 December (latest year uses medPrice3)
+      hChg = allKeys.map((k,i) => {
+        if (i===0) return null;
+        const cur=hMap.get(k); const prev=hMap.get(allKeys[i-1]);
+        const c=cur ? priceField(cur,viewMode,latestYr) : null;
+        const p=prev ? priceField(prev,viewMode,latestYr) : null;
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      });
+      uChg = allKeys.map((k,i) => {
+        if (i===0) return null;
+        const cur=uMap.get(k); const prev=uMap.get(allKeys[i-1]);
+        const c=cur ? priceField(cur,viewMode,latestYr) : null;
+        const p=prev ? priceField(prev,viewMode,latestYr) : null;
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      });
+    }
+    State.charts.dc2 = new Chart(ctx, {
+      type:'line',
+      data:{ labels:lbl, datasets:[
+        { ...lineDs(viewMode==='monthly'?'House MoM %':'House YoY %', hChg, CC.primary, 'yLeft') },
+        { ...lineDs(viewMode==='monthly'?'Unit MoM %':'Unit YoY %',  uChg, CC.accent,  'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
+        viewMode==='monthly'?'MoM % Change':'YoY % Change', 'pct'
+      ),
+    });
+    const movLabel = viewMode==='monthly' ? 'MoM %' : 'YoY %';
+    setLegend('legendDC2',[
+      {label:`House ${movLabel}`, color:CC.primary},
+      {label:`Unit ${movLabel}`,  color:CC.accent},
+    ]);
+  }
+
+  // ── Helper: filter allKeys/lbl to only periods where a value is non-null ──
+  function filteredSeries(keys, lblArr, ...valArrays) {
+    // Keep an index if ANY of the value arrays has a non-null value at that position
+    const keep = keys.map((_,i) => valArrays.some(arr => arr[i] != null));
+    return {
+      keys:   keys.filter((_,i)  => keep[i]),
+      labels: lblArr.filter((_,i) => keep[i]),
+      vals:   valArrays.map(arr  => arr.filter((_,i) => keep[i])),
+    };
+  }
+
+  // ── Helper: single-axis chart options ────────────────────────────────────
+  function singleAxisOpts(tooltipCb, leftTitle, leftType) {
+    return {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ ...CHART_BASE.plugins, legend:{ display:false },
+        tooltip:{ ...CHART_BASE.plugins.tooltip, callbacks:{ label: tooltipCb } } },
+      scales:{
+        x: CHART_BASE.scales.x,
+        yLeft: scaleL(leftTitle, leftType),
+      },
+    };
+  }
+
+  // ── Helper: pull a field from State.nationalData by period key ────────────
+  // Used by chart 5 (lending) and chart 12 (gross yield) so must be defined
+  // before those chart blocks execute.
+  function getNatRateSeries(field, keys, vm, latYr) {
+    const stateVal = document.getElementById('stateSelect').value;
+    if (vm === 'monthly') {
+      const lookup = new Map();
+      for (const nr of State.nationalData) {
+        if (!nr.monthEnd || safeNum(nr[field])==null) continue;
+        const k = `${nr.monthEnd.getFullYear()}-${String(nr.monthEnd.getMonth()+1).padStart(2,'0')}`;
+        if (nr.state === null) { if (!lookup.has(k)) lookup.set(k, safeNum(nr[field])); }
+        else if (!stateVal || nr.state === stateVal) lookup.set(k, safeNum(nr[field]));
+      }
+      return keys.map(k => lookup.get(k) ?? null);
+    } else {
+      const byYear = new Map();
+      for (const nr of State.nationalData) {
+        if (!nr.monthEnd || safeNum(nr[field])==null) continue;
+        const yr = nr.monthEnd.getFullYear().toString();
+        if (!byYear.has(yr)) byYear.set(yr, []);
+        byYear.get(yr).push({ v: safeNum(nr[field]), d: nr.monthEnd });
+      }
+      return keys.map(k => {
+        const entries = byYear.get(k);
+        if (!entries || !entries.length) return null;
+        const yr = Number(k);
+        if (yr === latYr) return entries.reduce((a,b) => b.d > a.d ? b : a).v;
+        return entries.reduce((s,e) => s+e.v, 0) / entries.length;
+      });
+    }
+  }
+
+  // ── 3. HOUSE AFFORDABILITY ───────────────────────────────────────────────
+  // Bar = MoM/YoY price change %, Line = affordability index
+  {
+    const ctx = document.getElementById('chartDC3').getContext('2d');
+    const hChg = allKeys.map((k,i) => {
+      const r = hMap.get(k); if (!r) return null;
+      if (viewMode==='monthly') {
+        if (i===0) return null;
+        const prev = hMap.get(allKeys[i-1]);
+        const c=safeNum(r.medPrice3), p=safeNum(prev?.medPrice3);
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      } else {
+        if (i===0) return null;
+        const prev = hMap.get(allKeys[i-1]);
+        const c = priceField(r,viewMode,latestYr);
+        const p = prev ? priceField(prev,viewMode,latestYr) : null;
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      }
+    });
+    const hAff = allKeys.map(k => {
+      const r=hMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.affordabilityIndex3) : safeNum(r.affordabilityIndex12);
+    });
+    State.charts.dc3 = new Chart(ctx, {
+      data:{ labels:lbl, datasets:[
+        { ...barDs('House Affordability Index', hAff, CC.mint, 'yLeft') },
+        { ...lineDs(`House ${viewMode==='monthly'?'MoM':'YoY'} %`, hChg, CC.primary, 'yRight') },
+      ]},
+      options: baseOpts(
+        c => c.dataset.yAxisID==='yRight'
+          ? ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`
+          : ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'x':'—'}`,
+        'Affordability Index', 'ratio',
+        viewMode==='monthly'?'MoM % Change':'YoY % Change', 'pct', CC.primary
+      ),
+    });
+    setLegend('legendDC3',[
+      {label:'House Affordability Index', color:CC.mint},
+      {label:`House ${viewMode==='monthly'?'MoM':'YoY'} %`, color:CC.primary},
+    ]);
+  }
+
+  // ── 4. UNIT AFFORDABILITY ────────────────────────────────────────────────
+  {
+    const ctx = document.getElementById('chartDC4').getContext('2d');
+    const uChg = allKeys.map((k,i) => {
+      const r = uMap.get(k); if (!r) return null;
+      if (viewMode==='monthly') {
+        if (i===0) return null;
+        const prev = uMap.get(allKeys[i-1]);
+        const c=safeNum(r.medPrice3), p=safeNum(prev?.medPrice3);
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      } else {
+        if (i===0) return null;
+        const prev = uMap.get(allKeys[i-1]);
+        const c = priceField(r,viewMode,latestYr);
+        const p = prev ? priceField(prev,viewMode,latestYr) : null;
+        return (c&&p&&p!==0) ? ((c/p)-1)*100 : null;
+      }
+    });
+    const uAff = allKeys.map(k => {
+      const r=uMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.affordabilityIndex3) : safeNum(r.affordabilityIndex12);
+    });
+    State.charts.dc4 = new Chart(ctx, {
+      data:{ labels:lbl, datasets:[
+        { ...barDs('Unit Affordability Index', uAff, CC.plum, 'yLeft') },
+        { ...lineDs(`Unit ${viewMode==='monthly'?'MoM':'YoY'} %`, uChg, CC.accent, 'yRight') },
+      ]},
+      options: baseOpts(
+        c => c.dataset.yAxisID==='yRight'
+          ? ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`
+          : ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'x':'—'}`,
+        'Affordability Index', 'ratio',
+        viewMode==='monthly'?'MoM % Change':'YoY % Change', 'pct', CC.accent
+      ),
+    });
+    setLegend('legendDC4',[
+      {label:'Unit Affordability Index', color:CC.plum},
+      {label:`Unit ${viewMode==='monthly'?'MoM':'YoY'} %`, color:CC.accent},
+    ]);
+  }
+
+  // ── 5. LENDING (all lines, single axis) ──────────────────────────────────
+  {
+    const ctx = document.getElementById('chartDC5').getContext('2d');
+    const { labels:lendLbl, hMap:hM, uMap:uM, allKeys:lendKeys } =
+      buildSeries(houseData, unitData, [], viewMode);
+
+    const hPrices = lendKeys.map(k => { const r=hM.get(k); return r?priceField(r,viewMode,latestYr):null; });
+    const uPrices = lendKeys.map(k => { const r=uM.get(k); return r?priceField(r,viewMode,latestYr):null; });
+
+    // Pull OO/investor directly from State.nationalData (same logic as getNatRateSeries in chart 12)
+    const oo  = getNatRateSeries('lendingOwnerOccupier', lendKeys, viewMode, latestYr);
+    const inv = getNatRateSeries('lendingInvestor',      lendKeys, viewMode, latestYr);
+
+    State.charts.dc5 = new Chart(ctx, {
+      type:'line',
+      data:{ labels:lendLbl, datasets:[
+        { ...lineDs('House Median Price', hPrices, CC.primary, 'yLeft', true, ctx) },
+        { ...lineDs('Unit Median Price',  uPrices, CC.accent,  'yLeft') },
+        { ...lineDs('OO Lending',         oo,      CC.mint,   'yLeft') },
+        { ...lineDs('Investor Lending',   inv,     CC.amber,  'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${formatCurrency(c.raw)}`,
+        'Value ($)', 'currency'
+      ),
+    });
+    setLegend('legendDC5',[
+      {label:'House Median Price', color:CC.primary},
+      {label:'Unit Median Price',  color:CC.accent},
+      {label:'OO Lending',         color:CC.mint},
+      {label:'Investor Lending',   color:CC.amber},
+    ], 'dc5');
+  }
+
+  // ── 6. LISTINGS vs DAYS ON MARKET (only periods with listings data) ───────
+  {
+    const ctx = document.getElementById('chartDC6').getContext('2d');
+    const hList = allKeys.map(k=>{ const r=hMap.get(k); return r?safeNum(r.listings12):null; });
+    const uList = allKeys.map(k=>{ const r=uMap.get(k); return r?safeNum(r.listings12):null; });
+    const hDom  = allKeys.map(k=>{ const r=hMap.get(k); return r?safeNum(r.dom):null; });
+    const uDom  = allKeys.map(k=>{ const r=uMap.get(k); return r?safeNum(r.dom):null; });
+    const { labels:fLbl, vals:[fHList,fUList,fHDom,fUDom] } =
+      filteredSeries(allKeys, lbl, hList, uList, hDom, uDom);
+    State.charts.dc6 = new Chart(ctx, {
+      data:{ labels:fLbl, datasets:[
+        { ...barDs('Listings 12M — House', fHList, CC.primary, 'yLeft') },
+        { ...barDs('Listings 12M — Unit',  fUList, CC.accent,  'yLeft') },
+        { ...lineDs('DOM — House', fHDom, CC.amber, 'yRight') },
+        { ...lineDs('DOM — Unit',  fUDom, CC.coral, 'yRight') },
+      ]},
+      options: baseOpts(
+        c => c.dataset.yAxisID==='yRight'
+          ? ` ${c.dataset.label}: ${safeNum(c.raw)!=null?Math.round(c.raw)+'d':'—'}`
+          : ` ${c.dataset.label}: ${formatNumber(c.raw)}`,
+        'Listings (12M)', 'count', 'Days on Market', 'days', CC.amber
+      ),
+    });
+    setLegend('legendDC6',[
+      {label:'Listings — House', color:CC.primary},
+      {label:'Listings — Unit',  color:CC.accent},
+      {label:'DOM — House',      color:CC.amber},
+      {label:'DOM — Unit',       color:CC.coral},
+    ]);
+  }
+
+  // ── 7. RENT (all left axis, only periods with rent data) ─────────────────
+  {
+    const ctx = document.getElementById('chartDC7').getContext('2d');
+    const hRent = allKeys.map(k=>{ const r=hMap.get(k); return r?safeNum(r.medRent):null; });
+    const uRent = allKeys.map(k=>{ const r=uMap.get(k); return r?safeNum(r.medRent):null; });
+    const { labels:fLbl, vals:[fHRent,fURent] } =
+      filteredSeries(allKeys, lbl, hRent, uRent);
+    State.charts.dc7 = new Chart(ctx, {
+      data:{ labels:fLbl, datasets:[
+        { ...barDs('Median Rent — House', fHRent, CC.primary, 'yLeft') },
+        { ...barDs('Median Rent — Unit',  fURent, CC.accent,  'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${formatCurrency(c.raw)}/wk`,
+        'Median Rent ($/wk)', 'currency'
+      ),
+    });
+    setLegend('legendDC7',[
+      {label:'Rent — House', color:CC.primary},
+      {label:'Rent — Unit',  color:CC.accent},
+    ]);
+  }
+
+  // ── 8. POPULATION GROWTH (all left axis) ─────────────────────────────────
+  {
+    const ctx = document.getElementById('chartDC8').getContext('2d');
+    const lgaVal   = document.getElementById('lgaSelect').value;
+    const stateVal = document.getElementById('stateSelect').value;
+    const popRows  = getPopulationRows(lgaVal, stateVal);
+    const popLabels = popRows.map(r => String(r.year));
+    const lgaGr  = popRows.map(r => safeNum(r.lgaPopGrowth));
+    const capGr  = popRows.map(r => safeNum(r.capitalCityPopGrowth));
+    const stGr   = popRows.map(r => safeNum(r.statePopGrowth));
+    // Resolve actual place names for the legend
+    const CAPITAL_CITY_NAMES = {
+      'NSW':'Greater Sydney','VIC':'Greater Melbourne','QLD':'Greater Brisbane',
+      'SA':'Greater Adelaide','WA':'Greater Perth','TAS':'Greater Hobart',
+      'ACT':'Canberra','NT':'Darwin',
+    };
+    const STATE_FULL_NAMES = {
+      'NSW':'New South Wales','VIC':'Victoria','QLD':'Queensland',
+      'SA':'South Australia','WA':'Western Australia','TAS':'Tasmania',
+      'ACT':'Australian Capital Territory','NT':'Northern Territory',
+    };
+    const popState    = (popRows[0]?.state) || stateVal;
+    const lgaName     = lgaVal  || 'LGA';
+    const capName     = CAPITAL_CITY_NAMES[popState] || (popState ? `${popState} Capital` : 'Capital City');
+    const stateName   = STATE_FULL_NAMES[popState]   || popState || 'State';
+
+    State.charts.dc8 = new Chart(ctx, {
+      type:'line',
+      data:{ labels:popLabels, datasets:[
+        { ...lineDs(`${lgaName} Growth %`,   lgaGr, CC.primary, 'yLeft', true, ctx) },
+        { ...lineDs(`${capName} Growth %`,   capGr, CC.accent,  'yLeft') },
+        { ...lineDs(`${stateName} Growth %`, stGr,  CC.amber,   'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
+        'Annual Growth (%)', 'pct'
+      ),
+    });
+    setLegend('legendDC8',[
+      {label:`${lgaName} Growth %`,   color:CC.primary},
+      {label:`${capName} Growth %`,   color:CC.accent},
+      {label:`${stateName} Growth %`, color:CC.amber},
+    ], 'dc8');
+  }
+
+  // ── 9. DWELLING SALES (all bars, all left axis) ───────────────────────────
+  {
+    const ctx = document.getElementById('chartDC9').getContext('2d');
+    const hSales = allKeys.map(k=>{ const r=hMap.get(k); return r?safeNum(r.sales12):null; });
+    const uSales = allKeys.map(k=>{ const r=uMap.get(k); return r?safeNum(r.sales12):null; });
+    const total  = allKeys.map((_,i) => {
+      const h=hSales[i], u=uSales[i];
+      return (h!=null||u!=null) ? (h||0)+(u||0) : null;
+    });
+    State.charts.dc9 = new Chart(ctx, {
+      data:{ labels:lbl, datasets:[
+        { ...barDs('House Sales 12M', hSales, CC.primary, 'yLeft') },
+        { ...barDs('Unit Sales 12M',  uSales, CC.accent,  'yLeft') },
+        { ...barDs('Total Sales 12M', total,  CC.amber,   'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${formatNumber(c.raw)}`,
+        'Sales (12M)', 'count'
+      ),
+    });
+    setLegend('legendDC9',[
+      {label:'House Sales', color:CC.primary},
+      {label:'Unit Sales',  color:CC.accent},
+      {label:'Total Sales', color:CC.amber},
+    ]);
+  }
+
+  // ── 10. PRICE TO INCOME (% format, all left axis) ────────────────────────
+  {
+    const ctx = document.getElementById('chartDC10').getContext('2d');
+    const hPTI = allKeys.map(k => {
+      const r=hMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.price3mToIncome) : safeNum(r.price12mToIncome);
+    });
+    const uPTI = allKeys.map(k => {
+      const r=uMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.price3mToIncome) : safeNum(r.price12mToIncome);
+    });
+    State.charts.dc10 = new Chart(ctx, {
+      type:'line',
+      data:{ labels:lbl, datasets:[
+        { ...lineDs('House PTI', hPTI, CC.primary, 'yLeft', true, ctx) },
+        { ...lineDs('Unit PTI',  uPTI, CC.accent,  'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
+        'Price-to-Income (%)', 'pct'
+      ),
+    });
+    setLegend('legendDC10',[
+      {label:'House PTI', color:CC.primary},
+      {label:'Unit PTI',  color:CC.accent},
+    ]);
+  }
+
+  // ── 11. RENT TO INCOME (% format, all left axis, only periods with RTI) ──
+  {
+    const ctx = document.getElementById('chartDC11').getContext('2d');
+    const hRTI = allKeys.map(k => { const r=hMap.get(k); return r?safeNum(r.rent12mToIncome):null; });
+    const uRTI = allKeys.map(k => { const r=uMap.get(k); return r?safeNum(r.rent12mToIncome):null; });
+    const hAff = allKeys.map(k => {
+      const r=hMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.affordabilityIndex3) : safeNum(r.affordabilityIndex12);
+    });
+    const uAff = allKeys.map(k => {
+      const r=uMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.affordabilityIndex3) : safeNum(r.affordabilityIndex12);
+    });
+    // Trim to periods where RTI data exists (ignore affordability for gating)
+    const { labels:fLbl, vals:[fHRTI,fURTI] } =
+      filteredSeries(allKeys, lbl, hRTI, uRTI);
+    // Re-slice affordability to match the same trimmed keys
+    const rtiKeys = allKeys.filter((_,i) => hRTI[i]!=null || uRTI[i]!=null);
+    const fHAff = rtiKeys.map(k => { const r=hMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.affordabilityIndex3) : safeNum(r.affordabilityIndex12); });
+    const fUAff = rtiKeys.map(k => { const r=uMap.get(k); if (!r) return null;
+      return (viewMode==='monthly'||(r.monthEnd&&r.monthEnd.getFullYear()===latestYr))
+        ? safeNum(r.affordabilityIndex3) : safeNum(r.affordabilityIndex12); });
+    State.charts.dc11 = new Chart(ctx, {
+      type:'line',
+      data:{ labels:fLbl, datasets:[
+        { ...lineDs('House RTI',           fHRTI, CC.primary, 'yLeft', true, ctx) },
+        { ...lineDs('Unit RTI',            fURTI, CC.accent,  'yLeft') },
+        { ...lineDs('House Afford. Index', fHAff, CC.mint,    'yLeft') },
+        { ...lineDs('Unit Afford. Index',  fUAff, CC.plum,    'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
+        'Ratio (%)', 'pct'
+      ),
+    });
+    setLegend('legendDC11',[
+      {label:'House RTI',           color:CC.primary},
+      {label:'Unit RTI',            color:CC.accent},
+      {label:'House Afford. Index', color:CC.mint},
+      {label:'Unit Afford. Index',  color:CC.plum},
+    ]);
+  }
+
+  // ── 12. GROSS YIELD (all left axis, only periods with yield data) ─────────
+  {
+    const ctx = document.getElementById('chartDC12').getContext('2d');
+    const hYield = allKeys.map(k => {
+      const r=hMap.get(k);
+      const price=r?priceField(r,viewMode,latestYr):null;
+      const rent=r?safeNum(r.medRent):null;
+      return (price&&rent&&price!==0) ? (rent*52/price)*100 : null;
+    });
+    const uYield = allKeys.map(k => {
+      const r=uMap.get(k);
+      const price=r?priceField(r,viewMode,latestYr):null;
+      const rent=r?safeNum(r.medRent):null;
+      return (price&&rent&&price!==0) ? (rent*52/price)*100 : null;
+    });
+    const cashRates = getNatRateSeries('cashRate', allKeys, viewMode, latestYr);
+    const bankRates = getNatRateSeries('bankRate', allKeys, viewMode, latestYr);
+    // Trim to periods where yield data exists (not gated on rate data)
+    const { labels:fLbl, vals:[fHY,fUY] } =
+      filteredSeries(allKeys, lbl, hYield, uYield);
+    // Re-slice rates to match the trimmed yield key set
+    const yieldKeys = allKeys.filter((_,i) => hYield[i]!=null || uYield[i]!=null);
+    const fCash = yieldKeys.map(k => cashRates[allKeys.indexOf(k)]);
+    const fBank = yieldKeys.map(k => bankRates[allKeys.indexOf(k)]);
+    State.charts.dc12 = new Chart(ctx, {
+      type:'line',
+      data:{ labels:fLbl, datasets:[
+        { ...lineDs('House Gross Yield %', fHY,   CC.primary, 'yLeft', true, ctx) },
+        { ...lineDs('Unit Gross Yield %',  fUY,   CC.accent,  'yLeft') },
+        { ...lineDs('Cash Rate %',         fCash, CC.coral,   'yLeft') },
+        { ...lineDs('Bank Rate %',         fBank, CC.amber,   'yLeft') },
+      ]},
+      options: singleAxisOpts(
+        c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
+        'Rate / Yield (%)', 'pct'
+      ),
+    });
+    setLegend('legendDC12',[
+      {label:'House Gross Yield', color:CC.primary},
+      {label:'Unit Gross Yield',  color:CC.accent},
+      {label:'Cash Rate',         color:CC.coral},
+      {label:'Bank Rate',         color:CC.amber},
     ]);
   }
 }
@@ -3885,6 +4798,38 @@ function generateReport() {
   State.filteredData  = transformed;
   State.filteredHouse = transformedHouse;
   State.filteredUnit  = transformedUnit;
+
+  // Enrich rows with matching national/state data by month_end + state
+  function enrichWithNational(rows, stateFilter) {
+    if (!State.nationalData.length) return rows;
+    // Build a fast lookup: ISO month string → national row
+    const lookup = new Map();
+    for (const nr of State.nationalData) {
+      if (!nr.monthEnd) continue;
+      if (stateFilter && nr.state && nr.state !== stateFilter) continue;
+      const key = `${nr.monthEnd.getFullYear()}-${String(nr.monthEnd.getMonth() + 1).padStart(2,'0')}`;
+      // Prefer state-specific over national (null state) row
+      if (!lookup.has(key) || nr.state) lookup.set(key, nr);
+    }
+    return rows.map(r => {
+      if (!r.monthEnd) return r;
+      const key = `${r.monthEnd.getFullYear()}-${String(r.monthEnd.getMonth() + 1).padStart(2,'0')}`;
+      const nr = lookup.get(key);
+      if (!nr) return r;
+      return {
+        ...r,
+        cashRate:             r.cashRate             ?? nr.cashRate,
+        bankRate:             r.bankRate             ?? nr.bankRate,
+        medianIncome:         r.medianIncome         ?? nr.medianIncome,
+        lendingOwnerOccupier: r.lendingOwnerOccupier ?? nr.lendingOwnerOccupier,
+        lendingInvestor:      r.lendingInvestor      ?? nr.lendingInvestor,
+      };
+    });
+  }
+
+  State.filteredData  = enrichWithNational(transformed,      state);
+  State.filteredHouse = enrichWithNational(transformedHouse, state);
+  State.filteredUnit  = enrichWithNational(transformedUnit,  state);
   State.currentView = viewMode;
   State.selectedMetrics = metricKeys;
 
@@ -3907,7 +4852,7 @@ function generateReport() {
       : `A ${viewMode === 'yearly' ? 'yearly' : 'monthly'} overview of the ${lgaLabel} property market, highlighting trends in prices, rents, supply, demand, and overall market activity.`;
   }
 
-  renderSnapshotCards(transformedHouse, transformedUnit);
+  renderSnapshotCards(transformedHouse, transformedUnit, lga, state);
   renderDefaultComparisonCharts(transformedHouse, transformedUnit, viewMode);
   renderAllCustomCharts();
 
@@ -3949,6 +4894,14 @@ function mapRow(r) {
     rentalList12: r.rental_listings_12m ?? null,
     medRent:      r.median_rent_12m ?? null,
     dom:          r.dom_12m         ?? null,
+    totalProperties:        r.total_properties          ?? null,
+    affordabilityIndex12:   r.affordability_index_12m   ?? null,
+    affordabilityIndex3:    r.affordability_index_3m    ?? null,
+    momMedianPriceChange:   r.mom_median_price_change   ?? null,
+    yoyMedianPriceChange:   r.yoy_median_price_change   ?? null,
+    price3mToIncome:        r.price_3m_to_income        ?? null,
+    price12mToIncome:       r.price_12m_to_income       ?? null,
+    rent12mToIncome:        r.rent_12m_to_income        ?? null,
   };
 }
 
@@ -4013,6 +4966,137 @@ async function fetchFromSupabase(apiKey) {
   }
 
   return allRows;
+}
+
+
+// ----------------------------------------------------------------
+// NATIONAL / STATE DATA FETCH  (cash rate, bank rate, income, lending)
+// ----------------------------------------------------------------
+async function fetchNationalStateData(apiKey) {
+  const headers = {
+    'apikey':        apiKey,
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type':  'application/json',
+  };
+
+  let allRows = [];
+  let offset  = 0;
+
+  while (true) {
+    const url = `${SUPABASE_URL}/rest/v1/national_state_data` +
+      `?select=*` +
+      `&order=month_end.asc` +
+      `&offset=${offset}&limit=${PAGE_SIZE}`;
+
+    const res = await fetch(url, { headers: { ...headers, 'Prefer': 'count=exact' } });
+    if (!res.ok) {
+      console.warn('National/state data fetch error:', res.status, await res.text());
+      break;
+    }
+
+    const page = await res.json();
+    if (!Array.isArray(page) || page.length === 0) break;
+    allRows = allRows.concat(page.map(r => ({
+      state:                  r.state                   ?? null,
+      monthEnd:               r.month_end ? new Date(r.month_end) : null,
+      cashRate:               r.cash_rate               ?? null,
+      bankRate:               r.bank_rate               ?? null,
+      medianIncome:           r.median_income           ?? null,
+      lendingOwnerOccupier:   r.lending_owner_occupier  ?? null,
+      lendingInvestor:        r.lending_investor        ?? null,
+    })));
+    offset += page.length;
+    if (page.length < PAGE_SIZE) break;
+  }
+  return allRows;
+}
+
+// Return a synthetic object where each field is drawn from the latest non-null
+// row for that field. Cash rate / bank rate are typically stored on national
+// (null-state) rows so we scan all rows as a fallback rather than filtering
+// to only state-matching rows, preventing blank values in the snapshot.
+function getLatestNationalState(state) {
+  const all = State.nationalData
+    .filter(r => r.monthEnd != null)
+    .sort((a, b) => a.monthEnd - b.monthEnd);
+
+  if (!all.length) return null;
+
+  function latestValue(field) {
+    // Prefer state-matching rows (includes null-state national rows)
+    const pref = all.filter(r => !state || r.state === state || r.state === null);
+    for (let i = pref.length - 1; i >= 0; i--) {
+      if (pref[i][field] != null) return pref[i][field];
+    }
+    // Hard fallback: scan every row regardless of state
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (all[i][field] != null) return all[i][field];
+    }
+    return null;
+  }
+
+  return {
+    cashRate:             latestValue('cashRate'),
+    bankRate:             latestValue('bankRate'),
+    medianIncome:         latestValue('medianIncome'),
+    lendingOwnerOccupier: latestValue('lendingOwnerOccupier'),
+    lendingInvestor:      latestValue('lendingInvestor'),
+  };
+}
+
+
+async function fetchPopulationData(apiKey) {
+  const headers = {
+    'apikey':        apiKey,
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type':  'application/json',
+  };
+
+  let allRows = [];
+  let offset  = 0;
+
+  while (true) {
+    const url = `${SUPABASE_URL}/rest/v1/population_data` +
+      `?select=state,lga_name,year,lga_population,capital_city_population,state_population,lga_pop_growth,capital_city_pop_growth,state_pop_growth` +
+      `&order=lga_name.asc,year.asc` +
+      `&offset=${offset}&limit=${PAGE_SIZE}`;
+
+    const res = await fetch(url, { headers: { ...headers, 'Prefer': 'count=exact' } });
+    if (!res.ok) {
+      console.warn('Population fetch error:', res.status, await res.text());
+      break;
+    }
+
+    const page = await res.json();
+    if (!Array.isArray(page) || page.length === 0) break;
+    allRows = allRows.concat(page.map(r => ({
+      state:                r.state                    ?? null,
+      lga:                  r.lga_name                 ?? null,
+      year:                 r.year != null ? Number(r.year) : null,
+      lgaPopulation:        r.lga_population           ?? null,
+      capitalCityPopulation:r.capital_city_population  ?? null,
+      statePopulation:      r.state_population         ?? null,
+      lgaPopGrowth:         r.lga_pop_growth           ?? null,
+      capitalCityPopGrowth: r.capital_city_pop_growth  ?? null,
+      statePopGrowth:       r.state_pop_growth         ?? null,
+    })));
+    offset += page.length;
+    if (page.length < PAGE_SIZE) break;
+  }
+  return allRows;
+}
+
+// Look up population rows for a given lga+state, return sorted by year
+function getPopulationRows(lga, state) {
+  return State.populationData
+    .filter(r => r.lga === lga && (!state || r.state === state))
+    .sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
+}
+
+// Get the latest (most recent year) population row for a lga+state
+function getLatestPopulation(lga, state) {
+  const rows = getPopulationRows(lga, state);
+  return rows.length ? rows[rows.length - 1] : null;
 }
 
 // ----------------------------------------------------------------
@@ -4606,6 +5690,39 @@ function initCustomSelects() {
             ...r,
             monthEnd: r.monthEnd ? new Date(r.monthEnd) : null,
           }));
+          // Also restore population cache if available
+          try {
+            const cachedPop = sessionStorage.getItem('pa_pop_data');
+            if (cachedPop) State.populationData = JSON.parse(cachedPop);
+          } catch(_) { /* ignore */ }
+          // Restore national/state cache if available
+          try {
+            const cachedNat = sessionStorage.getItem('pa_nat_data');
+            if (cachedNat) {
+              State.nationalData = JSON.parse(cachedNat).map(r => ({
+                ...r,
+                monthEnd: r.monthEnd ? new Date(r.monthEnd) : null,
+              }));
+            }
+          } catch(_) { /* ignore */ }
+
+          // If population not cached, fetch it now silently
+          if (!State.populationData.length) {
+            fetchPopulationData(SUPABASE_KEY).then(rows => {
+              State.populationData = rows;
+              try { sessionStorage.setItem('pa_pop_data', JSON.stringify(rows)); } catch(_) {}
+            }).catch(e => console.warn('Population fetch failed:', e));
+          }
+          // If national not cached, fetch it now silently
+          if (!State.nationalData.length) {
+            fetchNationalStateData(SUPABASE_KEY).then(rows => {
+              State.nationalData = rows;
+              try { sessionStorage.setItem('pa_nat_data', JSON.stringify(
+                rows.map(r => ({ ...r, monthEnd: r.monthEnd ? r.monthEnd.toISOString() : null }))
+              )); } catch(_) {}
+            }).catch(e => console.warn('National/state fetch failed:', e));
+          }
+
           const lgas = [...new Set(State.rawData.map(r => r.lga).filter(Boolean))];
           showStatus(
             `${State.rawData.length.toLocaleString()} records loaded`,
@@ -4623,21 +5740,35 @@ function initCustomSelects() {
       } catch(_) { sessionStorage.removeItem('pa_sb_data'); }
     }
 
-    // Fresh fetch
+    // Fresh fetch — load all three tables in parallel
     showStatus('Connecting to database…', SUPABASE_URL, 'loading');
     try {
-      const rows = await fetchFromSupabase(SUPABASE_KEY);
+      const [rows, popRows, natRows] = await Promise.all([
+        fetchFromSupabase(SUPABASE_KEY),
+        fetchPopulationData(SUPABASE_KEY).catch(e => { console.warn('Population fetch failed:', e); return []; }),
+        fetchNationalStateData(SUPABASE_KEY).catch(e => { console.warn('National/state fetch failed:', e); return []; }),
+      ]);
 
       if (rows.length === 0) {
         showStatus('No rows returned. Check RLS policies on the lga_data table.', '', 'error');
         return;
       }
 
-      State.rawData = rows;
+      State.rawData        = rows;
+      State.populationData = popRows;
+      State.nationalData   = natRows;
 
       try {
         sessionStorage.setItem('pa_sb_data', JSON.stringify(
           rows.map(r => ({ ...r, monthEnd: r.monthEnd ? r.monthEnd.toISOString() : null }))
+        ));
+      } catch(_) { /* quota */ }
+      try {
+        sessionStorage.setItem('pa_pop_data', JSON.stringify(popRows));
+      } catch(_) { /* quota */ }
+      try {
+        sessionStorage.setItem('pa_nat_data', JSON.stringify(
+          natRows.map(r => ({ ...r, monthEnd: r.monthEnd ? r.monthEnd.toISOString() : null }))
         ));
       } catch(_) { /* quota */ }
 
@@ -4655,7 +5786,6 @@ function initCustomSelects() {
       document.getElementById('reportSection').classList.remove('visible');
       document.getElementById('configRecordsNote').textContent =
         `${rows.length.toLocaleString()} records loaded`;
-
 
     } catch(err) {
       console.error(err);
