@@ -169,7 +169,7 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.9fr);
   gap: 28px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .hero-copy,
@@ -1017,7 +1017,7 @@ tbody tr:last-child td { border-bottom: none; }
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(340px, 420px);
   gap: 28px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .hero-copy {
@@ -3203,6 +3203,118 @@ tbody tr:last-child td { border-bottom: none; }
 
 
 
+
+/* ── Data load progress bar ─────────────────────────────────────── */
+.load-progress-wrap {
+  margin-top: 6px;
+  display: none;
+}
+.load-progress-wrap.visible { display: block; }
+.load-progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--border-light);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.load-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.25s ease, background 0.4s ease;
+  width: 0%;
+  background: #ef4444;
+}
+.load-progress-label {
+  font-size: 11px;
+  color: var(--text-light);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+
+
+
+/* ══════════════════════════════════════════════════════
+   AI ASSISTANT — floating chat panel (Gemini)
+══════════════════════════════════════════════════════ */
+#ai-fab {
+  position: fixed; bottom: 28px; right: 28px; z-index: 9000;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(10,98,102,0.4);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; transition: transform 0.18s, background 0.18s;
+}
+#ai-fab:hover { background: #0d7a7e; transform: scale(1.06); }
+#ai-fab.open  { background: #0a5255; }
+#ai-panel {
+  position: fixed; bottom: 92px; right: 28px; z-index: 9000;
+  width: 360px; max-height: 560px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; box-shadow: 0 8px 40px rgba(10,98,102,0.18);
+  display: flex; flex-direction: column; overflow: hidden;
+  transform: scale(0.93) translateY(14px); opacity: 0; pointer-events: none;
+  transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s;
+}
+#ai-panel.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: all; }
+.ai-panel-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 15px 11px; border-bottom: 1px solid var(--border-light); flex-shrink: 0;
+}
+.ai-panel-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--primary);
+  animation: aiPulse 2s infinite;
+}
+@keyframes aiPulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:0.45; transform:scale(0.75); }
+}
+.ai-panel-title { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.ai-panel-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-light); padding: 2px 4px; font-size: 15px; border-radius: 4px;
+}
+.ai-panel-close:hover { color: var(--text); background: var(--bg-subtle); }
+#ai-messages {
+  flex: 1; overflow-y: auto; padding: 12px 14px 6px;
+  display: flex; flex-direction: column; gap: 9px; min-height: 80px;
+}
+.ai-msg {
+  max-width: 88%; padding: 9px 12px; border-radius: 12px;
+  font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+}
+.ai-msg.assistant { background: var(--bg-subtle); color: var(--text); border-bottom-left-radius: 4px; align-self: flex-start; }
+.ai-msg.user      { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
+.ai-msg.thinking  { background: var(--bg-subtle); color: var(--text-light); font-style: italic; align-self: flex-start; }
+.ai-suggestion-pills { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 8px; }
+.ai-suggestion-pills:empty { display: none; }
+.ai-action-pill {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted);
+  cursor: pointer; transition: background 0.15s, border-color 0.15s; font-family: var(--font-body);
+}
+.ai-action-pill:hover { background: var(--bg-subtle); border-color: var(--primary); color: var(--accent); }
+.ai-input-row {
+  display: flex; gap: 8px; padding: 9px 11px 11px;
+  border-top: 1px solid var(--border-light); flex-shrink: 0;
+}
+#ai-input {
+  flex: 1; border: 1px solid var(--border); border-radius: 18px;
+  padding: 7px 13px; font-family: var(--font-body); font-size: 13px;
+  color: var(--text); background: var(--bg-subtle); outline: none;
+  resize: none; min-height: 34px; max-height: 96px; transition: border-color 0.15s;
+}
+#ai-input:focus { border-color: var(--primary); background: var(--bg-card); }
+#ai-send {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; align-self: flex-end; transition: background 0.15s;
+}
+#ai-send:hover { background: #0d7a7e; }
+#ai-send:disabled { background: var(--border); cursor: not-allowed; }
+
 </style>
 </head>
 <body>
@@ -3227,11 +3339,17 @@ tbody tr:last-child td { border-bottom: none; }
         <p class="hero-sub hero-sub-outside">
           Build custom reports, explore property trends across Australian regions, and turn data into insights that matter.
         </p>
+
       </div>
 
       <div class="hero-card-slim region-selection-card">
         <div class="config-meta-row">
           <span class="config-records-note" id="configRecordsNote">— records loaded</span>
+        </div>
+        <div class="load-progress-wrap" id="loadProgressWrap">
+          <div class="load-progress-bar-track">
+            <div class="load-progress-bar-fill" id="loadProgressFill"></div>
+          </div>
         </div>
 
         <p class="region-selection-label">CONFIGURATION</p>
@@ -3328,12 +3446,12 @@ tbody tr:last-child td { border-bottom: none; }
               <div class="field-group">
                 <label class="field-label">AGGREGATION</label>
                 <div class="custom-select-combo" id="aggregationCombo" data-select-id="aggregationSelect">
-                  <button type="button" class="custom-select-trigger" id="aggregationSelectTrigger">Monthly</button>
+                  <button type="button" class="custom-select-trigger" id="aggregationSelectTrigger">Yearly</button>
                   <div class="custom-select-dropdown" id="aggregationSelectDropdown"></div>
                 </div>
                 <select id="aggregationSelect" style="display:none;">
                   <option value="monthly">Monthly</option>
-                  <option value="yearly">Yearly</option>
+                  <option value="yearly" selected>Yearly</option>
                 </select>
               </div>
             </div>
@@ -3684,6 +3802,31 @@ tbody tr:last-child td { border-bottom: none; }
 </footer>
 
 
+
+
+
+
+
+<!-- ── AI ASSISTANT ──────────────────────────────────────── -->
+<button id="ai-fab" title="Ask AI Assistant" aria-label="Open AI assistant">
+  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
+<div id="ai-panel" role="dialog" aria-label="AI Assistant">
+  <div class="ai-panel-header">
+    <span class="ai-panel-dot"></span>
+    <span class="ai-panel-title">Property Research AI</span>
+    <button class="ai-panel-close" id="ai-close" aria-label="Close">✕</button>
+  </div>
+  <div id="ai-messages"></div>
+  <div id="ai-suggestion-pills" class="ai-suggestion-pills"></div>
+  <div class="ai-input-row">
+    <textarea id="ai-input" placeholder="Ask me anything about the data…" rows="1"></textarea>
+    <button id="ai-send" aria-label="Send">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
 </div><!-- /app-wrapper -->
 
 <script>
@@ -3703,11 +3846,11 @@ const State = {
   filteredData:     [],
   filteredHouse:    [],
   filteredUnit:     [],
-  currentView:      'monthly',
+  currentView:      'yearly',
   selectedMetrics:  [],
   charts:           {},
   compareSubjects:  [],
-  compareViewMode:  'monthly',
+  compareViewMode:  'yearly',
   // Active geography level: 'lga' | 'division' | 'subdivision'
   geoLevel:         'lga',
 };
@@ -3802,21 +3945,38 @@ function formatDate(v) {
 // METRIC CONFIG + CHART DEFAULTS
 // ----------------------------------------------------------------
 const CC = {
-  primary: '#2aadbb',
-  accent:  '#0a6266',
-  light:   '#b2e8ec',
+  // Main palette (use first)
+  primary: '#2aadbb',   // main teal
+  accent:  '#0a6266',   // dark teal
+  light:   '#b2e8ec',   // light teal
+  dark:    '#161d27',   // near-black
+  slate:   '#64748b',   // grey
+  // Secondary palette (use when more series needed)
   amber:   '#f59e0b',
-  plum:    '#8b5cf6',
   coral:   '#ef4444',
   mint:    '#10b981',
-  slate:   '#64748b',
+  plum:    '#8b5cf6',
 };
+
+// Ordered palette — main first, then secondary
+// Used by any chart needing up to 9 series
+const CHART_PALETTE = [
+  '#2aadbb', // primary
+  '#0a6266', // accent
+  '#b2e8ec', // light
+  '#161d27', // dark
+  '#64748b', // slate
+  '#f59e0b', // amber
+  '#ef4444', // coral
+  '#10b981', // mint
+  '#8b5cf6', // plum
+];
 
 const METRIC_DEFS = [
   { key: 'medPrice12', label: 'Median Price (12M)', shortLabel: 'Median Price', note: 'Snapshot', type: 'currency', color: CC.primary, primary: true, sub: '12-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
   { key: 'medPrice3', label: 'Median Price (3M)', shortLabel: 'Median Price 3M', note: 'Recent', type: 'currency', color: CC.accent, sub: '3-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
-  { key: 'pct25',     label: 'P25 Price (12M)',   shortLabel: 'P25 Price',      note: 'Lower quartile', type: 'currency', color: CC.mint,  sub: '25th percentile', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
-  { key: 'pct75',     label: 'P75 Price (12M)',   shortLabel: 'P75 Price',      note: 'Upper quartile', type: 'currency', color: CC.plum,  sub: '75th percentile', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'pct25',     label: 'P25 Price (12M)',   shortLabel: 'P25 Price',      note: 'Lower quartile', type: 'currency', color: CC.light,  sub: '25th percentile', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+  { key: 'pct75',     label: 'P75 Price (12M)',   shortLabel: 'P75 Price',      note: 'Upper quartile', type: 'currency', color: CC.dark,  sub: '75th percentile', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
   { key: 'momMedianPriceChange', label: 'MoM Price Change (%)', shortLabel: 'MoM Chg', note: 'Month-on-month', type: 'pct', color: CC.amber, sub: 'median price', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>` },
   { key: 'yoyMedianPriceChange', label: 'YoY Price Change (%)', shortLabel: 'YoY Chg', note: 'Year-on-year',   type: 'pct', color: CC.coral, sub: 'median price', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>` },
   { key: 'affordabilityIndex12', label: 'Affordability Index (12M)', shortLabel: 'Afford. (12M)', note: 'Ratio', type: 'ratio', color: CC.slate, sub: '12-month', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>` },
@@ -3825,7 +3985,7 @@ const METRIC_DEFS = [
   { key: 'price3mToIncome',   label: 'Price-to-Income (3M)',  shortLabel: 'PTI (3M)',  note: 'Multiple', type: 'ratio', color: CC.plum,  sub: '3-month price',  icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
   { key: 'rent12mToIncome',   label: 'Rent-to-Income (12M)',  shortLabel: 'RTI (12M)', note: 'Multiple', type: 'ratio', color: CC.mint,  sub: 'rental burden',  icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` },
   { key: 'grossYield',         label: 'Gross Yield (%)',        shortLabel: 'Gross Yield', note: 'Pre-tax',   type: 'pct',   color: CC.amber, sub: 'annual rent / price', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>` },
-  { key: 'houseUnitDiff3m',    label: 'House–Unit Diff (3M)',   shortLabel: 'H/U Diff 3M', note: 'Spread',   type: 'currency', color: CC.plum,  sub: '3-month spread', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>` },
+  { key: 'houseUnitDiff3m',    label: 'House–Unit Diff (3M)',   shortLabel: 'H/U Diff 3M', note: 'Spread',   type: 'currency', color: CC.dark,  sub: '3-month spread', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>` },
   { key: 'houseUnitDiff12m',   label: 'House–Unit Diff (12M)',  shortLabel: 'H/U Diff 12M',note: 'Spread',   type: 'currency', color: CC.coral, sub: '12-month spread', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>` },
   { key: 'lgaPopGrowth',       label: 'LGA Pop. Growth (%)',    shortLabel: 'LGA Pop Gr.', note: 'YoY',      type: 'pct',   color: CC.mint,  sub: 'annual % change', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>` },
   { key: 'lgaPopulation',      label: 'LGA Population',         shortLabel: 'LGA Pop.',    note: 'Count',    type: 'count', color: CC.slate, sub: 'total population', icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>` },
@@ -4562,20 +4722,20 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
     });
     State.charts.dc3 = new Chart(ctx, {
       data:{ labels:lbl, datasets:[
-        { ...barDs('House Affordability Index', hAff, CC.mint, 'yLeft') },
-        { ...lineDs(`House ${viewMode==='monthly'?'MoM':'YoY'} %`, hChg, CC.primary, 'yRight') },
+        { ...barDs('House Affordability Index', hAff, CC.primary, 'yLeft') },
+        { ...lineDs(`House ${viewMode==='monthly'?'MoM':'YoY'} %`, hChg, CC.accent, 'yRight') },
       ]},
       options: baseOpts(
         c => c.dataset.yAxisID==='yRight'
           ? ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`
           : ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'x':'—'}`,
         'Affordability Index', 'ratio',
-        viewMode==='monthly'?'MoM % Change':'YoY % Change', 'pct', CC.primary
+        viewMode==='monthly'?'MoM % Change':'YoY % Change', 'pct', CC.accent
       ),
     });
     setLegend('legendDC3',[
-      {label:'House Affordability Index', color:CC.mint},
-      {label:`House ${viewMode==='monthly'?'MoM':'YoY'} %`, color:CC.primary},
+      {label:'House Affordability Index', color:CC.primary},
+      {label:`House ${viewMode==='monthly'?'MoM':'YoY'} %`, color:CC.accent},
     ]);
   }
 
@@ -4604,7 +4764,7 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
     });
     State.charts.dc4 = new Chart(ctx, {
       data:{ labels:lbl, datasets:[
-        { ...barDs('Unit Affordability Index', uAff, CC.plum, 'yLeft') },
+        { ...barDs('Unit Affordability Index', uAff, CC.primary, 'yLeft') },
         { ...lineDs(`Unit ${viewMode==='monthly'?'MoM':'YoY'} %`, uChg, CC.accent, 'yRight') },
       ]},
       options: baseOpts(
@@ -4616,7 +4776,7 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
       ),
     });
     setLegend('legendDC4',[
-      {label:'Unit Affordability Index', color:CC.plum},
+      {label:'Unit Affordability Index', color:CC.primary},
       {label:`Unit ${viewMode==='monthly'?'MoM':'YoY'} %`, color:CC.accent},
     ]);
   }
@@ -4645,20 +4805,20 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
       data:{ labels:lendFLbl, datasets:[
         { ...lineDs('House Median Price', fHPrices, CC.primary, 'yLeft', true, ctx) },
         { ...lineDs('Unit Median Price',  fUPrices, CC.accent,  'yLeft') },
-        { ...lineDs('OO Lending',         fOO,      CC.mint,    'yRight') },
-        { ...lineDs('Investor Lending',   fInv,     CC.amber,   'yRight') },
+        { ...lineDs('OO Lending',         fOO,      CC.light,   'yRight') },
+        { ...lineDs('Investor Lending',   fInv,     CC.dark,    'yRight') },
       ]},
       options: baseOpts(
         c => ` ${c.dataset.label}: ${formatCurrency(c.raw)}`,
         'Median Price ($)', 'currency',
-        'Lending ($)', 'currency', CC.mint
+        'Lending ($)', 'currency', CC.light
       ),
     });
     setLegend('legendDC5',[
       {label:'House Price (left)',         color:CC.primary},
       {label:'Unit Price (left)',           color:CC.accent},
-      {label:'OO Lending (right)',          color:CC.mint},
-      {label:'Investor Lending (right)',    color:CC.amber},
+      {label:'OO Lending (right)',          color:CC.light},
+      {label:'Investor Lending (right)',    color:CC.dark},
     ], 'dc5');
   }
 
@@ -4675,21 +4835,21 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
       data:{ labels:fLbl, datasets:[
         { ...barDs('Listings 12M — House', fHList, CC.primary, 'yLeft') },
         { ...barDs('Listings 12M — Unit',  fUList, CC.accent,  'yLeft') },
-        { ...lineDs('DOM — House', fHDom, CC.amber, 'yRight') },
-        { ...lineDs('DOM — Unit',  fUDom, CC.coral, 'yRight') },
+        { ...lineDs('DOM — House', fHDom, CC.light, 'yRight') },
+        { ...lineDs('DOM — Unit',  fUDom, CC.dark, 'yRight') },
       ]},
       options: baseOpts(
         c => c.dataset.yAxisID==='yRight'
           ? ` ${c.dataset.label}: ${safeNum(c.raw)!=null?Math.round(c.raw)+'d':'—'}`
           : ` ${c.dataset.label}: ${formatNumber(c.raw)}`,
-        'Listings (12M)', 'count', 'Days on Market', 'days', CC.amber
+        'Listings (12M)', 'count', 'Days on Market', 'days', CC.light
       ),
     });
     setLegend('legendDC6',[
       {label:'Listings — House', color:CC.primary},
       {label:'Listings — Unit',  color:CC.accent},
-      {label:'DOM — House',      color:CC.amber},
-      {label:'DOM — Unit',       color:CC.coral},
+      {label:'DOM — House',      color:CC.light},
+      {label:'DOM — Unit',       color:CC.dark},
     ]);
   }
 
@@ -4744,7 +4904,7 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
       data:{ labels:fLbl, datasets:[
         { ...lineDs(`${lgaName} Growth %`,   fLgaGr, CC.primary, 'yLeft', true, ctx) },
         { ...lineDs(`${capName} Growth %`,   fCapGr, CC.accent,  'yLeft') },
-        { ...lineDs(`${stateName} Growth %`, fStGr,  CC.amber,   'yLeft') },
+        { ...lineDs(`${stateName} Growth %`, fStGr,  CC.light,   'yLeft') },
       ]},
       options: singleAxisOpts(
         c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
@@ -4754,7 +4914,7 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
     setLegend('legendDC8',[
       {label:`${lgaName} Growth %`,   color:CC.primary},
       {label:`${capName} Growth %`,   color:CC.accent},
-      {label:`${stateName} Growth %`, color:CC.amber},
+      {label:`${stateName} Growth %`, color:CC.light},
     ], 'dc8');
   }
 
@@ -4771,7 +4931,7 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
       data:{ labels:lbl, datasets:[
         { ...barDs('House Sales 12M', hSales, CC.primary, 'yLeft') },
         { ...barDs('Unit Sales 12M',  uSales, CC.accent,  'yLeft') },
-        { ...barDs('Total Sales 12M', total,  CC.amber,   'yLeft') },
+        { ...barDs('Total Sales 12M', total,  CC.light,   'yLeft') },
       ]},
       options: singleAxisOpts(
         c => ` ${c.dataset.label}: ${formatNumber(c.raw)}`,
@@ -4781,7 +4941,7 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
     setLegend('legendDC9',[
       {label:'House Sales', color:CC.primary},
       {label:'Unit Sales',  color:CC.accent},
-      {label:'Total Sales', color:CC.amber},
+      {label:'Total Sales', color:CC.light},
     ]);
   }
 
@@ -4846,8 +5006,8 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
       data:{ labels:fLbl, datasets:[
         { ...lineDs('House RTI',           fHRTI, CC.primary, 'yLeft', true, ctx) },
         { ...lineDs('Unit RTI',            fURTI, CC.accent,  'yLeft') },
-        { ...lineDs('House Afford. Index', fHAff, CC.mint,    'yLeft') },
-        { ...lineDs('Unit Afford. Index',  fUAff, CC.plum,    'yLeft') },
+        { ...lineDs('House Afford. Index', fHAff, CC.light,   'yLeft') },
+        { ...lineDs('Unit Afford. Index',  fUAff, CC.dark,    'yLeft') },
       ]},
       options: singleAxisOpts(
         c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
@@ -4857,8 +5017,8 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
     setLegend('legendDC11',[
       {label:'House RTI',           color:CC.primary},
       {label:'Unit RTI',            color:CC.accent},
-      {label:'House Afford. Index', color:CC.mint},
-      {label:'Unit Afford. Index',  color:CC.plum},
+      {label:'House Afford. Index', color:CC.light},
+      {label:'Unit Afford. Index',  color:CC.dark},
     ]);
   }
 
@@ -4882,8 +5042,8 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
       data:{ labels:fLbl, datasets:[
         { ...lineDs('House Gross Yield %', fHY,   CC.primary, 'yLeft', true, ctx) },
         { ...lineDs('Unit Gross Yield %',  fUY,   CC.accent,  'yLeft') },
-        { ...lineDs('Cash Rate %',         fCash, CC.coral,   'yLeft') },
-        { ...lineDs('Bank Rate %',         fBank, CC.amber,   'yLeft') },
+        { ...lineDs('Cash Rate %',         fCash, CC.light,   'yLeft') },
+        { ...lineDs('Bank Rate %',         fBank, CC.dark,    'yLeft') },
       ]},
       options: singleAxisOpts(
         c => ` ${c.dataset.label}: ${safeNum(c.raw)!=null?c.raw.toFixed(2)+'%':'—'}`,
@@ -4893,8 +5053,8 @@ function renderDefaultComparisonCharts(houseData, unitData, viewMode) {
     setLegend('legendDC12',[
       {label:'House Gross Yield', color:CC.primary},
       {label:'Unit Gross Yield',  color:CC.accent},
-      {label:'Cash Rate',         color:CC.coral},
-      {label:'Bank Rate',         color:CC.amber},
+      {label:'Cash Rate',         color:CC.light},
+      {label:'Bank Rate',         color:CC.dark},
     ]);
   }
 }
@@ -5636,8 +5796,8 @@ function generateReport() {
 
 // Colour palette for up to 8 comparison subjects
 const COMPARE_COLORS = [
-  '#2aadbb', '#0a6266', '#f59e0b', '#8b5cf6',
-  '#ef4444', '#10b981', '#64748b', '#f97316'
+  '#2aadbb', '#0a6266', '#b2e8ec', '#161d27',
+  '#64748b', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6'
 ];
 
 // Key metrics shown in the snapshot comparison table (per spec)
@@ -5859,7 +6019,7 @@ function generateCompareReport() {
   if (bubbleEl) {
     // All bubbles use the same accent colour family — use teal shades
     // so the page looks clean rather than a rainbow of chips
-    const BUBBLE_COLORS = ['#0a6266','#0d7c82','#117a82','#0a5c60','#0e8a8a','#0c6e72'];
+    const BUBBLE_COLORS = ['#0a6266','#2aadbb','#0d7c82','#0a5c60','#117a82','#0c6e72'];
     bubbleEl.innerHTML = subjects.map((s, i) => {
       const bg = BUBBLE_COLORS[i % BUBBLE_COLORS.length];
       return `<span class="compare-subject-bubble" style="background:${bg}">
@@ -6081,7 +6241,7 @@ function renderCompareCharts(subjects, viewMode, propType) {
     return map;
   }
 
-  const SUBJECT_COLORS = ['#2aadbb','#0a6266','#f59e0b','#8b5cf6','#ef4444','#10b981','#64748b','#f97316'];
+  const SUBJECT_COLORS = CHART_PALETTE;
 
   // Filter defs for current viewMode
   const defs = COMPARE_CHART_DEFS.filter(def => {
@@ -6417,7 +6577,7 @@ function mapRow(r, geoLevel = 'lga') {
 // ----------------------------------------------------------------
 // PAGINATED SUPABASE FETCH — generic, used by all three tables
 // ----------------------------------------------------------------
-async function fetchTable(apiKey, tableName, geoLevel, progressLabel) {
+async function fetchTable(apiKey, tableName, geoLevel, progressLabel, onProgress = null) {
   const headers = {
     'apikey':        apiKey,
     'Authorization': `Bearer ${apiKey}`,
@@ -6438,7 +6598,6 @@ async function fetchTable(apiKey, tableName, geoLevel, progressLabel) {
     if (!res.ok) {
       const body = await res.text();
       if (res.status === 401) throw new Error('Invalid API key — check your publishable key and try again.');
-      // Non-fatal for division/subdivision tables (may not exist yet)
       console.warn(`[${tableName}] fetch error ${res.status}: ${body}`);
       return [];
     }
@@ -6454,12 +6613,8 @@ async function fetchTable(apiKey, tableName, geoLevel, progressLabel) {
     allRows = allRows.concat(page.map(r => mapRow(r, geoLevel)));
     offset += page.length;
 
-    const pct = total ? Math.round((offset / total) * 100) : null;
-    showStatus(
-      pct != null ? `Loading Data: ${pct}%` : 'Loading Data…',
-      `${progressLabel}: ${offset.toLocaleString()}${total ? ' / ' + total.toLocaleString() : ''} rows`,
-      'loading'
-    );
+    // Report per-table progress to caller — never call showStatus directly
+    if (onProgress) onProgress({ loaded: offset, total, label: progressLabel });
 
     if (page.length < PAGE_SIZE) break;
   }
@@ -7726,15 +7881,74 @@ function updateLgaFromSubdivision() {
     }
 
     // ── Fresh fetch — all three tables in parallel ────────────────────────
-    showStatus('Connecting to database…', SUPABASE_URL, 'loading');
+    // Aggregate progress across all three tables so the bar only moves forward.
+    // Phase 1: totals unknown → show 0%. Phase 2: totals known → combined %.
+    const progressState = {
+      lga:  { loaded: 0, total: null },
+      div:  { loaded: 0, total: null },
+      sub:  { loaded: 0, total: null },
+    };
+
+    function updateCombinedProgress() {
+      const { lga, div, sub } = progressState;
+      const allTotalsKnown = lga.total != null && div.total != null && sub.total != null;
+      if (!allTotalsKnown) {
+        // Show spinner with row count but no percentage yet
+        const totalLoaded = lga.loaded + div.loaded + sub.loaded;
+        showLoadProgress(null, `Loading… ${totalLoaded.toLocaleString()} rows`);
+        return;
+      }
+      const totalRows  = lga.total  + div.total  + sub.total;
+      const loadedRows = lga.loaded + div.loaded + sub.loaded;
+      const pct = Math.min(100, Math.round((loadedRows / totalRows) * 100));
+      showLoadProgress(pct, `Loading Data: ${pct}% · ${loadedRows.toLocaleString()} / ${totalRows.toLocaleString()} rows`);
+    }
+
+    function showLoadProgress(pct, label) {
+      const wrap  = document.getElementById('loadProgressWrap');
+      const fill  = document.getElementById('loadProgressFill');
+      const note  = document.getElementById('configRecordsNote');
+      if (wrap) wrap.classList.add('visible');
+      if (note) note.textContent = label;
+      if (fill && pct != null) {
+        fill.style.width = pct + '%';
+        // Color: red→orange→yellow→green as it fills
+        if (pct < 25)      fill.style.background = '#ef4444';
+        else if (pct < 50) fill.style.background = '#f59e0b';
+        else if (pct < 75) fill.style.background = '#2aadbb';
+        else               fill.style.background = '#10b981';
+      }
+    }
+
+    function hideLoadProgress() {
+      const wrap = document.getElementById('loadProgressWrap');
+      if (wrap) {
+        const fill = document.getElementById('loadProgressFill');
+        if (fill) { fill.style.width = '100%'; fill.style.background = '#10b981'; }
+        setTimeout(() => { wrap.classList.remove('visible'); }, 800);
+      }
+    }
+
+    showLoadProgress(0, 'Connecting to database…');
     try {
-      showStatus('Fetching LGA data…', '', 'loading');
       const [lgaRows, divRows, subRows] = await Promise.all([
-        fetchTable(SUPABASE_KEY, 'lga_data',          'lga',          'LGA data'),
-        fetchTable(SUPABASE_KEY, 'division_data',      'division',     'Division data')
-          .catch(e => { console.warn('division_data unavailable:', e.message); return []; }),
-        fetchTable(SUPABASE_KEY, 'subdivision_data',   'subdivision',  'Sub-division data')
-          .catch(e => { console.warn('subdivision_data unavailable:', e.message); return []; }),
+        fetchTable(SUPABASE_KEY, 'lga_data', 'lga', 'LGA data', ({ loaded, total }) => {
+          progressState.lga.loaded = loaded;
+          if (total != null) progressState.lga.total = total;
+          updateCombinedProgress();
+        }),
+        fetchTable(SUPABASE_KEY, 'division_data', 'division', 'Division data', ({ loaded, total }) => {
+          progressState.div.loaded = loaded;
+          if (total != null) progressState.div.total = total;
+          else if (progressState.div.total === null) progressState.div.total = 0;
+          updateCombinedProgress();
+        }).catch(e => { console.warn('division_data unavailable:', e.message); progressState.div.total = 0; return []; }),
+        fetchTable(SUPABASE_KEY, 'subdivision_data', 'subdivision', 'Sub-division data', ({ loaded, total }) => {
+          progressState.sub.loaded = loaded;
+          if (total != null) progressState.sub.total = total;
+          else if (progressState.sub.total === null) progressState.sub.total = 0;
+          updateCombinedProgress();
+        }).catch(e => { console.warn('subdivision_data unavailable:', e.message); progressState.sub.total = 0; return []; }),
       ]);
 
       if (lgaRows.length === 0) {
@@ -7752,6 +7966,8 @@ function updateLgaFromSubdivision() {
 
       const lgas = [...new Set(lgaRows.map(r => r.lga).filter(Boolean))];
       const totalRows = lgaRows.length + divRows.length + subRows.length;
+      showLoadProgress(100, `${totalRows.toLocaleString()} records loaded`);
+      hideLoadProgress();
       showStatus(
         `${totalRows.toLocaleString()} records loaded`,
         `${lgas.length} LGAs · ${divRows.length.toLocaleString()} division rows · ${subRows.length.toLocaleString()} subdivision rows`,
@@ -7766,12 +7982,308 @@ function updateLgaFromSubdivision() {
 
     } catch(err) {
       console.error(err);
+      hideLoadProgress();
       showStatus('Failed to load data: ' + err.message, 'Check your network connection and try refreshing.', 'error');
     }
   }
 
   autoFetch();
 })();
+
+
+
+
+// ══════════════════════════════════════════════════════════════
+// AI ASSISTANT — Gemini 2.5 Flash
+// ══════════════════════════════════════════════════════════════
+(function() {
+
+  // ── Gemini API call (user-provided key, stored in localStorage) ──
+  async function mockBackendCall(promptText) {
+    let API_KEY = localStorage.getItem('gemini_api_key');
+    if (!API_KEY) {
+      API_KEY = prompt('To use the AI Assistant, please paste your Gemini API Key:');
+      if (!API_KEY) return 'AI assistant disabled. Please refresh and provide an API key.';
+      localStorage.setItem('gemini_api_key', API_KEY.trim());
+      API_KEY = API_KEY.trim();
+    }
+    // Try models in order of preference — fall back if one isn't available on the key
+    const MODELS = [
+      'gemini-2.5-flash-preview-05-20',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+    ];
+    for (const model of MODELS) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: promptText }] }],
+            generationConfig: { maxOutputTokens: 1024, temperature: 0.4 }
+          })
+        });
+        const data = await response.json();
+        if (response.status === 403 || response.status === 401) {
+          localStorage.removeItem('gemini_api_key');
+          console.error('Gemini auth error:', data);
+          return 'Invalid API key — the saved key has been cleared. Click the chat button and try again with a valid key.';
+        }
+        if (response.status === 429) {
+          console.warn('Rate limit hit, retrying in 5s…');
+          await new Promise(r => setTimeout(r, 5000));
+          const retry = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: promptText }] }],
+              generationConfig: { maxOutputTokens: 1024, temperature: 0.4 }
+            })
+          });
+          if (retry.status === 429) {
+            return 'Rate limit reached — you\u2019ve hit the free tier quota. Wait a minute and try again, or enable billing at console.cloud.google.com.';
+          }
+          const retryData = await retry.json();
+          const retryText = retryData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (retryText) return retryText;
+        }
+        if (response.status === 404 || response.status === 400) {
+          console.warn(`Model ${model} unavailable (${response.status}), trying next…`);
+          continue;
+        }
+        if (!response.ok) {
+          console.error('Gemini API Error:', response.status, data);
+          return `API error ${response.status}. Please try again.`;
+        }
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+        console.warn('Unexpected response shape:', data);
+        continue;
+      } catch (error) {
+        console.error('Fetch Error:', error);
+        return "Sorry, I couldn't connect to the AI. Check your internet connection.";
+      }
+    }
+    return 'No Gemini model could be reached with your API key. Ensure your key has the Generative Language API enabled at console.cloud.google.com.';
+  }
+
+  const WELCOME = `Hi! I'm your Property Research AI powered by Gemini.
+
+I can **generate reports**, **compare regions**, answer data questions, and summarise the current report.
+
+Try: "Show me Albury NSW yearly" or "Compare Sydney and Melbourne".`;
+
+  // DOM refs
+  const fab      = document.getElementById('ai-fab');
+  const panel    = document.getElementById('ai-panel');
+  const closeBtn = document.getElementById('ai-close');
+  const msgBox   = document.getElementById('ai-messages');
+  const input    = document.getElementById('ai-input');
+  const sendBtn  = document.getElementById('ai-send');
+  const pillsEl  = document.getElementById('ai-suggestion-pills');
+
+  let history  = [];   // { role, content } pairs for context
+  let thinking = false;
+
+  // ── Open / close ────────────────────────────────────────────
+  function openPanel() {
+    panel.classList.add('open');
+    fab.classList.add('open');
+    if (!msgBox.children.length) showWelcome();
+    setTimeout(() => input.focus(), 220);
+  }
+  function closePanel() {
+    panel.classList.remove('open');
+    fab.classList.remove('open');
+  }
+  fab.addEventListener('click', () => panel.classList.contains('open') ? closePanel() : openPanel());
+  closeBtn.addEventListener('click', closePanel);
+
+  // ── Welcome ─────────────────────────────────────────────────
+  function showWelcome() {
+    appendMsg('assistant', WELCOME);
+    showPills(['Show me Albury NSW', 'Compare Sydney & Melbourne', 'Summarise current report', 'Highest gross yield LGA?']);
+  }
+
+  function showPills(pills) {
+    if (!pillsEl) return;
+    pillsEl.innerHTML = '';
+    pills.forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = 'ai-action-pill';
+      btn.textContent = p;
+      btn.onclick = () => { input.value = p; autoResize(); sendMessage(); };
+      pillsEl.appendChild(btn);
+    });
+  }
+
+  // ── Messages ─────────────────────────────────────────────────
+  function appendMsg(role, text) {
+    const el = document.createElement('div');
+    el.className = 'ai-msg ' + role;
+    el.innerHTML = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+    msgBox.appendChild(el);
+    msgBox.scrollTop = msgBox.scrollHeight;
+    return el;
+  }
+  function removeThinking() { msgBox.querySelector('.ai-msg.thinking')?.remove(); }
+
+  // ── Build full prompt with live context ──────────────────────
+  // ── Build full prompt with live context ──────────────────────
+  function getDashboardContext() {
+    const title = document.getElementById('reportTitle')?.textContent || 'No region selected';
+    const isCompareMode = document.getElementById('modeCompare')?.classList.contains('active');
+    const mode = isCompareMode ? 'Compare Mode' : 'Focused Mode';
+    let kpiText = '';
+    const snapshotCards = document.querySelectorAll('.snapshot-card');
+    snapshotCards.forEach(card => {
+      const label  = card.querySelector('.snapshot-label')?.innerText || '';
+      const values = Array.from(card.querySelectorAll('.snapshot-value')).map(v => v.innerText).join(' vs ');
+      if (label && values) kpiText += `  * ${label}: ${values}\n`;
+    });
+    let compareText = '';
+    if (isCompareMode) {
+      const compareRows = document.querySelectorAll('#compareKpiTable tbody tr');
+      compareRows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText);
+        if (cells.length > 1) compareText += `  * ${cells[0]}: ${cells.slice(1).join(' vs ')}\n`;
+      });
+    }
+    const systemPrompt = `You are an expert Australian Property Market Data Analyst embedded directly inside a real estate analytics dashboard.
+--- CURRENT DASHBOARD STATE ---
+Region/Context: ${title}
+Dashboard Mode: ${mode}
+--- VISIBLE DATA METRICS ---
+${isCompareMode ? 'COMPARE TABLE DATA:\n' + compareText : 'SNAPSHOT METRICS:\n' + kpiText}
+--- INSTRUCTIONS ---
+1. Answer data questions using ONLY the visible metrics provided above.
+2. DASHBOARD CONTROL: You have the ability to navigate the dashboard for the user. If the user asks to generate a report, view a region, or compare areas, you MUST output a JSON action block at the very end of your response, wrapped exactly in <action> tags.
+ACTION SCHEMAS:
+To load a single region (Focused Mode), output:
+<action>{"type": "report", "lga": "[Insert LGA Name]", "state": "[Insert State Abbreviation, e.g., NSW]", "aggregation": "yearly"}</action>
+To compare multiple regions (Compare Mode), output:
+<action>{"type": "compare", "regions": [{"lga": "[LGA 1]"}, {"lga": "[LGA 2]"}], "aggregation": "yearly"}</action>
+Example User Prompt: "Generate a report for Albury NSW"
+Example AI Response: "Sure, I am loading the report for Albury in New South Wales now. <action>{"type": "report", "lga": "Albury", "state": "NSW", "aggregation": "yearly"}</action>"
+If the user only asks a question about the current data, do NOT output an <action> tag. Keep your tone professional and concise.
+User's Question: `;
+    return systemPrompt;
+  }
+
+  function buildPrompt(userText) {
+    // Conversation history as text
+    const historyText = history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n');
+    const systemCtx   = getDashboardContext();
+    return systemCtx + userText + (historyText ? '\n\nPrevious conversation:\n' + historyText : '');
+  }
+
+  // ── Execute dashboard action from AI response ────────────────
+  function execAction(json) {
+    try {
+      const a = JSON.parse(json);
+      const aggEl = document.getElementById('aggregationSelect');
+      const agg   = a.aggregation || 'yearly';
+      if (aggEl) {
+        aggEl.value = agg;
+        const at = document.getElementById('aggregationSelectTrigger');
+        if (at) at.textContent = agg === 'yearly' ? 'Yearly' : 'Monthly';
+      }
+
+      if (a.type === 'report') {
+        const stEl = document.getElementById('stateSelect');
+        if (a.state && stEl) {
+          stEl.value = a.state;
+          stEl.dispatchEvent(new Event('change'));
+          const trig = document.getElementById('stateSelectTrigger');
+          if (trig) trig.textContent = a.state;
+        }
+        setMode('focused');
+        setTimeout(() => {
+          if (a.division) {
+            const di = document.getElementById('divisionSearch');
+            if (di) { di.value = a.division; di.dispatchEvent(new Event('input')); }
+            setTimeout(() => { State.geoLevel = 'division'; generateReport(); }, 400);
+          } else if (a.lga) {
+            if (typeof updateLgaList === 'function') updateLgaList();
+            setTimeout(() => {
+              const ls = document.getElementById('lgaSelect');
+              const m  = ls ? [...ls.options].find(o => o.value.toLowerCase().includes(a.lga.toLowerCase())) : null;
+              if (m) { selectLgaOption(m.value, m.text); setTimeout(() => generateReport(), 300); }
+              else appendMsg('assistant', `Could not find LGA "${a.lga}" — try selecting the state filter first.`);
+            }, 500);
+          }
+        }, 400);
+
+      } else if (a.type === 'compare') {
+        setMode('compare');
+        _compareSelections.lga = [];
+        _compareSelections.division = [];
+        _compareSelections.subdivision = [];
+        (a.regions || []).forEach(r => {
+          if (r.lga)      toggleCompareSelection('lga', r.lga);
+          if (r.division) toggleCompareSelection('division', r.division);
+        });
+        applyCompareMutex();
+        if (typeof renderCompareTagPills === 'function') renderCompareTagPills();
+        setTimeout(() => generateReport(), 400);
+      }
+    } catch(e) { console.warn('AI action parse error:', e); }
+  }
+
+  // ── Send ─────────────────────────────────────────────────────
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text || thinking) return;
+
+    if (pillsEl) pillsEl.innerHTML = '';
+    appendMsg('user', text);
+    input.value = '';
+    autoResize();
+
+    thinking = true;
+    sendBtn.disabled = true;
+    const thinkEl = appendMsg('thinking', 'Thinking…');
+
+    const fullPrompt = buildPrompt(text);
+    const rawText    = await mockBackendCall(fullPrompt);
+
+    removeThinking();
+
+    const match   = rawText.match(/<action>([\s\S]*?)<\/action>/);
+    const display = rawText.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
+
+    appendMsg('assistant', display || 'Done!');
+
+    // Keep last 6 turns of history for context
+    history.push({ role: 'user', content: text });
+    history.push({ role: 'assistant', content: display });
+    if (history.length > 12) history = history.slice(-12);
+
+    if (match) setTimeout(() => execAction(match[1].trim()), 300);
+
+    thinking = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+
+  // ── Input auto-resize ─────────────────────────────────────────
+  function autoResize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 96) + 'px';
+  }
+  input.addEventListener('input', autoResize);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+
+})();
+
 </script>
 </body>
 </html>
