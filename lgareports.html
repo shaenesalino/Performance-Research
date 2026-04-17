@@ -3315,6 +3315,32 @@ tbody tr:last-child td { border-bottom: none; }
 #ai-send:hover { background: #0d7a7e; }
 #ai-send:disabled { background: var(--border); cursor: not-allowed; }
 
+
+/* AI key entry row */
+.ai-key-row {
+  display: flex; gap: 7px; padding: 10px 12px;
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0; background: var(--bg-subtle);
+}
+.ai-key-row.hidden { display: none; }
+#ai-key-input {
+  flex: 1; border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-size: 12px; font-family: var(--font-body);
+  color: var(--text); background: var(--bg-card); outline: none;
+}
+#ai-key-input::placeholder { color: var(--text-light); }
+#ai-key-input:focus { border-color: var(--primary); }
+.ai-key-save-btn {
+  padding: 6px 12px; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; font-size: 12px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: background 0.15s;
+}
+.ai-key-save-btn:hover { background: #0d7a7e; }
+.ai-key-note {
+  font-size: 10px; color: var(--text-light); padding: 0 12px 8px;
+  text-align: center; flex-shrink: 0;
+}
+
 </style>
 </head>
 <body>
@@ -3808,15 +3834,20 @@ tbody tr:last-child td { border-bottom: none; }
 
 
 <!-- ── AI ASSISTANT ──────────────────────────────────────── -->
-<button id="ai-fab" title="Ask AI Assistant" aria-label="Open AI assistant">
+<button id="ai-fab" title="Ask Performia AI" aria-label="Open Performia AI">
   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
 </button>
-<div id="ai-panel" role="dialog" aria-label="AI Assistant">
+<div id="ai-panel" role="dialog" aria-label="Performia AI">
   <div class="ai-panel-header">
     <span class="ai-panel-dot"></span>
-    <span class="ai-panel-title">Property Research AI</span>
+    <span class="ai-panel-title">Performia AI <span style="font-weight:400;color:var(--text-light);font-size:11px;">powered by Gemini</span></span>
     <button class="ai-panel-close" id="ai-close" aria-label="Close">✕</button>
   </div>
+  <div id="ai-key-row" class="ai-key-row">
+    <input id="ai-key-input" type="password" placeholder="Paste your Gemini API key…" autocomplete="off"/>
+    <button id="ai-key-save" class="ai-key-save-btn">Connect</button>
+  </div>
+  <div class="ai-key-note" id="ai-key-note">Get a free key at <strong>aistudio.google.com</strong></div>
   <div id="ai-messages"></div>
   <div id="ai-suggestion-pills" class="ai-suggestion-pills"></div>
   <div class="ai-input-row">
@@ -7998,15 +8029,12 @@ function updateLgaFromSubdivision() {
 // ══════════════════════════════════════════════════════════════
 (function() {
 
-  // ── Gemini API call (user-provided key, stored in localStorage) ──
+  // ── Gemini API call (key stored in memory only, cleared on page reload) ──
+  let _geminiKey = '';   // in-memory only — cleared on every page load
+
   async function mockBackendCall(promptText) {
-    let API_KEY = localStorage.getItem('gemini_api_key');
-    if (!API_KEY) {
-      API_KEY = prompt('To use the AI Assistant, please paste your Gemini API Key:');
-      if (!API_KEY) return 'AI assistant disabled. Please refresh and provide an API key.';
-      localStorage.setItem('gemini_api_key', API_KEY.trim());
-      API_KEY = API_KEY.trim();
-    }
+    const API_KEY = _geminiKey;
+    if (!API_KEY) return 'Please enter your Gemini API key above to start.';
     // Try models in order of preference — fall back if one isn't available on the key
     const MODELS = [
       'gemini-2.5-flash-preview-05-20',
@@ -8027,9 +8055,10 @@ function updateLgaFromSubdivision() {
         });
         const data = await response.json();
         if (response.status === 403 || response.status === 401) {
-          localStorage.removeItem('gemini_api_key');
+          _geminiKey = '';
           console.error('Gemini auth error:', data);
-          return 'Invalid API key — the saved key has been cleared. Click the chat button and try again with a valid key.';
+          showKeyRow();
+          return 'Invalid API key — please enter a valid key above.';
         }
         if (response.status === 429) {
           console.warn('Rate limit hit, retrying in 5s…');
@@ -8069,7 +8098,7 @@ function updateLgaFromSubdivision() {
     return 'No Gemini model could be reached with your API key. Ensure your key has the Generative Language API enabled at console.cloud.google.com.';
   }
 
-  const WELCOME = `Hi! I'm your Property Research AI powered by Gemini.
+  const WELCOME = `Hi! I'm Performia, your AI property analyst powered by Gemini.
 
 I can **generate reports**, **compare regions**, answer data questions, and summarise the current report.
 
@@ -8083,16 +8112,47 @@ Try: "Show me Albury NSW yearly" or "Compare Sydney and Melbourne".`;
   const input    = document.getElementById('ai-input');
   const sendBtn  = document.getElementById('ai-send');
   const pillsEl  = document.getElementById('ai-suggestion-pills');
+  const keyRow   = document.getElementById('ai-key-row');
+  const keyNote  = document.getElementById('ai-key-note');
+  const keyInput = document.getElementById('ai-key-input');
+  const keySave  = document.getElementById('ai-key-save');
 
-  let history  = [];   // { role, content } pairs for context
+  let history  = [];
   let thinking = false;
+
+  // ── Key row helpers ──────────────────────────────────────────
+  function showKeyRow() {
+    if (keyRow)  keyRow.classList.remove('hidden');
+    if (keyNote) keyNote.style.display = '';
+    setTimeout(() => keyInput?.focus(), 100);
+  }
+  function hideKeyRow() {
+    if (keyRow)  keyRow.classList.add('hidden');
+    if (keyNote) keyNote.style.display = 'none';
+  }
+
+  // ── Key save ─────────────────────────────────────────────────
+  keySave.addEventListener('click', () => {
+    const k = keyInput.value.trim();
+    if (!k) { keyInput.style.borderColor = '#ef4444'; setTimeout(() => keyInput.style.borderColor = '', 1200); return; }
+    _geminiKey = k;
+    hideKeyRow();
+    if (!msgBox.children.length) showWelcome();
+    input.focus();
+  });
+  keyInput.addEventListener('keydown', e => { if (e.key === 'Enter') keySave.click(); });
 
   // ── Open / close ────────────────────────────────────────────
   function openPanel() {
     panel.classList.add('open');
     fab.classList.add('open');
-    if (!msgBox.children.length) showWelcome();
-    setTimeout(() => input.focus(), 220);
+    if (!_geminiKey) {
+      showKeyRow();
+    } else {
+      hideKeyRow();
+      if (!msgBox.children.length) showWelcome();
+    }
+    setTimeout(() => (_geminiKey ? input : keyInput)?.focus(), 220);
   }
   function closePanel() {
     panel.classList.remove('open');
@@ -8134,18 +8194,31 @@ Try: "Show me Albury NSW yearly" or "Compare Sydney and Melbourne".`;
   function removeThinking() { msgBox.querySelector('.ai-msg.thinking')?.remove(); }
 
   // ── Build full prompt with live context ──────────────────────
-  // ── Build full prompt with live context ──────────────────────
   function getDashboardContext() {
     const title = document.getElementById('reportTitle')?.textContent || 'No region selected';
     const isCompareMode = document.getElementById('modeCompare')?.classList.contains('active');
     const mode = isCompareMode ? 'Compare Mode' : 'Focused Mode';
+
+    // In Focused Mode each snapshot card has a House column and a Unit column.
+    // Read the snapshot-mini-label text ("House", "Unit") so the AI knows which is which.
     let kpiText = '';
     const snapshotCards = document.querySelectorAll('.snapshot-card');
     snapshotCards.forEach(card => {
-      const label  = card.querySelector('.snapshot-label')?.innerText || '';
-      const values = Array.from(card.querySelectorAll('.snapshot-value')).map(v => v.innerText).join(' vs ');
-      if (label && values) kpiText += `  * ${label}: ${values}\n`;
+      const label = card.querySelector('.snapshot-label')?.innerText || '';
+      const cols  = Array.from(card.querySelectorAll('.snapshot-split > div, .snapshot-split-3 > div'));
+      if (cols.length) {
+        const parts = cols.map(col => {
+          const val = col.querySelector('.snapshot-value')?.innerText?.trim() || '\u2014';
+          const sub = col.querySelector('.snapshot-mini-label')?.innerText?.trim() || '';
+          return sub ? `${sub}: ${val}` : val;
+        });
+        if (label) kpiText += `  * ${label}: ${parts.join(' | ')}\n`;
+      } else {
+        const val = card.querySelector('.snapshot-value')?.innerText?.trim() || '';
+        if (label && val) kpiText += `  * ${label}: ${val}\n`;
+      }
     });
+
     let compareText = '';
     if (isCompareMode) {
       const compareRows = document.querySelectorAll('#compareKpiTable tbody tr');
@@ -8154,15 +8227,23 @@ Try: "Show me Albury NSW yearly" or "Compare Sydney and Melbourne".`;
         if (cells.length > 1) compareText += `  * ${cells[0]}: ${cells.slice(1).join(' vs ')}\n`;
       });
     }
-    const systemPrompt = `You are an expert Australian Property Market Data Analyst embedded directly inside a real estate analytics dashboard.
+
+    const systemPrompt = `You are Performia, an expert Australian Property Market Data Analyst embedded directly inside a real estate analytics dashboard.
 --- CURRENT DASHBOARD STATE ---
 Region/Context: ${title}
 Dashboard Mode: ${mode}
 --- VISIBLE DATA METRICS ---
-${isCompareMode ? 'COMPARE TABLE DATA:\n' + compareText : 'SNAPSHOT METRICS:\n' + kpiText}
+${isCompareMode ? 'COMPARE TABLE DATA:\n' + compareText : 'SNAPSHOT METRICS (Focused Mode):\n' + kpiText}
+--- IMPORTANT DATA STRUCTURE RULES ---
+- In Focused Mode, every metric shows TWO values side by side: one for HOUSES and one for UNITS in the SAME LGA/region.
+- The format is "House: [value] | Unit: [value]". These are NEVER benchmarks, indexes, or comparisons to other regions.
+- Do NOT describe the Unit value as a benchmark, average, reference point, or index. It is simply the unit property type within the same region.
+- When discussing any metric, always specify whether you are referring to the house figure or the unit figure.
+- There is NO benchmark data in this dashboard. Do not invent, assume, or imply any benchmark comparison.
 --- INSTRUCTIONS ---
 1. Answer data questions using ONLY the visible metrics provided above.
-2. DASHBOARD CONTROL: You have the ability to navigate the dashboard for the user. If the user asks to generate a report, view a region, or compare areas, you MUST output a JSON action block at the very end of your response, wrapped exactly in <action> tags.
+2. Always distinguish between house and unit figures when discussing metrics.
+3. DASHBOARD CONTROL: You have the ability to navigate the dashboard for the user. If the user asks to generate a report, view a region, or compare areas, you MUST output a JSON action block at the very end of your response, wrapped exactly in <action> tags.
 ACTION SCHEMAS:
 To load a single region (Focused Mode), output:
 <action>{"type": "report", "lga": "[Insert LGA Name]", "state": "[Insert State Abbreviation, e.g., NSW]", "aggregation": "yearly"}</action>
@@ -8174,7 +8255,6 @@ If the user only asks a question about the current data, do NOT output an <actio
 User's Question: `;
     return systemPrompt;
   }
-
   function buildPrompt(userText) {
     // Conversation history as text
     const historyText = history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n');
