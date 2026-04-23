@@ -69,9 +69,6 @@ input,select,textarea{font-family:inherit;color:var(--text)}
 [data-dark] .nav-item[data-p="goals"]       .nav-icon{background:rgba(247,37,133,.16)}
 [data-dark] .nav-item[data-p="reports"]     .nav-icon{background:rgba(168,85,247,.18)}
 [data-dark] .nav-item[data-p="settings"]    .nav-icon{background:rgba(148,163,184,.18); color:#CBD5E1}
-.sb-footer{padding:12px 8px;border-top:1px solid var(--border)}
-.sb-footer button{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--muted);transition:background .14s}
-.sb-footer button:hover{background:var(--bg);color:var(--text)}
 /* MAIN */
 .main{margin-left:var(--sw);flex:1;min-width:0;display:flex;flex-direction:column}
 .topbar{height:var(--th);background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
@@ -223,6 +220,14 @@ tbody tr:hover td{background:var(--bg)}
 .set-sub{font-size:11.5px;color:var(--muted);margin-top:1px}
 .set-ctrl select,.set-ctrl input[type=text]{padding:7px 11px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:13px;outline:none;background:var(--white)}
 .set-ctrl select:focus,.set-ctrl input:focus{border-color:var(--blue)}
+/* iOS-style toggle switch */
+.toggle-sw{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;cursor:pointer}
+.toggle-sw input{opacity:0;width:0;height:0;position:absolute}
+.toggle-sw .track{position:absolute;inset:0;background:var(--border);border-radius:99px;transition:background .2s}
+.toggle-sw .thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:var(--white);border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .22s cubic-bezier(.4,0,.2,1)}
+.toggle-sw input:checked + .track{background:var(--blue)}
+.toggle-sw input:checked + .track + .thumb{transform:translateX(20px)}
+.toggle-sw input:focus-visible + .track{box-shadow:0 0 0 3px rgba(74,144,226,.3)}
 /* MODAL */
 .modal-bg{position:fixed;inset:0;z-index:500;background:rgba(17,24,39,.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .18s}
 .modal-bg.open{opacity:1;pointer-events:all}
@@ -267,6 +272,30 @@ tbody tr:hover td{background:var(--bg)}
 /* TOAST */
 .toast{position:fixed;bottom:20px;right:20px;z-index:999;background:var(--text);color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .22s;box-shadow:var(--shadow-lg);pointer-events:none;max-width:300px}
 .toast.show{opacity:1;transform:none}
+
+/* UPDATE BANNER */
+.upd-banner{position:fixed;top:0;left:0;right:0;z-index:300;background:linear-gradient(135deg,#4A90E2,#5BC0BE,#7ED957);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:14px;font-size:13.5px;font-weight:500;box-shadow:0 2px 12px rgba(0,0,0,.15);transform:translateY(-100%);transition:transform .35s cubic-bezier(.4,0,.2,1);will-change:transform}
+.upd-banner.show{transform:translateY(0)}
+.upd-banner-msg{display:flex;align-items:center;gap:8px;min-width:0}
+.upd-banner-icon{width:22px;height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.upd-banner-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.upd-banner-txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upd-banner-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.upd-banner-btn{background:rgba(255,255,255,.95);color:#1F2937;border:none;padding:6px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;transition:transform .12s,background .14s;white-space:nowrap}
+.upd-banner-btn:hover{background:#fff}
+.upd-banner-btn:active{transform:scale(.96)}
+.upd-banner-close{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:background .14s}
+.upd-banner-close:hover{background:rgba(255,255,255,.28)}
+/* Push the rest of the app down when banner is visible */
+body.has-update-banner .sidebar{top:46px;height:calc(100vh - 46px)}
+body.has-update-banner .topbar{top:46px}
+@media(max-width:700px){
+  .upd-banner{padding:8px 12px;gap:8px;font-size:12.5px}
+  .upd-banner-txt{font-size:12px}
+  .upd-banner-btn{padding:5px 11px;font-size:11.5px}
+  body.has-update-banner .topbar{top:44px}
+  .upd-banner-icon{display:none}
+}
 /* EMPTY */
 .empty{text-align:center;padding:40px 16px;color:var(--muted)}
 .empty-icon{font-size:36px;margin-bottom:10px;opacity:.45}
@@ -432,6 +461,19 @@ tbody tr:hover td{background:var(--bg)}
 </style>
 </head>
 <body>
+<!-- UPDATE BANNER (shown when a new version is detected) -->
+<div class="upd-banner" id="updBanner" role="alert" aria-live="polite">
+  <div class="upd-banner-msg">
+    <span class="upd-banner-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+    </span>
+    <span class="upd-banner-txt">New updates available.</span>
+  </div>
+  <div class="upd-banner-actions">
+    <button class="upd-banner-btn" id="updBannerRefresh">Refresh Now</button>
+    <button class="upd-banner-close" id="updBannerClose" aria-label="Dismiss update notice">✕</button>
+  </div>
+</div>
 <div class="shell">
 <!-- SIDEBAR -->
 <aside class="sidebar">
@@ -449,9 +491,6 @@ tbody tr:hover td{background:var(--bg)}
     <div class="nav-item" data-p="reports"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 19V8"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V10"/><path d="M2.5 21h19.5"/></svg></span>Reports</div>
     <div class="nav-item" data-p="settings"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.7l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.7-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.7.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.7 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.7.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.7-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.7v.1a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></span>Settings</div>
   </nav>
-  <div class="sb-footer">
-    <button id="themeBtn">🌙 Toggle dark mode</button>
-  </div>
 </aside>
 <!-- MAIN -->
 <div class="main">
@@ -609,6 +648,7 @@ tbody tr:hover td{background:var(--bg)}
           <h3>General</h3>
           <div class="set-row"><div><div class="set-lbl">Currency</div><div class="set-sub">Symbol shown on amounts</div></div><div class="set-ctrl"><select id="setCurrency"><option value="₱">₱ Philippine Peso</option><option value="$">$ US Dollar</option><option value="€">€ Euro</option><option value="£">£ British Pound</option><option value="¥">¥ Japanese Yen</option></select></div></div>
           <div class="set-row"><div><div class="set-lbl">Your Name</div><div class="set-sub">Used in the greeting</div></div><div class="set-ctrl"><input type="text" id="setName" placeholder="Your name" style="width:160px"/></div></div>
+          <div class="set-row"><div><div class="set-lbl">Dark Mode</div><div class="set-sub">Switch between light and dark theme</div></div><div class="set-ctrl"><label class="toggle-sw" for="setDarkMode"><input type="checkbox" id="setDarkMode"/><span class="track"></span><span class="thumb"></span></label></div></div>
         </div>
         <div class="set-section">
           <h3>Data</h3>
@@ -1409,6 +1449,8 @@ document.addEventListener('click', (e)=>{
 function loadSettings(){
   g('setCurrency').value=SET.cy||'₱';
   g('setName').value=SET.name||'';
+  const sw=g('setDarkMode');
+  if(sw) sw.checked=document.documentElement.hasAttribute('data-dark');
 }
 function applySettings(){
   SET.cy=g('setCurrency').value;
@@ -1656,7 +1698,12 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   // Theme
-  g('themeBtn').addEventListener('click',toggleTheme);
+  // Dark mode toggle in Settings — sync state on load + handle change
+  const darkSw = g('setDarkMode');
+  if(darkSw){
+    darkSw.checked = document.documentElement.hasAttribute('data-dark');
+    darkSw.addEventListener('change', toggleTheme);
+  }
 
   // Month nav
   g('prevMo').addEventListener('click',()=>{
@@ -3053,6 +3100,121 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 })();
 
+</script>
+
+<script>
+/* ── UPDATE CHECKER ──────────────────────────
+   How it works:
+   1. BUILD_VERSION below is bumped each time you ship a new HTML.
+   2. Every 5 min (and once on load), we fetch ./version.json with cache-bust.
+   3. If remote.version > BUILD_VERSION, banner slides down.
+   4. "Refresh Now" hard-reloads the page (cache bypass).
+   5. "Dismiss" hides for this session only — banner reappears on next launch.
+   To deploy a new version:
+   - Bump BUILD_VERSION in this file
+   - Update version.json on your host (same value)
+*/
+(function(){
+  const BUILD_VERSION = '2026.04.23.1';            // <-- BUMP THIS ON EACH RELEASE
+  const VERSION_URL   = './version.json';          // relative to where the HTML is hosted
+  const POLL_MS       = 5 * 60 * 1000;             // re-check every 5 minutes
+  const DISMISS_KEY   = 'sl_update_dismissed_for'; // sessionStorage: hides banner per session per detected version
+
+  // Compare two version strings as dot-separated tuples (works for "2026.04.23.1" or semver "1.2.3")
+  function newer(remote, current){
+    if(!remote || !current || remote === current) return false;
+    const a = String(remote).split('.').map(n => parseInt(n,10) || 0);
+    const b = String(current).split('.').map(n => parseInt(n,10) || 0);
+    const len = Math.max(a.length, b.length);
+    for(let i=0; i<len; i++){
+      const x = a[i] || 0, y = b[i] || 0;
+      if(x > y) return true;
+      if(x < y) return false;
+    }
+    return false;
+  }
+
+  let bannerShown = false;
+  let detectedVersion = null;
+
+  function showBanner(remoteVersion){
+    if(bannerShown) return;
+    // skip if user dismissed THIS specific version this session
+    let dismissed = '';
+    try{ dismissed = sessionStorage.getItem(DISMISS_KEY) || ''; }catch(e){}
+    if(dismissed === remoteVersion) return;
+
+    const banner = document.getElementById('updBanner');
+    if(!banner) return;
+    bannerShown = true;
+    detectedVersion = remoteVersion;
+    document.body.classList.add('has-update-banner');
+    // Force reflow then add show class so the slide-down transition runs
+    requestAnimationFrame(() => banner.classList.add('show'));
+  }
+
+  function hideBanner(){
+    const banner = document.getElementById('updBanner');
+    if(!banner) return;
+    banner.classList.remove('show');
+    document.body.classList.remove('has-update-banner');
+    bannerShown = false;
+    if(detectedVersion){
+      try{ sessionStorage.setItem(DISMISS_KEY, detectedVersion); }catch(e){}
+    }
+  }
+
+  function refreshNow(){
+    // Bypass HTTP cache by adding a cache-buster, then reload.
+    // location.reload(true) is deprecated; this technique is more reliable.
+    const url = new URL(window.location.href);
+    url.searchParams.set('_v', Date.now().toString(36));
+    window.location.replace(url.toString());
+  }
+
+  async function checkForUpdate(){
+    // Only run when actually online & not on file:// (which can't fetch siblings)
+    if(!navigator.onLine) return;
+    if(window.location.protocol === 'file:') return;
+    try{
+      // Cache-bust the version.json fetch itself so we always see the latest
+      const url = VERSION_URL + (VERSION_URL.includes('?') ? '&' : '?') + '_=' + Date.now();
+      const res = await fetch(url, {cache:'no-store', credentials:'omit'});
+      if(!res.ok) return;
+      const data = await res.json();
+      const remote = (data && (data.version || data.v)) ? String(data.version || data.v) : null;
+      if(remote && newer(remote, BUILD_VERSION)) showBanner(remote);
+    }catch(e){
+      // silent — offline, CORS, JSON parse error, etc.
+    }
+  }
+
+  // Wire up buttons
+  function init(){
+    document.getElementById('updBannerRefresh')?.addEventListener('click', refreshNow);
+    document.getElementById('updBannerClose')?.addEventListener('click', hideBanner);
+    // Initial check on load
+    checkForUpdate();
+    // Periodic check
+    setInterval(checkForUpdate, POLL_MS);
+    // Re-check when page becomes visible again (user returns to PWA)
+    document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState === 'visible') checkForUpdate();
+    });
+    // Re-check when network comes back
+    window.addEventListener('online', checkForUpdate);
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init);
+  }else{
+    init();
+  }
+
+  // Expose for debugging from the console
+  window.__sl_buildVersion = BUILD_VERSION;
+  window.__sl_checkForUpdate = checkForUpdate;
+})();
 </script>
 
 </body>
