@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#C9E8F2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -72,7 +72,12 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html, body { height: 100%; }
+  html, body {
+    height: 100%;
+    touch-action: manipulation; /* disables double-tap zoom on most touch surfaces */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     font-family: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN",
       Quicksand, Comfortaa, "Arial Rounded MT Bold", "Arial Rounded MT",
@@ -1831,6 +1836,43 @@ const HEADER_LOGO_URL = 'data:image/webp;base64,' + HEADER_LOGO_B64;
 
   /* Fill any <img.app-logo> in the document */
   document.querySelectorAll('img.app-logo').forEach(img => { img.src = HEADER_LOGO_URL; });
+})();
+
+/* ============================================================
+   DISABLE PINCH / DOUBLE-TAP ZOOM
+   ============================================================ */
+(function disableZoom() {
+  /* iOS Safari ignores user-scalable=no in normal browser mode but fires
+     gesturestart/change/end for pinches — preventDefault on those blocks zoom. */
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(evt => {
+    document.addEventListener(evt, e => e.preventDefault(), { passive: false });
+  });
+
+  /* Block multi-touch zoom on touch devices that don't fire gesture events */
+  document.addEventListener('touchmove', e => {
+    if (e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+
+  /* Belt-and-suspenders double-tap zoom blocker for iOS Safari.
+     touch-action:manipulation handles most cases but not text/link selections. */
+  let lastTap = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTap < 350) e.preventDefault();
+    lastTap = now;
+  }, { passive: false });
+
+  /* Lock browser zoom level via Ctrl/Cmd + scroll on desktop */
+  document.addEventListener('wheel', e => {
+    if (e.ctrlKey || e.metaKey) e.preventDefault();
+  }, { passive: false });
+
+  /* Lock keyboard zoom shortcuts on desktop (Cmd/Ctrl with +/-/0) */
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && ['=','+','-','_','0'].includes(e.key)) {
+      e.preventDefault();
+    }
+  });
 })();
 /* ============================================================
    ICON LIBRARY — clean inline SVGs
