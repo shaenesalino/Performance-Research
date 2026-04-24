@@ -104,7 +104,11 @@
 
   /* ---------- Header ---------- */
   .app-header {
-    padding: calc(env(safe-area-inset-top, 0px) + 18px) calc(env(safe-area-inset-right, 0px) + 22px) 18px calc(env(safe-area-inset-left, 0px) + 22px);
+    padding:
+      max(54px, calc(env(safe-area-inset-top, 0px) + 36px))
+      calc(env(safe-area-inset-right, 0px) + 22px)
+      18px
+      calc(env(safe-area-inset-left, 0px) + 22px);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1327,7 +1331,11 @@
 
     /* Header */
     .app-header {
-      padding: calc(env(safe-area-inset-top, 0px) + 14px) calc(env(safe-area-inset-right, 0px) + 16px) 14px calc(env(safe-area-inset-left, 0px) + 16px);
+      padding:
+        max(48px, calc(env(safe-area-inset-top, 0px) + 30px))
+        calc(env(safe-area-inset-right, 0px) + 16px)
+        14px
+        calc(env(safe-area-inset-left, 0px) + 16px);
       border-radius: 0 0 22px 22px;
     }
     .app-logo { height: 42px; }
