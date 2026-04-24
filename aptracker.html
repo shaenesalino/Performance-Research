@@ -1024,16 +1024,31 @@ const cloudSync = {
 };
 
 // Lazy-load the Supabase JS SDK from a CDN. Only happens when sync is on.
+// We use the UMD build via <script> tag (not ES module dynamic import) because
+// Safari has flaky behavior with esm.sh — it errors with "TypeError: Load
+// failed" on TLS/MIME edge cases. UMD via jsDelivr works in every browser.
 async function loadSupabaseSdk() {
-  if (window.__supabaseSdk) return window.__supabaseSdk;
-  try {
-    const mod = await import('https://esm.sh/@supabase/supabase-js@2.45.4');
-    window.__supabaseSdk = mod;
-    return mod;
-  } catch (err) {
-    console.error('Failed to load Supabase SDK:', err);
-    throw new Error('Could not load Supabase library. Check your internet connection.');
-  }
+  if (window.supabase && window.supabase.createClient) return window.supabase;
+  // If a previous attempt failed, remove its tag so we can retry cleanly
+  const existing = document.getElementById('supabaseSdkScript');
+  if (existing) existing.remove();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.id = 'supabaseSdkScript';
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+    script.crossOrigin = 'anonymous';
+    script.onload = () => {
+      if (window.supabase && window.supabase.createClient) {
+        resolve(window.supabase);
+      } else {
+        reject(new Error('Supabase loaded but createClient not found'));
+      }
+    };
+    script.onerror = () => {
+      reject(new Error('Could not download Supabase library — check your internet connection or a content blocker'));
+    };
+    document.head.appendChild(script);
+  });
 }
 
 function setSyncStatus(status, error = null) {
@@ -1086,8 +1101,8 @@ async function initCloudSync() {
     return false;
   }
   try {
-    const { createClient } = await loadSupabaseSdk();
-    cloudSync.client = createClient(url, key, {
+    const sdk = await loadSupabaseSdk();
+    cloudSync.client = sdk.createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false }
     });
     cloudSync.enabled = true;
@@ -1254,6 +1269,8 @@ async function connectCloudSync() {
     const err = cloudSync.lastError || '';
     if (err.includes('relation') || err.includes('does not exist') || err.includes('schema cache')) {
       toast('Connected, but table missing — run the SQL in setup instructions', 'warn');
+    } else if (err.toLowerCase().includes('row-level security') || err.toLowerCase().includes('row level security') || err.toLowerCase().includes('rls')) {
+      toast('Connected, but RLS is blocking writes — run the disable-RLS line in setup instructions', 'warn');
     } else {
       toast('Connection failed: ' + err, 'warn');
     }
@@ -1350,7 +1367,11 @@ function renderCloudSyncCard() {
   id text primary key,
   state jsonb not null,
   updated_at timestamptz not null default now()
-);</pre>
+);
+
+-- Supabase enables RLS by default; we don't need it here because
+-- the app's admin password is the practical access gate.
+alter table app_state disable row level security;</pre>
           </li>
           <li>In the left sidebar, click the <strong>gear icon (Settings) → API</strong>.</li>
           <li>Copy the <strong>Project URL</strong> and the <strong>anon public</strong> key. Paste them in the fields above and click <strong>Connect</strong>.</li>
