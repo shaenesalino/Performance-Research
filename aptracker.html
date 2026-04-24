@@ -59,6 +59,7 @@
   .num { font-variant-numeric: tabular-nums; font-weight: 600; }
   input, select, textarea, button { font-family: inherit; }
   input[type="number"], input[type="date"] { font-variant-numeric: tabular-nums; font-weight: 600; }
+  input[type="date"], input[type="month"] { min-width: 0; max-width: 100%; box-sizing: border-box; }
 
   /* Inputs */
   .input-base { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; padding: 8px 12px; font-size: 14px; transition: border-color 0.15s, box-shadow 0.15s; width: 100%; color: #111827; }
@@ -678,6 +679,105 @@ function lifetimeRentForUnit(unitId) {
   return total;
 }
 
+// Outstanding balance for a tenant — running balance across their tenancy window
+// (chained from 0 so previous tenants' debts don't carry over).
+function tenantOutstanding(tenantId) {
+  const t = tenantById(tenantId);
+  if (!t || !t.unitId) return 0;
+  const tenancyStart = t.moveInDate ? t.moveInDate.slice(0,7) : null;
+  const tenancyEnd = t.moveOutDate ? t.moveOutDate.slice(0,7) : null;
+  const ledger = computeLedger(t.unitId).filter(r => {
+    if (tenancyStart && r.monthId < tenancyStart) return false;
+    if (tenancyEnd && r.monthId > tenancyEnd) return false;
+    return true;
+  });
+  let bal = 0;
+  for (const r of ledger) bal = bal + r.charges - r.payments;
+  return bal;
+}
+
+// Most recent payment date for a tenant (within their tenancy window). Null if none.
+function tenantLastPaidDate(tenantId) {
+  const t = tenantById(tenantId);
+  if (!t || !t.unitId) return null;
+  const start = t.moveInDate || null;
+  const end = t.moveOutDate || null;
+  const pays = state.payments.filter(p => {
+    if (p.unitId !== t.unitId) return false;
+    if (!p.date) return false;
+    if (start && p.date < start) return false;
+    if (end && p.date > end) return false;
+    return true;
+  });
+  if (!pays.length) return null;
+  return pays.map(p => p.date).sort().pop();
+}
+
+// Latest month with a remaining balance (used by Mark-as-Paid to know which
+// month to apply the payment to). Falls back to current month if none.
+function latestUnpaidMonthIdForTenant(tenantId) {
+  const t = tenantById(tenantId);
+  if (!t || !t.unitId) return currentMonthId();
+  const tenancyStart = t.moveInDate ? t.moveInDate.slice(0,7) : null;
+  const tenancyEnd = t.moveOutDate ? t.moveOutDate.slice(0,7) : null;
+  const ledger = computeLedger(t.unitId).filter(r => {
+    if (tenancyStart && r.monthId < tenancyStart) return false;
+    if (tenancyEnd && r.monthId > tenancyEnd) return false;
+    return true;
+  });
+  // Find the latest month where unit is occupied with charges remaining
+  for (let i = ledger.length - 1; i >= 0; i--) {
+    if (ledger[i].charges - ledger[i].payments > 0.01) return ledger[i].monthId;
+  }
+  return ledger.length ? ledger[ledger.length-1].monthId : currentMonthId();
+}
+
+// Effective due-day for a tenant (1–31). Falls back to settings.defaultDueDay,
+// then to 5 if nothing is configured.
+function tenantDueDayFor(tenantId) {
+  const t = tenantById(tenantId);
+  const day = t && t.dueDay != null ? parseInt(t.dueDay) : NaN;
+  if (!isNaN(day) && day >= 1 && day <= 31) return day;
+  const fallback = parseInt(state.settings.defaultDueDay);
+  return (!isNaN(fallback) && fallback >= 1 && fallback <= 31) ? fallback : 5;
+}
+
+// Returns the due date 'YYYY-MM-DD' for a tenant's bill of `monthId`.
+// Convention: bill for month YYYY-MM is due on the dueDay of the FOLLOWING
+// calendar month (e.g., April bill → May 5 if dueDay=5). If the dueDay
+// exceeds the next month's length (e.g., 31 in Feb), we cap to the last day.
+function tenantDueDateFor(tenantId, monthId) {
+  const day = tenantDueDayFor(tenantId);
+  const [y, m] = monthId.split('-').map(Number); // m is 1-indexed
+  // In Date constructor, month is 0-indexed, so passing m yields the next month.
+  const lastDayOfNext = new Date(y, m + 1, 0).getDate();
+  const capped = Math.min(day, lastDayOfNext);
+  // Format as YYYY-MM-DD without timezone shift
+  const yy = (m === 12) ? y + 1 : y;
+  const mm = (m === 12) ? 1 : m + 1;
+  return `${yy}-${String(mm).padStart(2,'0')}-${String(capped).padStart(2,'0')}`;
+}
+
+// Resolves a due date for a unit's bill in a given month. Uses the tenant
+// occupying the unit in that month; falls back to the default day.
+function unitDueDateFor(unitId, monthId) {
+  const tenantInMonth = state.tenants.find(t => {
+    if (t.unitId !== unitId) return false;
+    const start = t.moveInDate ? t.moveInDate.slice(0,7) : '0000-00';
+    const end = t.moveOutDate ? t.moveOutDate.slice(0,7) : '9999-99';
+    return start <= monthId && monthId <= end;
+  });
+  if (tenantInMonth) return tenantDueDateFor(tenantInMonth.id, monthId);
+  // Generic fallback using settings
+  const day = parseInt(state.settings.defaultDueDay) || 5;
+  const [y, m] = monthId.split('-').map(Number);
+  const lastDayOfNext = new Date(y, m + 1, 0).getDate();
+  const capped = Math.min(day, lastDayOfNext);
+  const yy = (m === 12) ? y + 1 : y;
+  const mm = (m === 12) ? 1 : m + 1;
+  return `${yy}-${String(mm).padStart(2,'0')}-${String(capped).padStart(2,'0')}`;
+}
+
 // ============================================================================
 // 5. MIGRATIONS
 // ============================================================================
@@ -799,7 +899,7 @@ function migrateState(old) {
 
   // Ensure tenants have all required defaults
   s.tenants = s.tenants.map(t => Object.assign({
-    contactNumber: '', social: '', deposit: 0,
+    contactNumber: '', social: '', deposit: 0, advance: 0, dueDay: null,
     moveInDate: null, moveOutDate: null, unitId: null,
     tenantCode: null, active: true, createdAt: new Date().toISOString(),
   }, t));
@@ -807,6 +907,43 @@ function migrateState(old) {
   // Ensure tenant codes exist
   s.tenants.forEach(t => {
     if (!t.tenantCode) t.tenantCode = slugify(t.name) + '-' + Math.random().toString(36).slice(2,6);
+  });
+
+  // Backfill deposit movements: if a tenant has a recorded deposit > 0 but no
+  // movements exist, create an initial 'in' movement so the balance matches.
+  // This fixes legacy tenants whose deposit was set via Edit (which used to
+  // update t.deposit without creating a movement).
+  if (!Array.isArray(s.depositMovements)) s.depositMovements = [];
+  s.tenants.forEach(t => {
+    if (!(t.deposit > 0)) return;
+    const movements = s.depositMovements.filter(m => m.tenantId === t.id);
+    const balance = movements.reduce((acc, m) => acc + (m.type === 'in' ? Number(m.amount) || 0 : -(Number(m.amount) || 0)), 0);
+    if (balance === 0) {
+      s.depositMovements.push({
+        id: 'dep-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+        tenantId: t.id,
+        date: t.moveInDate || new Date().toISOString().slice(0,10),
+        type: 'in',
+        amount: t.deposit,
+        notes: 'Security deposit (restored from record)'
+      });
+    }
+  });
+
+  // Reconcile advance: if a tenant carries advance > 0 but a payment with
+  // method 'Advance' already exists for their unit during the tenancy,
+  // they're a legacy record from when we auto-created that payment. Zero
+  // out the advance so it doesn't get applied twice by the new logic.
+  s.tenants.forEach(t => {
+    if (!(t.advance > 0) || !t.unitId) return;
+    const start = t.moveInDate || '1970-01-01';
+    const end = t.moveOutDate || '9999-12-31';
+    const hasAdvancePayment = (s.payments || []).some(p =>
+      p.unitId === t.unitId &&
+      p.method === 'Advance' &&
+      p.date >= start && p.date <= end
+    );
+    if (hasAdvancePayment) t.advance = 0;
   });
 
   s.meta.schemaVersion = SCHEMA_VERSION;
@@ -1229,19 +1366,19 @@ function renderMonth(monthId) {
   `;
 
   const body = `
+    <div class="flex items-center gap-2 mb-5">
+      <a href="#/month/${prevId}" class="btn btn-secondary btn-icon" title="Previous month">${icons.left}</a>
+      <h2 class="text-2xl font-bold text-ink leading-tight flex-1 text-center" style="letter-spacing:-0.01em">${monthLabel(monthId)}</h2>
+      <a href="#/month/${nextId}" class="btn btn-secondary btn-icon" title="Next month">${icons.right}</a>
+    </div>
+
     ${bannersBlock}
     ${statsBlock}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-      <div class="flex items-center gap-2">
-        <a href="#/month/${prevId}" class="btn btn-secondary btn-icon" title="Previous month">${icons.left}</a>
-        <div>
-          <div class="stat-label">Meter readings · payments</div>
-          <h2 class="text-2xl font-bold text-ink leading-tight">${monthLabel(monthId)}</h2>
-        </div>
-        <a href="#/month/${nextId}" class="btn btn-secondary btn-icon" title="Next month">${icons.right}</a>
-      </div>
-      <div class="flex items-center gap-2">
-        <button onclick="confirmDeleteMonth('${monthId}')" class="btn btn-danger">${icons.trash}Delete month</button>
+
+    <div class="flex items-end justify-between mb-3">
+      <div>
+        <div class="stat-label">Meter readings · payments</div>
+        <h3 class="section-h">${monthLabel(monthId)}</h3>
       </div>
     </div>
 
@@ -1252,7 +1389,6 @@ function renderMonth(monthId) {
           <div class="flex flex-wrap gap-2 mt-2 text-sm">
             <span class="chip chip-muted">kWh rate: <strong class="num ml-1">${month.kwhRate != null ? fmtNum(month.kwhRate, 2) : '—'}</strong></span>
             <span class="chip chip-muted">Actual electric: <strong class="num ml-1">${month.actualElectricBill != null ? fmtMoney(month.actualElectricBill) : '—'}</strong></span>
-            <span class="chip chip-muted">Due: <strong class="ml-1">${month.dueDate ? fmtDate(month.dueDate) : '—'}</strong></span>
           </div>
         </div>
         <button onclick="openMonthEntryModal('${monthId}')" class="btn btn-primary">
@@ -1262,25 +1398,29 @@ function renderMonth(monthId) {
     </div>
 
     <div class="card overflow-x-auto mb-5">
+      ${(() => { const anyOther = units.some(u => { const ch = computeCharges(u.id, monthId); return ch && ch.otherCharge > 0; }); return `
       <table class="entry-table">
         <thead>
           <tr class="group-row">
             <th></th>
+            <th class="col-div"></th>
             <th colspan="3" class="group-electric col-div">${icons.bolt} Electric</th>
             <th colspan="3" class="group-water col-div">${icons.droplet} Water</th>
-            <th colspan="2" class="group-bill col-div">Monthly Bill</th>
+            ${anyOther ? '<th class="col-div"></th>' : ''}
+            <th class="col-div"></th>
             <th class="col-div"></th>
           </tr>
           <tr>
             <th>Unit</th>
+            <th class="col-div" style="text-align:center">Rent</th>
             <th class="col-div" style="text-align:center">Prev kWh</th>
             <th style="text-align:center">New kWh</th>
             <th style="text-align:center">Electric ${CURRENCY}</th>
             <th class="col-div" style="text-align:center">Prev m³</th>
             <th style="text-align:center">New m³</th>
             <th style="text-align:center">Water ${CURRENCY}</th>
-            <th class="col-div" style="text-align:center">Rent + Other</th>
-            <th style="text-align:center">Total</th>
+            ${anyOther ? '<th class="col-div" style="text-align:center">Other</th>' : ''}
+            <th class="col-div" style="text-align:center">Total</th>
             <th class="col-div" style="text-align:center">Status</th>
           </tr>
         </thead>
@@ -1304,13 +1444,14 @@ function renderMonth(monthId) {
                     </div>
                   </div>
                 </td>
+                <td data-label="Rent" class="td-bill col-div mobile-sep num" style="text-align:center;font-weight:600">${hasR ? fmtMoney(ch.rent) : '—'}</td>
                 <td data-label="Prev kWh" class="td-electric col-div mobile-sep num" style="text-align:center;color:#6B7280">${fmtNum(prevE.value, 2)}</td>
                 <td data-label="New kWh" class="td-electric num" style="text-align:center;font-weight:600">${r.electricReading != null ? fmtNum(r.electricReading, 2) : '—'}</td>
                 <td data-label="Electric ${CURRENCY}" class="td-electric num" style="text-align:center">${hasR ? fmtMoney(ch.electricBill) : '—'}</td>
                 <td data-label="Prev m³" class="td-water col-div mobile-sep num" style="text-align:center;color:#6B7280">${fmtNum(prevW.value, 2)}</td>
                 <td data-label="New m³" class="td-water num" style="text-align:center;font-weight:600">${r.waterReading != null ? fmtNum(r.waterReading, 2) : '—'}</td>
                 <td data-label="Water ${CURRENCY}" class="td-water num" style="text-align:center">${hasR ? fmtMoney(ch.waterBill) : '—'}</td>
-                <td data-label="Rent + Other" class="td-bill col-div mobile-sep num" style="text-align:center;color:#6B7280">${hasR ? fmtMoney(ch.rent + ch.otherCharge) : '—'}</td>
+                ${anyOther ? `<td data-label="Other" class="td-bill col-div mobile-sep num" style="text-align:center;color:#6B7280">${hasR && ch.otherCharge > 0 ? fmtMoney(ch.otherCharge) : '—'}</td>` : ''}
                 <td data-label="Total" class="td-bill total-cell num" style="text-align:center">${hasR ? fmtMoney(ch.total) : '—'}</td>
                 <td data-label="Status" class="col-div mobile-sep" style="text-align:center">${vacantFlag ? '<span class="chip chip-muted">Vacant</span>' : hasR ? '<span class="chip chip-paid">'+icons.check+'</span>' : '<span class="chip chip-muted">—</span>'}</td>
               </tr>
@@ -1318,6 +1459,7 @@ function renderMonth(monthId) {
           }).join('')}
         </tbody>
       </table>
+      `; })()}
     </div>
 
     <div class="border-t border-line pt-6 mb-5">
@@ -1372,6 +1514,10 @@ function renderMonth(monthId) {
       </div>
     </div>
 
+    <div class="flex justify-end mb-8">
+      <button onclick="confirmClearMonth('${monthId}')" class="btn btn-secondary" style="color:#DC2626">${icons.trash}Clear month data</button>
+    </div>
+
     ${buildRecentMonthsTable(monthId)}
   `;
 
@@ -1382,7 +1528,7 @@ function renderMonth(monthId) {
 function hasAnyReadings(monthId) {
   const m = monthById(monthId);
   if (!m) return false;
-  if (m.kwhRate != null || m.actualElectricBill != null || m.dueDate) return true;
+  if (m.kwhRate != null || m.actualElectricBill != null) return true;
   return Object.keys(m.readings || {}).length > 0;
 }
 
@@ -1536,13 +1682,68 @@ function wireMonthFormReactivity(monthId) {
   recompute();
 }
 
+// After readings are saved for a month, scan for tenants whose advance
+// hasn't been applied yet and apply it to the move-in calendar month.
+// "First cycle" = the move-in month — the advance covers ~one month of rent
+// from the move-in date. Once applied, tenant.advance is zeroed so it's a
+// one-time thing.
+function applyPendingAdvances() {
+  let appliedCount = 0;
+  state.tenants.forEach(t => {
+    if (!(t.advance > 0)) return;
+    if (!t.unitId || !t.moveInDate) return;
+    const moveInMonth = t.moveInDate.slice(0, 7); // YYYY-MM
+    // Only apply once any month with readings exists for this unit at or
+    // after move-in (otherwise the bill hasn't been raised yet).
+    const hasBilledMonth = state.months.some(m => {
+      if (m.id < moveInMonth) return false;
+      if (!m.readings || !m.readings[t.unitId]) return false;
+      return Object.keys(m.readings[t.unitId]).length > 0;
+    });
+    if (!hasBilledMonth) return;
+    // Belt-and-suspenders guard: if an Advance payment somehow exists in the
+    // tenancy window already, just zero out the advance and move on.
+    const start = t.moveInDate || '1970-01-01';
+    const end = t.moveOutDate || '9999-12-31';
+    const existsAdvance = state.payments.some(p =>
+      p.unitId === t.unitId &&
+      p.method === 'Advance' &&
+      p.date >= start && p.date <= end
+    );
+    if (existsAdvance) {
+      t.advance = 0;
+      return;
+    }
+    // Make sure the move-in month exists as a state.months entry so the
+    // payment has somewhere to land.
+    if (!monthById(moveInMonth)) {
+      state.months.push({
+        id: moveInMonth, kwhRate: null, actualElectricBill: null,
+        dueDate: null, readings: {}, createdAt: new Date().toISOString()
+      });
+    }
+    state.payments.push({
+      id: uid('pay'),
+      unitId: t.unitId,
+      monthId: moveInMonth,
+      amount: t.advance,
+      date: t.moveInDate,
+      method: 'Advance',
+      notes: 'Advance payment (move-in)',
+      createdAt: new Date().toISOString()
+    });
+    t.advance = 0;
+    appliedCount++;
+  });
+  return appliedCount;
+}
+
 function saveMonthForm(monthId) {
   const month = monthById(monthId);
   const rate = parseFloat($('#kwhRate').value);
   month.kwhRate = isNaN(rate) ? null : rate;
   const ab = parseFloat($('#actualBill').value);
   month.actualElectricBill = isNaN(ab) ? null : ab;
-  month.dueDate = $('#dueDate').value || null;
 
   $$('#readingsBody [data-unit-id]').forEach(tr => {
     const unitId = tr.dataset.unitId;
@@ -1570,15 +1771,18 @@ function saveMonthForm(monthId) {
     }
   });
 
+  // Auto-apply any pending advance payments now that readings have been entered
+  const advancesApplied = applyPendingAdvances();
+
   saveState();
-  toast('Month saved', 'success');
+  toast(advancesApplied > 0 ? `Month saved · ${advancesApplied} advance payment${advancesApplied===1?'':'s'} applied` : 'Month saved', 'success');
   render();
 }
 window.saveMonthForm = saveMonthForm;
 
-// Opens a full-form modal to enter/edit this month's rate, actual bill, due date,
-// and per-unit electric/water readings. Reuses existing IDs (#kwhRate, #actualBill,
-// #dueDate, #readingsBody) so wireMonthFormReactivity + saveMonthForm still work.
+// Opens a full-form modal to enter/edit this month's rate, actual bill, and
+// per-unit electric/water readings. Reuses existing IDs (#kwhRate, #actualBill,
+// #readingsBody) so wireMonthFormReactivity + saveMonthForm still work.
 function openMonthEntryModal(monthId) {
   const month = monthById(monthId) || (() => {
     const m = { id: monthId, kwhRate: null, actualElectricBill: null, dueDate: null, readings: {}, createdAt: new Date().toISOString() };
@@ -1633,7 +1837,7 @@ function openMonthEntryModal(monthId) {
       <div style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 24px">
         <div class="mb-4">
           <div class="text-xs font-semibold uppercase tracking-wide text-ink-5 mb-2">Month-level</div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wide text-ink-5 block mb-1">kWh Rate</label>
               <input type="number" step="0.01" id="kwhRate" class="input-base" value="${month.kwhRate ?? ''}" placeholder="e.g. 10.50" />
@@ -1642,11 +1846,8 @@ function openMonthEntryModal(monthId) {
               <label class="text-[11px] font-semibold uppercase tracking-wide text-ink-5 block mb-1">Actual Electric Bill</label>
               <input type="number" step="0.01" id="actualBill" class="input-base" value="${month.actualElectricBill ?? ''}" placeholder="for reconciliation" />
             </div>
-            <div>
-              <label class="text-[11px] font-semibold uppercase tracking-wide text-ink-5 block mb-1">Due Date</label>
-              <input type="date" id="dueDate" class="input-base" value="${month.dueDate ?? ''}" />
-            </div>
           </div>
+          <p class="text-[11px] text-ink-5 mt-2">Due dates are now set per-tenant in the Tenants tab — each tenant can have their own day (5th, 15th, 30th, etc.).</p>
         </div>
 
         <div>
@@ -1692,6 +1893,35 @@ function confirmDeleteMonth(monthId) {
   });
 }
 window.confirmDeleteMonth = confirmDeleteMonth;
+
+// "Clear month data" — soft variant: wipes readings/rate/dueDate but preserves
+// payment records (those represent actual money received).
+function confirmClearMonth(monthId) {
+  const m = monthById(monthId);
+  if (!m) return;
+  const readingsCount = Object.keys(m.readings || {}).length;
+  confirmDestructive({
+    title: `Clear ${monthLabel(monthId)} data?`,
+    message: 'This wipes the readings and month-level inputs (kWh rate, actual bill, due date). Payment records stay intact.',
+    warningList: [
+      readingsCount > 0 ? `${readingsCount} unit reading${readingsCount===1?'':'s'} will be cleared` : 'No readings recorded',
+      'kWh rate, actual electric bill, and due date will be cleared',
+      'Payments are kept (delete individually if needed)',
+      'Balances in following months will recalculate'
+    ],
+    confirmWord: 'CLEAR',
+    onConfirm: () => {
+      m.readings = {};
+      m.kwhRate = null;
+      m.actualElectricBill = null;
+      m.dueDate = null;
+      saveState();
+      toast('Month data cleared', 'success');
+      render();
+    }
+  });
+}
+window.confirmClearMonth = confirmClearMonth;
 
 // ---------- Payment modal ----------
 function addPaymentModal(unitId, monthId) {
@@ -1754,6 +1984,73 @@ function addPaymentModal(unitId, monthId) {
   });
 }
 window.addPaymentModal = addPaymentModal;
+
+// Tenant-context shortcut: opens the Record Payment modal targeting the latest
+// month with an outstanding balance for that tenant. The amount auto-fills
+// to the per-month balance (handled inside addPaymentModal).
+function markTenantAsPaid(tenantId) {
+  const t = tenantById(tenantId);
+  if (!t || !t.unitId) { toast('Tenant has no unit assigned', 'warn'); return; }
+  const monthId = latestUnpaidMonthIdForTenant(tenantId);
+  addPaymentModal(t.unitId, monthId);
+}
+window.markTenantAsPaid = markTenantAsPaid;
+
+// Quick action: set tenant's move-out date without going through full edit modal.
+function openMoveOutModal(tenantId) {
+  const t = tenantById(tenantId);
+  if (!t) return;
+  const dep = depositBalance(tenantId);
+  const outstanding = tenantOutstanding(tenantId);
+  showModal(`
+    <div class="p-6">
+      <h3 class="text-lg font-bold text-ink mb-1">Mark tenant as moved out</h3>
+      <p class="text-sm text-ink-5 mb-4"><strong class="text-ink">${h(t.name)}</strong> will be marked as moved out from this date forward. Past readings, payments, and statements stay intact.</p>
+      <form id="moveOutForm" class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Move-out date</label>
+          <input type="date" id="moveOutDate" class="input-base" value="${new Date().toISOString().slice(0,10)}" required />
+        </div>
+        ${(outstanding > 0.01 || dep > 0) ? `
+          <div class="bg-surface-2 border border-line rounded-md p-3 text-xs space-y-1.5">
+            ${outstanding > 0.01 ? `<div class="flex justify-between"><span class="text-ink-5">Outstanding balance</span><strong class="num" style="color:#DC2626">${fmtMoney(outstanding)}</strong></div>` : ''}
+            ${dep > 0 ? `<div class="flex justify-between"><span class="text-ink-5">Security deposit on hand</span><strong class="num" style="color:#C9920C">${fmtMoney(dep)}</strong></div>` : ''}
+            <div class="text-ink-5 pt-1.5 border-t border-line"><strong class="text-ink">Tip:</strong> ${dep > 0 ? 'Use <strong>Deposit entry</strong> after this to record the deposit refund.' : ''}${outstanding > 0.01 ? ' Outstanding balance still applies — record any final payments separately.' : ''}</div>
+          </div>
+        ` : ''}
+        <div class="flex gap-2 justify-end pt-2">
+          <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:#DC2626;border-color:#DC2626">${icons.check}Confirm move-out</button>
+        </div>
+      </form>
+    </div>
+  `);
+  $('#moveOutForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const date = $('#moveOutDate').value;
+    if (!date) { toast('Pick a move-out date', 'warn'); return; }
+    t.moveOutDate = date;
+    saveState();
+    closeModal();
+    toast('Tenant marked as moved out', 'success');
+    render();
+  });
+}
+window.openMoveOutModal = openMoveOutModal;
+
+// Tenant-view "Close" button: route admins back to the Tenants tab; for actual
+// tenants visiting via a link, fall back to history.back() (closes the tab if
+// they opened it fresh, otherwise returns to wherever they came from).
+function goBackFromTenantView() {
+  if (session.authed) {
+    navigate('#/tenants');
+  } else if (history.length > 1) {
+    history.back();
+  } else {
+    navigate('#/');
+  }
+}
+window.goBackFromTenantView = goBackFromTenantView;
 
 function deletePayment(paymentId) {
   if (!confirm('Delete this payment?')) return;
@@ -1819,7 +2116,8 @@ function renderUnits() {
                 <div class="flex justify-between"><span class="text-ink-5">Past tenants</span><span class="num">${pastTenants}</span></div>
                 <div class="flex justify-between pt-1.5 border-t border-line"><span class="text-ink-5 font-semibold">Lifetime rent billed</span><span class="num font-bold">${fmtMoney(lifetime)}</span></div>
               </div>
-              <a href="#/unit/${u.id}" class="btn btn-secondary w-full justify-center mt-3">View ledger &amp; history</a>
+              <button onclick="openRateChangesModal('${u.id}')" class="btn btn-secondary w-full justify-center mt-3">${icons.plus}Add change</button>
+              <a href="#/unit/${u.id}" class="btn btn-secondary w-full justify-center mt-2">View ledger &amp; history</a>
             </div>
           </div>
         `;
@@ -1830,7 +2128,9 @@ function renderUnits() {
   $('#app').innerHTML = layoutShell(body);
 }
 
-function openUnitModal(unitId) {
+function openUnitModal(unitId, mode = 'edit') {
+  // mode = 'edit' (default) → hide rate-changes UI; only basic edit
+  // mode = 'full'           → show rate-changes too (legacy use)
   const u = unitId ? unitById(unitId) : {
     id: uid('unit'), name: '', rent: 0, otherCharges: [],
     startElectric: 0, startWater: 0, active: true, rentHistory: [],
@@ -2098,20 +2398,20 @@ function openUnitModal(unitId) {
 
   showModal(`
     <div class="p-6">
-      <h3 class="text-lg font-bold text-ink mb-1">${isNew ? 'Add unit' : 'Edit unit'}</h3>
-      <p class="text-sm text-ink-5 mb-4">A unit is the physical property. Assign a tenant to it from the Tenants tab.</p>
+      <h3 id="unitModalTitle" class="text-lg font-bold text-ink mb-1">${isNew ? 'Add unit' : 'Edit unit'}</h3>
+      <p id="unitModalSubtitle" class="text-sm text-ink-5 mb-4">A unit is the physical property. Assign a tenant to it from the Tenants tab.</p>
       <form id="unitForm" class="space-y-3">
-        <div>
+        <div class="unit-edit-group">
           <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Unit name</label>
           <input type="text" id="unitName" class="input-base" value="${h(u.name)}" required placeholder="Unit #4" />
         </div>
-        <div>
+        <div class="unit-edit-group">
           <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Base rent (monthly)</label>
           <input type="number" step="0.01" id="rent" class="input-base" value="${u.rent}" required />
           <p class="text-[11px] text-ink-5 mt-1">Applies when no rate-change entry matches.</p>
         </div>
 
-        <div class="rounded-md p-3 mt-1" style="background:#F7F8FA;border:1px solid #E5E7EB">
+        <div id="rateChangesSection" class="rounded-md p-3 mt-1" style="background:#F7F8FA;border:1px solid #E5E7EB">
           <div class="flex items-center justify-between mb-2 gap-2">
             <div class="min-w-0">
               <div class="text-xs font-semibold uppercase tracking-wide text-ink-4">Rate changes over time</div>
@@ -2122,7 +2422,7 @@ function openUnitModal(unitId) {
           <div id="rentHistoryArea"></div>
         </div>
 
-        <div class="rounded-md p-3 mt-1" style="background:#F7F8FA;border:1px solid #E5E7EB">
+        <div class="rounded-md p-3 mt-1 unit-edit-group" style="background:#F7F8FA;border:1px solid #E5E7EB">
           <div class="flex items-center justify-between mb-2 gap-2">
             <div class="min-w-0">
               <div class="text-xs font-semibold uppercase tracking-wide text-ink-4">Other charges (current)</div>
@@ -2146,7 +2446,7 @@ function openUnitModal(unitId) {
           <div id="otherChargesList"></div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-3 unit-edit-group">
           <div>
             <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Start electric (kWh)</label>
             <input type="number" step="0.01" id="startElectric" class="input-base" value="${u.startElectric}" />
@@ -2156,7 +2456,7 @@ function openUnitModal(unitId) {
             <input type="number" step="0.01" id="startWater" class="input-base" value="${u.startWater}" />
           </div>
         </div>
-        <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <label class="flex items-center gap-2 text-sm cursor-pointer unit-edit-group">
           <input type="checkbox" id="active" ${u.active ? 'checked':''} />
           <span>Active (uncheck to hide from dashboard but keep history)</span>
         </label>
@@ -2168,10 +2468,22 @@ function openUnitModal(unitId) {
     </div>
   `);
 
+  // Section visibility based on mode
+  if (mode === 'rate-only') {
+    // Show only the rate-changes UI; hide everything else and rename the title
+    $$('.unit-edit-group').forEach(el => el.classList.add('hidden'));
+    $('#unitModalTitle').textContent = `Rate changes — ${u.name || 'Unit'}`;
+    $('#unitModalSubtitle').textContent = 'Set new rent and other charges effective from a specific month.';
+    // Auto-open the "Add change" form (most common action)
+    setTimeout(() => $('#rhToggleAdd')?.click(), 0);
+  } else {
+    // Default 'edit' — hide rate-changes section
+    const rcs = $('#rateChangesSection');
+    if (rcs) rcs.classList.add('hidden');
+  }
+
   renderRentHistoryList();
   renderOtherChargesList();
-
-  // Rate-change toggle: open/close the "Add change" form
   $('#rhToggleAdd').addEventListener('click', () => {
     if (rhMode !== 'idle') {
       // Close whatever's open
@@ -2257,6 +2569,12 @@ function openUnitModal(unitId) {
 }
 window.openUnitModal = openUnitModal;
 
+// Dedicated entry: opens the unit modal in rate-only mode (just rate-changes management).
+function openRateChangesModal(unitId) {
+  openUnitModal(unitId, 'rate-only');
+}
+window.openRateChangesModal = openRateChangesModal;
+
 function confirmDeleteUnit(unitId) {
   const u = unitById(unitId);
   if (!u) return;
@@ -2329,48 +2647,74 @@ function renderTenants() {
         const dep = depositBalance(t.id);
         const tenantUrl = `${location.origin}${location.pathname}#/tenant?code=${t.tenantCode}`;
         const movedOut = !!t.moveOutDate;
+        const outstanding = tenantOutstanding(t.id);
+        const lastPaid = tenantLastPaidDate(t.id);
+        const isPaid = outstanding < 0.01;
         return `
           <div class="card overflow-hidden ${movedOut ? 'opacity-70' : ''}">
             <div style="height:3px;background:${accent.color}"></div>
             <div class="p-5">
               <div class="flex items-start justify-between mb-3">
-                <div class="flex items-start gap-2.5">
+                <div class="flex items-start gap-2.5 min-w-0 flex-1">
                   <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${accent.color};margin-top:7px;flex-shrink:0"></span>
-                  <div>
-                    <div class="text-lg font-bold text-ink">${h(t.name)}</div>
+                  <div class="min-w-0">
+                    <div class="text-lg font-bold text-ink truncate">${h(t.name)}</div>
                     <div class="text-sm text-ink-5 mt-0.5">
                       ${unit ? h(unit.name) : '<span class="italic">No unit</span>'}
                     </div>
-                    <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      ${movedOut
-                        ? `<span class="chip chip-muted">Moved out ${fmtDate(t.moveOutDate)}</span>`
-                        : `<span class="chip chip-paid">Current</span>`}
-                    </div>
                   </div>
                 </div>
-                <div class="flex gap-1">
+                <div class="flex gap-1 flex-shrink-0">
                   <button onclick="openTenantModal('${t.id}')" class="btn btn-secondary btn-icon" title="Edit">${icons.edit}</button>
                   <button onclick="confirmDeleteTenant('${t.id}')" class="btn btn-danger btn-icon" title="Delete">${icons.trash}</button>
                 </div>
               </div>
+
               <div class="space-y-1.5 text-sm">
-                ${t.contactNumber ? `<div class="flex justify-between"><span class="text-ink-5">Contact</span><span class="num text-xs">${h(t.contactNumber)}</span></div>` : ''}
-                ${t.social ? `<div class="flex justify-between gap-2"><span class="text-ink-5">Social</span><span class="text-xs text-right truncate" style="max-width:60%" title="${h(t.social)}">${h(t.social)}</span></div>` : ''}
+                ${t.contactNumber ? `<div class="flex justify-between"><span class="text-ink-5">Contact</span><span class="num text-sm">${h(t.contactNumber)}</span></div>` : ''}
+                ${t.social ? `<div class="flex justify-between gap-2"><span class="text-ink-5">Social</span><span class="text-sm text-right truncate" style="max-width:60%" title="${h(t.social)}">${h(t.social)}</span></div>` : ''}
                 <div class="flex justify-between"><span class="text-ink-5">Move-in</span><span>${t.moveInDate ? fmtDate(t.moveInDate) : '—'}</span></div>
                 ${t.moveOutDate ? `<div class="flex justify-between"><span class="text-ink-5">Move-out</span><span>${fmtDate(t.moveOutDate)}</span></div>` : ''}
                 <div class="flex justify-between pt-1.5 border-t border-line"><span class="text-ink-5 font-semibold">Security deposit</span><span class="num font-bold" style="color:#C9920C">${fmtMoney(dep)}</span></div>
+                ${t.advance ? `<div class="flex justify-between"><span class="text-ink-5 font-semibold">Advance payment</span><span class="num font-bold" style="color:#C9920C">${fmtMoney(t.advance)}</span></div>` : ''}
               </div>
+
               <div class="border-t border-line my-3"></div>
+
+              <div class="space-y-1.5 text-sm">
+                <div class="flex justify-between"><span class="text-ink-5 font-semibold">Outstanding balance</span><span class="num font-bold" style="color:${isPaid ? '#3F9D2D' : '#DC2626'}">${fmtMoney(outstanding)}</span></div>
+                ${isPaid
+                  ? `<div class="flex justify-between"><span class="text-ink-5">Paid</span><span>${lastPaid ? fmtDate(lastPaid) : '<span class="text-ink-5 italic">—</span>'}</span></div>`
+                  : `<div class="flex justify-between"><span class="text-ink-5">Due</span><span style="color:#DC2626;font-weight:600">${unit ? fmtDate(tenantDueDateFor(t.id, latestUnpaidMonthIdForTenant(t.id))) : '<span class="text-ink-5 italic">—</span>'}</span></div>`
+                }
+              </div>
+
+              ${movedOut ? `
+                <div class="w-full mt-3 px-4 py-2.5 rounded-md text-center font-semibold text-sm flex items-center justify-center gap-2" style="background:#FEF2F2;border:1.5px solid #FECACA;color:#991B1B">
+                  ${icons.x}Moved out · ${fmtDate(t.moveOutDate)}
+                </div>
+              ` : isPaid && unit ? `
+                <div class="w-full mt-3 px-4 py-2.5 rounded-md text-center font-semibold text-sm flex items-center justify-center gap-2" style="background:#ECFDF5;border:1.5px solid #A7F3D0;color:#065F46">
+                  ${icons.check}Paid in full
+                </div>
+              ` : !movedOut && unit ? `
+                <button onclick="markTenantAsPaid('${t.id}')" class="btn btn-primary w-full justify-center mt-3" style="background:#3F9D2D;border-color:#3F9D2D">${icons.check}Mark as paid</button>
+              ` : ''}
+
+              <div class="border-t border-line my-3"></div>
+
               <div>
                 <div class="stat-label mb-1.5">Tenant link</div>
                 <div class="flex gap-1">
                   <input type="text" readonly value="${tenantUrl}" class="input-base text-xs !py-1.5" onclick="this.select()" />
-                  <a href="${tenantUrl}" target="_blank" rel="noopener" class="btn btn-secondary btn-icon" title="Open tenant view">${icons.eye}</a>
-                  <button onclick="copyTenantUrl('${t.tenantCode}')" class="btn btn-secondary btn-icon" title="Copy">${icons.copy}</button>
+                  <button onclick="copyTenantUrl('${t.tenantCode}')" class="btn btn-secondary btn-icon" title="Copy link">${icons.copy}</button>
                 </div>
+                <a href="#/tenant?code=${t.tenantCode}" class="btn btn-secondary w-full justify-center btn-sm mt-2">${icons.eye}View bills &amp; payment</a>
               </div>
+
               <div class="flex gap-2 mt-3">
-                <button onclick="openDepositModal('${t.id}')" class="btn btn-secondary w-full justify-center btn-sm">${icons.plus}Deposit entry</button>
+                <button onclick="openDepositModal('${t.id}')" class="btn btn-secondary ${movedOut ? 'w-full' : 'flex-1'} justify-center btn-sm">${icons.plus}Deposit entry</button>
+                ${!movedOut ? `<button onclick="openMoveOutModal('${t.id}')" class="btn btn-secondary flex-1 justify-center btn-sm" style="color:#991B1B">Move out</button>` : ''}
               </div>
             </div>
           </div>
@@ -2454,25 +2798,30 @@ function openTenantModal(tenantId) {
             <input type="date" id="moveOutDate" class="input-base" value="${t.moveOutDate || ''}" />
           </div>
         </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Rent due day of the month</label>
+          <input type="number" min="1" max="31" id="dueDay" class="input-base" style="max-width:120px" value="${t.dueDay || ''}" placeholder="${state.settings.defaultDueDay || 5}" />
+          <p class="text-[11px] text-ink-5 mt-1">e.g. 5, 15, or 30. Often matches the move-in day. Leave blank to use the default (${state.settings.defaultDueDay || 5}).</p>
+        </div>
 
         ${isNew ? `
           <div class="rounded-md p-4 mt-2" style="background:#EFF6FF;border:1px solid #BFDBFE">
             <div class="flex items-start gap-2 mb-3" style="color:#1E40AF">
               <span>${icons.info}</span>
               <div class="text-xs flex-1">
-                <strong>Move-in payment</strong> (1 month deposit + 1 month advance). Deposit is held as security; advance covers the <strong>first full month's rent</strong>.
+                <strong>Move-in payment</strong> = security deposit + advance payment. The deposit is held as security; the advance payment auto-applies to the first month's rent once readings are entered.
               </div>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Security deposit</label>
                 <input type="number" step="0.01" id="deposit" class="input-base" value="0" />
-                <p class="text-[11px] text-ink-5 mt-1">Held by landlord</p>
+                <p class="text-[11px] text-ink-5 mt-1">Held as security</p>
               </div>
               <div>
-                <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Advance (1st month)</label>
+                <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Advance payment</label>
                 <input type="number" step="0.01" id="advance" class="input-base" value="0" />
-                <p class="text-[11px] text-ink-5 mt-1">Applied to <span id="advanceMonthLabel" class="font-semibold">—</span></p>
+                <p class="text-[11px] text-ink-5 mt-1">Upfront payment that covers the first month of rent</p>
               </div>
             </div>
             <div class="mt-3 pt-3 border-t" style="border-color:#BFDBFE">
@@ -2483,10 +2832,17 @@ function openTenantModal(tenantId) {
             </div>
           </div>
         ` : `
-          <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Security deposit (record value)</label>
-            <input type="number" step="0.01" id="deposit" class="input-base" value="${t.deposit}" />
-            <p class="text-[11px] text-ink-5 mt-1">To change the actual held amount, add a Deposit entry from the tenant card.</p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Security deposit (held)</label>
+              <input type="number" step="0.01" id="deposit" class="input-base" value="${depositBalance(t.id).toFixed(2)}" />
+              <p class="text-[11px] text-ink-5 mt-1">Changing this creates an adjustment entry to match.</p>
+            </div>
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Advance payment</label>
+              <input type="number" step="0.01" id="advance" class="input-base" value="${t.advance || 0}" />
+              <p class="text-[11px] text-ink-5 mt-1">${(t.advance > 0) ? 'Upfront — auto-applies to first billed month.' : 'Already applied (or none recorded).'}</p>
+            </div>
           </div>
         `}
 
@@ -2508,13 +2864,20 @@ function openTenantModal(tenantId) {
       const dep = parseFloat($('#deposit').value) || 0;
       const adv = parseFloat($('#advance').value) || 0;
       $('#moveInTotal').textContent = fmtMoney(dep + adv);
-      const mId = firstFullMonth($('#moveInDate').value);
-      $('#advanceMonthLabel').textContent = mId === '—' ? '—' : monthLabel(mId);
+    };
+    // When the user picks a move-in date and the due-day field is still empty,
+    // suggest the day-of-month from the move-in date as the default.
+    const syncDueDayFromMoveIn = () => {
+      const mi = $('#moveInDate').value;
+      const dueDayEl = $('#dueDay');
+      if (!mi || !dueDayEl || dueDayEl.value) return;
+      const day = parseInt(mi.slice(8, 10));
+      if (!isNaN(day) && day >= 1 && day <= 31) dueDayEl.value = day;
     };
     $('#tenantUnit').addEventListener('change', () => { setDefaultsFromUnit(); updateSummary(); });
     $('#deposit').addEventListener('input', updateSummary);
     $('#advance').addEventListener('input', updateSummary);
-    $('#moveInDate').addEventListener('input', updateSummary);
+    $('#moveInDate').addEventListener('change', syncDueDayFromMoveIn);
     setDefaultsFromUnit();
     updateSummary();
   }
@@ -2527,6 +2890,11 @@ function openTenantModal(tenantId) {
       contactNumber: $('#tenantContact').value,
       social: $('#tenantSocial').value,
       deposit: parseFloat($('#deposit').value) || 0,
+      advance: parseFloat($('#advance')?.value || t.advance || 0) || 0,
+      dueDay: (() => {
+        const v = parseInt($('#dueDay').value);
+        return (!isNaN(v) && v >= 1 && v <= 31) ? v : null;
+      })(),
       moveInDate: $('#moveInDate').value || null,
       moveOutDate: $('#moveOutDate').value || null,
       unitId: $('#tenantUnit').value || null,
@@ -2536,36 +2904,36 @@ function openTenantModal(tenantId) {
     };
     if (isNew) {
       state.tenants.push(data);
-      // Deposit → deposit movement
+      // Deposit → deposit movement (so it shows on the deposit ledger)
       if (data.deposit > 0) {
         state.depositMovements.push({
           id: uid('dep'), tenantId: data.id, date: data.moveInDate || new Date().toISOString().slice(0,10),
           type: 'in', amount: data.deposit, notes: 'Security deposit (move-in)'
         });
       }
-      // Advance → auto-payment on first full month (only if assigned to a unit)
-      const advance = parseFloat($('#advance').value) || 0;
-      if (advance > 0 && data.moveInDate && data.unitId) {
-        const firstMonthId = firstFullMonth(data.moveInDate);
-        if (!monthById(firstMonthId)) {
-          state.months.push({
-            id: firstMonthId, kwhRate: null, actualElectricBill: null,
-            dueDate: null, readings: {}, createdAt: new Date().toISOString()
-          });
-        }
-        state.payments.push({
-          id: uid('pay'),
-          unitId: data.unitId,
-          monthId: firstMonthId,
-          amount: advance,
-          date: data.moveInDate,
-          method: 'Advance',
-          notes: `1-month advance (move-in) for ${monthLabel(firstMonthId)} — ${data.name}`,
-          createdAt: new Date().toISOString()
-        });
-      }
+      // NOTE: We deliberately do NOT auto-create a payment for the advance.
+      // The advance is held on the tenant record (data.advance) and conceptually
+      // represents 1 month rent paid up front. When billing each month, the
+      // landlord records actual payments as they come in. The advance can be
+      // applied manually (e.g., as a payment with method "Advance") when the
+      // tenant moves out, or returned via Deposit entry.
     } else {
       const i = state.tenants.findIndex(x => x.id === t.id);
+      // Reconcile deposit: if the typed value differs from the current held
+      // balance, create a balancing movement so the card matches the input.
+      const oldBalance = depositBalance(t.id);
+      const newBalance = data.deposit;
+      const diff = newBalance - oldBalance;
+      if (Math.abs(diff) > 0.01) {
+        state.depositMovements.push({
+          id: uid('dep'),
+          tenantId: t.id,
+          date: new Date().toISOString().slice(0,10),
+          type: diff > 0 ? 'in' : 'out',
+          amount: Math.abs(diff),
+          notes: 'Adjustment (Edit tenant)'
+        });
+      }
       state.tenants[i] = data;
     }
     saveState();
@@ -2604,24 +2972,49 @@ window.confirmDeleteTenant = confirmDeleteTenant;
 function openDepositModal(tenantId) {
   const t = tenantId ? tenantById(tenantId) : null;
   if (!t) { toast('Pick a tenant first', 'warn'); return; }
+  const u = t.unitId ? unitById(t.unitId) : null;
+  const heldBalance = depositBalance(t.id);
+  const curMonth = currentMonthId();
+  const curRent = u ? rentForUnit(u.id, curMonth) : 0;
+
   showModal(`
     <div class="p-6">
       <h3 class="text-lg font-bold text-ink mb-1">Deposit entry</h3>
-      <p class="text-sm text-ink-5 mb-4">${h(t.name)} · current held: <strong class="num">${fmtMoney(depositBalance(t.id))}</strong></p>
+      <p class="text-sm text-ink-5 mb-4">${h(t.name)} · current held: <strong class="num">${fmtMoney(heldBalance)}</strong></p>
       <form id="depForm" class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Type</label>
-            <select id="depType" class="input-base">
-              <option value="in">In (received)</option>
-              <option value="out">Out (refund / deduction)</option>
-            </select>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Type</label>
+          <select id="depType" class="input-base">
+            <option value="in">In (received)</option>
+            <option value="out">Out (refund / deduction)</option>
+            <option value="used"${!u ? ' disabled' : ''}>Used (rent payment)${!u ? ' — needs assigned unit' : ''}</option>
+          </select>
+        </div>
+
+        <div id="depAmountWrap">
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Amount</label>
+          <input type="number" step="0.01" id="depAmount" class="input-base" />
+        </div>
+
+        <div id="depMonthWrap" class="hidden">
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Month covered</label>
+          <input type="month" id="depMonth" class="input-base" value="${curMonth}" style="max-width:240px" />
+        </div>
+
+        <div id="depWarning" class="hidden rounded-md p-3" style="background:#FEF3C7;border:1px solid #FCD34D">
+          <div class="flex items-start gap-2 text-sm" style="color:#92400E">
+            <span class="flex-shrink-0">${icons.alert}</span>
+            <div>
+              <strong>Heads up:</strong> The security deposit will be reduced by the rent amount and the selected month will be marked as paid for rent. Top up the deposit later if you want to keep the same security level.
+            </div>
           </div>
-          <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Amount</label>
-            <input type="number" step="0.01" id="depAmount" class="input-base" required />
+          <div class="mt-2 pt-2 text-xs space-y-1" style="border-top:1px solid #FCD34D;color:#92400E">
+            <div class="flex justify-between"><span>Rent for selected month</span><strong class="num" id="depRentPreview">${fmtMoney(curRent)}</strong></div>
+            <div class="flex justify-between"><span>Deposit before</span><strong class="num">${fmtMoney(heldBalance)}</strong></div>
+            <div class="flex justify-between"><span>Deposit after</span><strong class="num" id="depAfterPreview">${fmtMoney(heldBalance - curRent)}</strong></div>
           </div>
         </div>
+
         <div>
           <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Date</label>
           <input type="date" id="depDate" class="input-base" value="${new Date().toISOString().slice(0,10)}" required />
@@ -2637,15 +3030,93 @@ function openDepositModal(tenantId) {
       </form>
     </div>
   `);
+
+  const updateRentPreview = () => {
+    if (!u) return;
+    const monthId = $('#depMonth').value || curMonth;
+    const rent = rentForUnit(u.id, monthId);
+    const after = heldBalance - rent;
+    $('#depRentPreview').textContent = fmtMoney(rent);
+    $('#depAfterPreview').textContent = fmtMoney(after);
+    $('#depAfterPreview').style.color = (rent > heldBalance + 0.01) ? '#DC2626' : '';
+  };
+
+  const updateMode = () => {
+    const isUsed = $('#depType').value === 'used';
+    $('#depAmountWrap').classList.toggle('hidden', isUsed);
+    $('#depMonthWrap').classList.toggle('hidden', !isUsed);
+    $('#depWarning').classList.toggle('hidden', !isUsed);
+    // Amount is only required in non-used modes
+    const amtEl = $('#depAmount');
+    if (amtEl) amtEl.required = !isUsed;
+    if (isUsed) updateRentPreview();
+  };
+
+  $('#depType').addEventListener('change', updateMode);
+  $('#depMonth').addEventListener('change', updateRentPreview);
+  // Initial state
+  $('#depAmount').required = true;
+
   $('#depForm').addEventListener('submit', (e) => {
     e.preventDefault();
+    const type = $('#depType').value;
+    const date = $('#depDate').value;
+    const notes = $('#depNotes').value;
+
+    if (type === 'used') {
+      if (!u) { toast('Tenant has no unit assigned', 'warn'); return; }
+      const monthId = $('#depMonth').value;
+      if (!monthId) { toast('Pick a month covered', 'warn'); return; }
+      const rent = rentForUnit(u.id, monthId);
+      if (!(rent > 0)) { toast('No rent set for this month', 'warn'); return; }
+      if (rent > heldBalance + 0.01) {
+        toast(`Deposit only has ${fmtMoney(heldBalance)} — not enough for ${fmtMoney(rent)} rent`, 'warn');
+        return;
+      }
+      // Make sure the target month exists so the payment has somewhere to land
+      if (!monthById(monthId)) {
+        state.months.push({
+          id: monthId, kwhRate: null, actualElectricBill: null,
+          dueDate: null, readings: {}, createdAt: new Date().toISOString()
+        });
+      }
+      // 1) Reduce the deposit by recording an 'out' movement
+      state.depositMovements.push({
+        id: uid('dep'),
+        tenantId: t.id,
+        type: 'out',
+        amount: rent,
+        date,
+        notes: notes || `Used for ${monthLabel(monthId)} rent`,
+      });
+      // 2) Record a payment so the month's bill reflects the rent as paid
+      state.payments.push({
+        id: uid('pay'),
+        unitId: u.id,
+        monthId,
+        amount: rent,
+        date,
+        method: 'Deposit',
+        notes: notes || `Paid from security deposit`,
+        createdAt: new Date().toISOString()
+      });
+      saveState();
+      closeModal();
+      toast(`Deposit ${fmtMoney(rent)} applied to ${monthLabel(monthId)} rent`, 'success');
+      render();
+      return;
+    }
+
+    // Normal in/out movement
+    const amount = parseFloat($('#depAmount').value);
+    if (!(amount > 0)) { toast('Enter a valid amount', 'warn'); return; }
     state.depositMovements.push({
       id: uid('dep'),
       tenantId: t.id,
-      type: $('#depType').value,
-      amount: parseFloat($('#depAmount').value),
-      date: $('#depDate').value,
-      notes: $('#depNotes').value,
+      type,
+      amount,
+      date,
+      notes,
     });
     saveState();
     closeModal();
@@ -3082,18 +3553,11 @@ function renderTenant(code) {
   const latest = ledger.length ? ledger[ledger.length-1] : null;
   const outstanding = latest ? latest.endBal : 0;
   const dep = depositBalance(tenant.id);
-  const latestMonth = latest ? monthById(latest.monthId) : null;
 
-  // Compute due date for the latest bill (month.dueDate or defaultDueDay of next month)
+  // Compute due date for the latest bill using the tenant's per-tenant due day
   let dueDateStr = null;
-  if (latestMonth) {
-    if (latestMonth.dueDate) {
-      dueDateStr = fmtDate(latestMonth.dueDate);
-    } else {
-      const [y,m] = latest.monthId.split('-').map(Number);
-      const day = state.settings.defaultDueDay || 5;
-      dueDateStr = fmtDate(new Date(y, m, day).toISOString().slice(0,10));
-    }
+  if (latest) {
+    dueDateStr = fmtDate(tenantDueDateFor(tenant.id, latest.monthId));
   }
 
   // Amount banner — compact horizontal strip
@@ -3352,9 +3816,15 @@ function renderTenant(code) {
                              : r.endBal > 0.01 ? { chip: 'chip-unpaid', label: 'Unpaid' }
                              : r.payments > 0 ? { chip: 'chip-paid', label: 'Paid' }
                              : { chip: 'chip-muted', label: '—' };
+                const monthPays = paymentsForUnitMonth(u.id, r.monthId);
+                const depositPays = monthPays.filter(p => p.method === 'Deposit');
+                const depositTotal = depositPays.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
                 return `
                   <tr>
-                    <td style="text-align:center"><span class="font-semibold">${monthLabel(r.monthId)}</span></td>
+                    <td style="text-align:center">
+                      <div class="font-semibold">${monthLabel(r.monthId)}</div>
+                      ${depositTotal > 0 ? `<div class="text-[11px] mt-0.5" style="color:#92400E">Paid from security deposit · ${fmtMoney(depositTotal)}</div>` : ''}
+                    </td>
                     <td class="num" style="text-align:center">${r.vacant ? '—' : fmtMoney(r.charges)}</td>
                     <td style="text-align:center"><span class="chip ${status.chip}">${status.label}</span></td>
                   </tr>
@@ -3370,6 +3840,9 @@ function renderTenant(code) {
   const accent = unitAccent(u.id);
   const body = `
     <div class="max-w-3xl mx-auto">
+      <div class="mb-4">
+        <button onclick="goBackFromTenantView()" class="btn btn-secondary btn-sm">${icons.left}Close</button>
+      </div>
       <div class="card mb-5 overflow-hidden">
         <div style="height:4px;background:${accent.color}"></div>
         <div class="p-5 sm:p-6">
@@ -3443,12 +3916,7 @@ function openStatement(unitId, monthId) {
   const pays = paymentsForUnitMonth(unitId, monthId);
   const b = row.breakdown;
 
-  const dueDate = month.dueDate || (() => {
-    const [y,m] = monthId.split('-').map(Number);
-    const day = state.settings.defaultDueDay || 5;
-    const next = new Date(y, m, day);
-    return next.toISOString().slice(0,10);
-  })();
+  const dueDate = unitDueDateFor(unitId, monthId);
 
   // Build the simple, senior-friendly line items
   const lineItems = [];
@@ -3522,91 +3990,91 @@ function openStatement(unitId, monthId) {
           </div>
         </div>
 
-        <div class="card p-8 sm:p-10" id="statementCard" style="background:#FFFFFF">
+        <div class="card p-8 sm:p-10" id="statementCard" style="background:#FFFFFF;font-family:'Manrope',system-ui,sans-serif;color:#111827">
 
           <!-- Header -->
-          <div class="flex items-start justify-between mb-6 pb-5 border-b-2 border-ink">
+          <div class="flex items-start justify-between mb-6 pb-5" style="border-bottom:2px solid #111827">
             <div>
-              <div class="text-xl font-bold text-ink">${h(state.settings.propertyName)}</div>
-              <div class="text-sm text-ink-5 mt-0.5">Statement of Account</div>
+              <div style="font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.01em">${h(state.settings.propertyName)}</div>
+              <div style="font-size:13px;color:#6B7280;font-weight:500;margin-top:2px">Statement of Account</div>
             </div>
             <div class="text-right">
-              <div class="stat-label">Statement for</div>
-              <div class="font-bold text-base text-ink mt-0.5">${monthLabel(monthId)}</div>
-              <div class="text-xs text-ink-5 mt-1">Issued: ${fmtDate(new Date().toISOString())}</div>
+              <div style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#6B7280">Statement for</div>
+              <div style="font-size:16px;font-weight:700;color:#111827;margin-top:2px">${monthLabel(monthId)}</div>
+              <div style="font-size:12px;color:#6B7280;font-weight:500;margin-top:4px">Issued: ${fmtDate(new Date().toISOString())}</div>
             </div>
           </div>
 
           <!-- Tenant info + Hero AMOUNT TO PAY -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 items-stretch">
             <div>
-              <div class="stat-label mb-1">Prepared for</div>
-              <div class="font-bold text-lg text-ink">${h(tenantDisplayName)}</div>
-              <div class="text-sm text-ink-5 mt-0.5">Unit: <strong class="text-ink">${h(u.name)}</strong></div>
+              <div style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#6B7280;margin-bottom:4px">Prepared for</div>
+              <div style="font-size:18px;font-weight:700;color:#111827;line-height:1.2">${h(tenantDisplayName)}</div>
+              <div style="font-size:13px;color:#6B7280;margin-top:4px;font-weight:500">Unit: <strong style="color:#111827;font-weight:700">${h(u.name)}</strong></div>
             </div>
             <div class="rounded-lg p-4 text-center sm:text-right" style="background:${amountDue > 0.01 ? '#FEF2F2' : '#ECFDF5'};border:1px solid ${amountDue > 0.01 ? '#FECACA' : '#A7F3D0'}">
-              <div class="stat-label" style="color:${amountDue > 0.01 ? '#991B1B' : '#065F46'}">Amount to Pay</div>
-              <div class="num font-bold mt-1" style="color:${dueColor};font-size:28px;line-height:1.1">${fmtMoney(Math.abs(amountDue))}</div>
+              <div style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:${amountDue > 0.01 ? '#991B1B' : '#065F46'}">Amount to Pay</div>
+              <div style="font-variant-numeric:tabular-nums;font-weight:800;color:${dueColor};font-size:28px;line-height:1.1;margin-top:4px;letter-spacing:-0.02em">${fmtMoney(Math.abs(amountDue))}</div>
               ${amountDue > 0.01 ? `
-                <div class="text-xs mt-1" style="color:#991B1B">Please pay by <strong>${fmtDate(dueDate)}</strong></div>
+                <div style="font-size:12px;color:#991B1B;margin-top:4px;font-weight:500">Please pay by <strong style="font-weight:700">${fmtDate(dueDate)}</strong></div>
               ` : amountDue < -0.01 ? `
-                <div class="text-xs mt-1" style="color:#065F46">Credit on your account</div>
+                <div style="font-size:12px;color:#065F46;margin-top:4px;font-weight:500">Credit on your account</div>
               ` : `
-                <div class="text-xs mt-1" style="color:#065F46">Paid in full. Thank you!</div>
+                <div style="font-size:12px;color:#065F46;margin-top:4px;font-weight:500">Paid in full. Thank you!</div>
               `}
             </div>
           </div>
 
           <!-- Bill breakdown -->
           <div class="mb-4">
-            <div class="stat-label mb-2">Your bill</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#6B7280;margin-bottom:8px">Your bill</div>
             ${row.vacant ? `
-              <div class="py-4 text-center italic text-ink-5 text-sm">Vacant this month — no charges</div>
+              <div style="padding:16px 0;text-align:center;font-style:italic;color:#6B7280;font-size:14px">Vacant this month — no charges</div>
             ` : ''}
             ${row.prevBal > 0.01 || !row.vacant ? `
-              <table class="w-full text-sm">
+              <table class="w-full" style="font-size:14px;border-collapse:collapse">
                 <tbody>
                   ${lineItems.map(it => `
                     <tr style="border-bottom:1px solid #E5E7EB">
-                      <td class="py-2.5">
-                        <div class="text-ink font-medium">${h(it.label)}</div>
-                        ${it.hint ? `<div class="text-xs text-ink-5 mt-0.5">${h(it.hint)}</div>` : ''}
+                      <td style="padding:10px 0;vertical-align:top">
+                        <div style="color:#111827;font-weight:600">${h(it.label)}</div>
+                        ${it.hint ? `<div style="font-size:12px;color:#6B7280;margin-top:2px;font-weight:500">${h(it.hint)}</div>` : ''}
                       </td>
-                      <td class="num-cell py-2.5 font-medium">${fmtMoney(it.amount)}</td>
+                      <td style="padding:10px 0;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;vertical-align:top">${fmtMoney(it.amount)}</td>
                     </tr>
                   `).join('')}
                   <tr style="background:#F7F8FA;border-bottom:2px solid #111827">
-                    <td class="py-3 font-bold text-ink">Total charges</td>
-                    <td class="num-cell py-3 font-bold text-ink text-base">${fmtMoney(totalBeforePayments)}</td>
+                    <td style="padding:12px 8px;font-weight:700;color:#111827">Total charges</td>
+                    <td style="padding:12px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#111827;font-size:15px">${fmtMoney(totalBeforePayments)}</td>
                   </tr>
                   ${pays.length > 0 ? `
                     <tr>
-                      <td colspan="2" class="pt-3 pb-1">
-                        <div class="text-xs font-semibold uppercase tracking-wider" style="color:#3F9D2D">Payments you made</div>
+                      <td colspan="2" style="padding:12px 0 4px">
+                        <div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#3F9D2D">Payments you made</div>
                       </td>
                     </tr>
                     ${pays.map(p => `
                       <tr style="border-bottom:1px solid #E5E7EB">
-                        <td class="py-2 text-xs text-ink-4">• ${fmtDate(p.date)}${p.method ? ` (${h(p.method)})` : ''}${p.notes ? ` — ${h(p.notes)}` : ''}</td>
-                        <td class="num-cell py-2 text-sm" style="color:#3F9D2D">−${fmtMoney(p.amount).replace('−','')}</td>
+                        <td style="padding:8px 0;font-size:12px;color:#374151;font-weight:500">• ${fmtDate(p.date)}${p.method ? ` (${h(p.method)})` : ''}${p.notes ? ` — ${h(p.notes)}` : ''}</td>
+                        <td style="padding:8px 0;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;color:#3F9D2D">−${fmtMoney(p.amount).replace('−','')}</td>
                       </tr>
                     `).join('')}
                     <tr style="border-bottom:1px solid #E5E7EB">
-                      <td class="py-2 font-semibold text-sm" style="color:#3F9D2D">Total paid</td>
-                      <td class="num-cell py-2 font-bold text-sm" style="color:#3F9D2D">−${fmtMoney(row.payments).replace('−','')}</td>
+                      <td style="padding:8px 0;font-weight:700;font-size:14px;color:#3F9D2D">Total paid</td>
+                      <td style="padding:8px 0;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;color:#3F9D2D">−${fmtMoney(row.payments).replace('−','')}</td>
                     </tr>
                   ` : row.payments > 0.01 ? `
                     <tr style="border-bottom:1px solid #E5E7EB">
-                      <td class="py-2.5 font-semibold text-sm" style="color:#3F9D2D">Payments you made</td>
-                      <td class="num-cell py-2.5 font-bold text-sm" style="color:#3F9D2D">−${fmtMoney(row.payments).replace('−','')}</td>
+                      <td style="padding:10px 0;font-weight:700;font-size:14px;color:#3F9D2D">Payments you made</td>
+                      <td style="padding:10px 0;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;color:#3F9D2D">−${fmtMoney(row.payments).replace('−','')}</td>
                     </tr>
                   ` : ''}
                   <tr style="border-top:3px solid #111827">
-                    <td class="pt-4 pb-2 font-bold text-base uppercase tracking-wide text-ink">Amount to Pay</td>
-                    <td class="num-cell pt-4 pb-2 font-bold" style="color:${dueColor};font-size:24px;line-height:1.1">${fmtMoney(Math.abs(amountDue))}</td>
+                    <td style="padding:16px 0 8px;font-weight:800;font-size:15px;letter-spacing:0.02em;text-transform:uppercase;color:#111827">Amount to Pay</td>
+                    <td style="padding:16px 0 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:${dueColor};font-size:24px;line-height:1.1;letter-spacing:-0.02em">${fmtMoney(Math.abs(amountDue))}</td>
                   </tr>
                   ${amountDue > 0.01 ? `
-                    <tr><td colspan="2" class="pt-1"><div class="text-xs text-right" style="color:#991B1B">Please pay by <strong>${fmtDate(dueDate)}</strong></div></td></tr>
+                    <tr><td colspan="2" style="padding-top:4px"><div style="font-size:12px;text-align:right;color:#991B1B;font-weight:500">Please pay by <strong style="font-weight:700">${fmtDate(dueDate)}</strong></div></td></tr>
                   ` : ''}
                 </tbody>
               </table>
@@ -3615,7 +4083,7 @@ function openStatement(unitId, monthId) {
 
           <!-- Footer -->
           <div class="mt-6 pt-4 text-center" style="border-top:1px solid #E5E7EB">
-            <div class="text-xs text-ink-5">For any questions about this bill, please contact your landlord.</div>
+            <div style="font-size:12px;color:#6B7280;font-weight:500">For any questions about this bill, please contact your landlord.</div>
           </div>
 
         </div>
