@@ -237,6 +237,7 @@
   /* Animations */
   .fade-in { animation: fadeIn 0.18s ease-out; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
   /* Modal */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.5); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -356,11 +357,16 @@ function loadState() {
   } catch (e) { console.error('loadState', e); }
   return null;
 }
-function saveState() {
+function saveStateLocal() {
   if (!state.meta) state.meta = {};
   state.meta.lastSavedAt = new Date().toISOString();
   state.meta.schemaVersion = SCHEMA_VERSION;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function saveState() {
+  saveStateLocal();
+  // Schedule a debounced cloud push if sync is active
+  schedulePush();
 }
 function loadSession() {
   try {
@@ -795,6 +801,8 @@ function migrateState(old) {
     waterBaseCubic: 10,
     waterPerExtra: 30,
     defaultDueDay: 5,
+    supabaseUrl: '',
+    supabaseKey: '',
   }, s.settings || {});
 
   s.units = s.units || [];
@@ -965,6 +973,8 @@ function seedData() {
       waterBaseCubic: 10,
       waterPerExtra: 30,
       defaultDueDay: 5,
+      supabaseUrl: '',
+      supabaseKey: '',
     },
     units: [],
     tenants: [],
@@ -973,6 +983,389 @@ function seedData() {
     depositMovements: [],
   };
 }
+
+// ============================================================================
+// 6.5 CLOUD SYNC (Supabase)
+// ============================================================================
+// Stores the entire `state` JSON in a single Supabase row (id='main') so it
+// can be pulled/pushed from any device. Conflict policy: last-write-wins.
+//
+// Setup the user does once:
+//   1. Sign up at supabase.com (free, no card needed)
+//   2. New project → wait ~1 min
+//   3. SQL Editor → run:
+//        create table if not exists app_state (
+//          id text primary key,
+//          state jsonb not null,
+//          updated_at timestamptz not null default now()
+//        );
+//   4. Settings → API → copy "Project URL" and "anon public" key
+//   5. Paste in our Settings → Cloud Sync section, click Connect
+//
+// Trade-offs we made:
+//   - We do NOT enable Supabase Row-Level Security. The admin password gates
+//     the app; that's the practical security layer. Anyone who finds the
+//     URL+anon key in source could read/write the table directly. That's an
+//     acceptable risk for a personal rental tracker — it's not card data.
+//     If the user wants RLS later, we add it.
+//   - Local first: every change persists to localStorage immediately. Cloud
+//     push is debounced ~1.5s (so rapid edits batch into one push).
+//   - Pull on app load: if cloud's updated_at > local's lastSavedAt, replace
+//     local with cloud. Else push local. Equal → no-op.
+//   - We strip supabaseUrl/Key from the cloud copy and re-inject them on
+//     pull, so device-specific config never travels.
+
+const cloudSync = {
+  client: null,
+  enabled: false,                // true after a successful initCloudSync
+  status: 'idle',                // 'idle' | 'syncing' | 'success' | 'error' | 'offline'
+  lastError: null,
+  pushTimer: null,
+};
+
+// Lazy-load the Supabase JS SDK from a CDN. Only happens when sync is on.
+async function loadSupabaseSdk() {
+  if (window.__supabaseSdk) return window.__supabaseSdk;
+  try {
+    const mod = await import('https://esm.sh/@supabase/supabase-js@2.45.4');
+    window.__supabaseSdk = mod;
+    return mod;
+  } catch (err) {
+    console.error('Failed to load Supabase SDK:', err);
+    throw new Error('Could not load Supabase library. Check your internet connection.');
+  }
+}
+
+function setSyncStatus(status, error = null) {
+  cloudSync.status = status;
+  cloudSync.lastError = error;
+  // Update header indicator if the DOM has rendered
+  const el = document.getElementById('syncIndicator');
+  if (el) el.outerHTML = renderSyncIndicator();
+  // Refresh the Cloud Sync card on settings if visible
+  const settingsCard = document.getElementById('cloudSyncCard');
+  if (settingsCard && parseRoute().name === 'settings') {
+    const fresh = renderCloudSyncCard();
+    settingsCard.outerHTML = fresh;
+    wireCloudSyncCard();
+  }
+}
+
+// Build the small status pill that lives in the header next to Refresh/Logout.
+function renderSyncIndicator() {
+  if (!cloudSync.enabled) {
+    return `<span id="syncIndicator" class="hidden"></span>`;
+  }
+  const last = state?.meta?.lastSyncedAt;
+  let icon, label, cls;
+  switch (cloudSync.status) {
+    case 'syncing':
+      icon = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3B82F6;animation:pulse 1.2s infinite"></span>';
+      label = 'Syncing…'; cls = 'chip-muted'; break;
+    case 'error':
+      icon = icons.alert;
+      label = 'Sync error'; cls = 'chip-unpaid'; break;
+    case 'offline':
+      icon = icons.alert;
+      label = 'Offline'; cls = 'chip-muted'; break;
+    case 'success':
+    default:
+      icon = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10B981"></span>';
+      label = last ? `Synced ${fmtRelative(last)}` : 'Synced'; cls = 'chip-paid';
+  }
+  return `<a href="#/settings" id="syncIndicator" class="chip ${cls} no-print" title="${cloudSync.lastError ? h(cloudSync.lastError) : 'Click to manage cloud sync'}" style="text-decoration:none;cursor:pointer">${icon}<span class="hidden sm:inline">${label}</span></a>`;
+}
+
+// Try to (re)create the Supabase client from current settings.
+async function initCloudSync() {
+  const url = (state.settings.supabaseUrl || '').trim();
+  const key = (state.settings.supabaseKey || '').trim();
+  if (!url || !key) {
+    cloudSync.enabled = false;
+    cloudSync.client = null;
+    return false;
+  }
+  try {
+    const { createClient } = await loadSupabaseSdk();
+    cloudSync.client = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    cloudSync.enabled = true;
+    cloudSync.lastError = null;
+    return true;
+  } catch (err) {
+    cloudSync.enabled = false;
+    cloudSync.client = null;
+    setSyncStatus('error', err.message);
+    return false;
+  }
+}
+
+function disableCloudSync() {
+  cloudSync.client = null;
+  cloudSync.enabled = false;
+  cloudSync.status = 'idle';
+  cloudSync.lastError = null;
+  if (cloudSync.pushTimer) { clearTimeout(cloudSync.pushTimer); cloudSync.pushTimer = null; }
+}
+
+// PULL: fetch the cloud row. Returns { state, updated_at } or null if no row.
+async function cloudPull() {
+  if (!cloudSync.enabled || !cloudSync.client) return null;
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await cloudSync.client
+      .from('app_state')
+      .select('state, updated_at')
+      .eq('id', 'main')
+      .maybeSingle();
+    if (error) throw error;
+    setSyncStatus('success');
+    return data || null;
+  } catch (err) {
+    // Network error vs query error — treat both as recoverable
+    setSyncStatus('error', err.message || String(err));
+    return null;
+  }
+}
+
+// PUSH: upsert the entire local state into the cloud row.
+// `silent=true` skips success status (used by debounce so rapid pushes don't
+// flicker the indicator on every keystroke).
+async function cloudPush() {
+  if (!cloudSync.enabled || !cloudSync.client) return false;
+  setSyncStatus('syncing');
+  try {
+    const stateToPush = JSON.parse(JSON.stringify(state));
+    // Strip device-only settings — these don't travel
+    if (stateToPush.settings) {
+      delete stateToPush.settings.supabaseUrl;
+      delete stateToPush.settings.supabaseKey;
+    }
+    const now = new Date().toISOString();
+    const { error } = await cloudSync.client
+      .from('app_state')
+      .upsert({ id: 'main', state: stateToPush, updated_at: now });
+    if (error) throw error;
+    state.meta = state.meta || {};
+    state.meta.lastSyncedAt = now;
+    saveStateLocal();
+    setSyncStatus('success');
+    return true;
+  } catch (err) {
+    setSyncStatus('error', err.message || String(err));
+    return false;
+  }
+}
+
+// Apply a cloud row to local state. Preserves device-only settings.
+function applyCloudData(cloudRow) {
+  if (!cloudRow || !cloudRow.state) return;
+  const localUrl = state.settings.supabaseUrl;
+  const localKey = state.settings.supabaseKey;
+  let pulled = JSON.parse(JSON.stringify(cloudRow.state));
+  pulled = migrateState(pulled) || pulled;
+  state = pulled;
+  state.settings = state.settings || {};
+  state.settings.supabaseUrl = localUrl;
+  state.settings.supabaseKey = localKey;
+  state.meta = state.meta || {};
+  state.meta.lastSyncedAt = cloudRow.updated_at || new Date().toISOString();
+  saveStateLocal();
+}
+
+// Debounced push: called by saveState() on every state change.
+function schedulePush() {
+  if (!cloudSync.enabled) return;
+  if (cloudSync.pushTimer) clearTimeout(cloudSync.pushTimer);
+  cloudSync.pushTimer = setTimeout(() => {
+    cloudSync.pushTimer = null;
+    cloudPush();
+  }, 1500);
+}
+
+// Initial sync on app load. Decide who's newer and reconcile.
+async function initialCloudSync() {
+  const ok = await initCloudSync();
+  if (!ok) return;
+  const cloudRow = await cloudPull();
+  if (!cloudRow) {
+    // Cloud is empty — push local up to seed it
+    await cloudPush();
+    return;
+  }
+  const cloudT = new Date(cloudRow.updated_at).getTime();
+  const localT = state.meta?.lastSavedAt ? new Date(state.meta.lastSavedAt).getTime() : 0;
+  // Within 2 seconds of each other = treat as equal (clock skew tolerance)
+  if (cloudT > localT + 2000) {
+    applyCloudData(cloudRow);
+    toast('Pulled latest from cloud', 'success');
+    render();
+  } else if (localT > cloudT + 2000) {
+    await cloudPush();
+  }
+  // else: in sync, nothing to do
+}
+
+// Manual button: force a fresh pull and apply
+async function manualCloudPull() {
+  if (!cloudSync.enabled) { toast('Cloud sync not connected', 'warn'); return; }
+  const row = await cloudPull();
+  if (!row) {
+    if (cloudSync.status === 'error') {
+      toast('Could not reach cloud — see Settings', 'warn');
+    } else {
+      toast('Cloud is empty — nothing to pull', 'info');
+    }
+    return;
+  }
+  applyCloudData(row);
+  toast('Pulled latest from cloud', 'success');
+  render();
+}
+window.manualCloudPull = manualCloudPull;
+
+// Manual button: force push local up
+async function manualCloudPush() {
+  if (!cloudSync.enabled) { toast('Cloud sync not connected', 'warn'); return; }
+  const ok = await cloudPush();
+  if (ok) toast('Synced to cloud', 'success');
+  else toast(cloudSync.lastError || 'Sync failed', 'warn');
+}
+window.manualCloudPush = manualCloudPush;
+
+// Connect with the values currently in the form fields
+async function connectCloudSync() {
+  const url = ($('#cloudUrl')?.value || '').trim();
+  const key = ($('#cloudKey')?.value || '').trim();
+  if (!url || !key) { toast('Both URL and key are required', 'warn'); return; }
+  state.settings.supabaseUrl = url;
+  state.settings.supabaseKey = key;
+  saveStateLocal();
+  const ok = await initCloudSync();
+  if (!ok) {
+    toast(cloudSync.lastError || 'Connection failed', 'warn');
+    return;
+  }
+  // Test connection by attempting a pull. If table doesn't exist, surface a
+  // friendly hint about running the SQL setup.
+  const testRow = await cloudPull();
+  if (cloudSync.status === 'error') {
+    const err = cloudSync.lastError || '';
+    if (err.includes('relation') || err.includes('does not exist') || err.includes('schema cache')) {
+      toast('Connected, but table missing — run the SQL in setup instructions', 'warn');
+    } else {
+      toast('Connection failed: ' + err, 'warn');
+    }
+    return;
+  }
+  if (testRow) {
+    // Cloud has data — does the user want to keep local or replace?
+    const cloudT = new Date(testRow.updated_at).getTime();
+    const localT = state.meta?.lastSavedAt ? new Date(state.meta.lastSavedAt).getTime() : 0;
+    if (cloudT > localT + 2000) {
+      applyCloudData(testRow);
+      toast('Connected · pulled cloud data', 'success');
+    } else {
+      await cloudPush();
+      toast('Connected · pushed local data', 'success');
+    }
+  } else {
+    await cloudPush();
+    toast('Connected · cloud seeded with local data', 'success');
+  }
+  render();
+}
+window.connectCloudSync = connectCloudSync;
+
+function disconnectCloudSync() {
+  if (!confirm('Disconnect cloud sync? Your local data is kept; nothing is deleted from the cloud.')) return;
+  state.settings.supabaseUrl = '';
+  state.settings.supabaseKey = '';
+  disableCloudSync();
+  saveStateLocal();
+  toast('Cloud sync disconnected', 'success');
+  render();
+}
+window.disconnectCloudSync = disconnectCloudSync;
+
+// Renders the Cloud Sync card on the Settings page. Pulled out so we can
+// re-render just the card when status changes.
+function renderCloudSyncCard() {
+  const url = state.settings.supabaseUrl || '';
+  const key = state.settings.supabaseKey || '';
+  const isConnected = cloudSync.enabled;
+  const last = state.meta?.lastSyncedAt;
+  let statusLine;
+  if (!isConnected) {
+    statusLine = `<span class="text-ink-5">Not connected</span>`;
+  } else {
+    const dot = (color) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px"></span>`;
+    if (cloudSync.status === 'error') {
+      statusLine = `${dot('#DC2626')}<span style="color:#DC2626">Error: ${h(cloudSync.lastError || 'unknown')}</span>`;
+    } else if (cloudSync.status === 'syncing') {
+      statusLine = `${dot('#3B82F6')}<span>Syncing…</span>`;
+    } else {
+      statusLine = `${dot('#10B981')}<span>Connected${last ? ` · last synced ${fmtRelative(last)}` : ''}</span>`;
+    }
+  }
+  return `
+    <div id="cloudSyncCard" class="card p-5 mb-4">
+      <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <h3 class="section-h">Cloud sync</h3>
+          <p class="section-sub">Keep this tracker in sync across your devices via Supabase (free).</p>
+        </div>
+        <div class="text-sm">${statusLine}</div>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Supabase Project URL</label>
+          <input type="text" id="cloudUrl" class="input-base text-xs" style="font-family:'SFMono-Regular','Menlo',monospace" value="${h(url)}" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Anon (public) Key</label>
+          <input type="password" id="cloudKey" class="input-base text-xs" style="font-family:'SFMono-Regular','Menlo',monospace" value="${h(key)}" placeholder="eyJhbGciOiJIUzI1NiIs…" />
+          <p class="text-[11px] text-ink-5 mt-1">Find these in Supabase: Settings → API. The anon key is safe in client code.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          ${isConnected
+            ? `<button onclick="manualCloudPush()" class="btn btn-primary">${icons.check}Sync now</button>
+               <button onclick="manualCloudPull()" class="btn btn-secondary">${icons.refresh}Pull from cloud</button>
+               <button onclick="connectCloudSync()" class="btn btn-secondary">Update keys</button>
+               <button onclick="disconnectCloudSync()" class="btn btn-secondary" style="color:#991B1B">Disconnect</button>`
+            : `<button onclick="connectCloudSync()" class="btn btn-primary">${icons.check}Connect</button>`
+          }
+        </div>
+      </div>
+
+      <details class="mt-4 pt-3" style="border-top:1px solid #E5E7EB">
+        <summary class="cursor-pointer text-sm font-semibold text-ink hover:text-ink-4">Setup instructions (5 mins, one-time)</summary>
+        <ol class="list-decimal list-inside text-sm space-y-2 mt-3 text-ink-4">
+          <li>Sign up at <a href="https://supabase.com" target="_blank" rel="noopener" class="underline" style="color:#1D4ED8">supabase.com</a> (free, no card needed).</li>
+          <li>Click <strong>New project</strong>. Pick any name, any region close to you, set a database password (save it for your records — you won't need it for the app). Wait ~1 minute for provisioning.</li>
+          <li>In the left sidebar, open <strong>SQL Editor</strong>. Paste this and click <strong>Run</strong>:
+<pre style="background:#0F172A;color:#E2E8F0;padding:10px 12px;border-radius:6px;font-size:12px;overflow-x:auto;margin-top:6px;line-height:1.45">create table if not exists app_state (
+  id text primary key,
+  state jsonb not null,
+  updated_at timestamptz not null default now()
+);</pre>
+          </li>
+          <li>In the left sidebar, click the <strong>gear icon (Settings) → API</strong>.</li>
+          <li>Copy the <strong>Project URL</strong> and the <strong>anon public</strong> key. Paste them in the fields above and click <strong>Connect</strong>.</li>
+          <li>On any other device: open this app → Settings → Cloud sync → paste the same two values → Connect. Done.</li>
+        </ol>
+        <p class="text-xs text-ink-5 mt-3"><strong>Honest trade-off:</strong> the anon key sits in client-side code, so anyone who finds your app's URL could read/write the table directly via SQL. The admin password gates the app, but not the database. For a personal rental tracker this risk is acceptable. If you later want stricter access control, we can add Row-Level Security policies — just ask.</p>
+      </details>
+    </div>
+  `;
+}
+
+// Re-attach event listeners after the card re-renders (none needed since we
+// use inline onclick, but kept for future).
+function wireCloudSyncCard() {}
+
 
 // ============================================================================
 // 7. ICONS
@@ -1120,7 +1513,8 @@ function layoutShell(content) {
   ` : '';
 
   const right = isAdmin
-    ? `<button onclick="refreshApp()" class="btn btn-secondary no-print" title="Reload the app (pulls the latest version)">${icons.refresh}<span class="hidden sm:inline">Refresh</span></button>
+    ? `${renderSyncIndicator()}
+       <button onclick="refreshApp()" class="btn btn-secondary no-print" title="Reload the app (pulls the latest version)">${icons.refresh}<span class="hidden sm:inline">Refresh</span></button>
        <button onclick="logout()" class="btn btn-secondary no-print">${icons.logout}<span class="hidden sm:inline">Logout</span></button>`
     : (session.mode === 'tenant' ? `<span class="chip chip-muted">Tenant · Read-only</span>` : '');
 
@@ -3384,6 +3778,8 @@ function renderSettings() {
       </div>
     </div>
 
+    ${renderCloudSyncCard()}
+
     <div class="card p-5 mb-4">
       <h3 class="section-h mb-3">GitHub Pages hosting</h3>
       <ol class="list-decimal list-inside text-sm space-y-1.5 text-ink-4">
@@ -4263,8 +4659,14 @@ async function init() {
     if (!t.tenantCode) t.tenantCode = slugify(t.name) + '-' + Math.random().toString(36).slice(2,6);
   });
 
-  saveState();
+  saveStateLocal();
   render();
+
+  // Cloud sync: if configured, fetch the cloud row in the background.
+  // initialCloudSync() will reconcile and re-render if cloud is newer.
+  if (state.settings.supabaseUrl && state.settings.supabaseKey) {
+    initialCloudSync().catch(err => console.error('Cloud sync init failed:', err));
+  }
 }
 
 init();
