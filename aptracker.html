@@ -2763,8 +2763,10 @@ function wireMonthFormReactivity(monthId) {
       const waterBill = cubicUsed != null ? waterBillFrom(cubicUsed, monthId) : null;
 
       const hasReading = newE != null || newW != null;
-      const otherChargeSum = (u.otherCharges || []).reduce((a,c) => a + (Number(c.amount)||0), 0);
-      const total = vacant ? 0 : ((electricBill||0) + (waterBill||0) + (u.rent||0) + otherChargeSum);
+      const effectiveRent = rentForUnit(u.id, monthId);
+      const effectiveOthers = otherChargesForUnit(u.id, monthId) || [];
+      const otherChargeSum = effectiveOthers.reduce((a,c) => a + (Number(c.amount)||0), 0);
+      const total = vacant ? 0 : ((electricBill||0) + (waterBill||0) + effectiveRent + otherChargeSum);
 
       const set = (selector, text, extraClass='') => {
         const el = tr.querySelector(selector);
@@ -3533,8 +3535,8 @@ function renderUnits() {
                 </div>
               </div>
               <div class="space-y-1.5 text-sm">
-                <div class="flex justify-between"><span class="text-ink-5">Rent</span><span class="num">${fmtMoney(u.rent)}</span></div>
-                ${(u.otherCharges || []).filter(oc => oc.amount > 0).map(oc => `<div class="flex justify-between"><span class="text-ink-5">${h(oc.label) || 'Other'}</span><span class="num">${fmtMoney(oc.amount)}</span></div>`).join('')}
+                <div class="flex justify-between"><span class="text-ink-5">Rent</span><span class="num">${fmtMoney(rentForUnit(u.id, currentMonthId()))}</span></div>
+                ${otherChargesForUnit(u.id, currentMonthId()).filter(oc => oc.amount > 0).map(oc => `<div class="flex justify-between"><span class="text-ink-5">${h(oc.label) || 'Other'}</span><span class="num">${fmtMoney(oc.amount)}</span></div>`).join('')}
                 <div class="flex justify-between"><span class="text-ink-5">Current tenant</span><span class="font-semibold">${currentTenant ? h(currentTenant.name) : '<span class="text-ink-5 italic">—</span>'}</span></div>
                 <div class="flex justify-between"><span class="text-ink-5">Past tenants</span><span class="num">${pastTenants}</span></div>
                 <div class="flex justify-between pt-1.5 border-t border-line"><span class="text-ink-5 font-semibold">Lifetime rent billed</span><span class="num font-bold">${fmtMoney(lifetime)}</span></div>
@@ -4229,7 +4231,7 @@ function openTenantModal(tenantId) {
     const unitSel = $('#tenantUnit');
     if (!unitSel) return 0;
     const u = unitById(unitSel.value);
-    return u ? u.rent : 0;
+    return u ? rentForUnit(u.id, currentMonthId()) : 0;
   };
 
   showModal(`
@@ -4251,7 +4253,7 @@ function openTenantModal(tenantId) {
             <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Assigned unit</label>
             <select id="tenantUnit" class="input-base">
               <option value="">— Not assigned —</option>
-              ${availableUnits.map(u => `<option value="${u.id}" ${t.unitId===u.id?'selected':''}>${h(u.name)} · ${CURRENCY}${fmtNum(u.rent, 0)}/mo</option>`).join('')}
+              ${availableUnits.map(u => `<option value="${u.id}" ${t.unitId===u.id?'selected':''}>${h(u.name)} · ${CURRENCY}${fmtNum(rentForUnit(u.id, currentMonthId()), 0)}/mo</option>`).join('')}
             </select>
           </div>
           <div>
