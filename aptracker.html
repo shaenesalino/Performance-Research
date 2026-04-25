@@ -1787,6 +1787,17 @@ function layoutShell(content) {
 function renderLogin() {
   const hasPassword = !!state.settings.adminPasswordHash;
   const propertyName = state.settings.propertyName || '';
+
+  // If a password already exists locally, classic password prompt — done.
+  if (hasPassword) {
+    return renderLoginPasswordOnly(propertyName);
+  }
+  // Fresh device with no local password — present the chooser
+  return renderLoginChooser(propertyName);
+}
+
+// Existing local password — straight password prompt
+function renderLoginPasswordOnly(propertyName) {
   const body = `
     <div class="max-w-md mx-auto mt-10 sm:mt-16 fade-in">
       <div class="card p-8 sm:p-10">
@@ -1795,86 +1806,256 @@ function renderLogin() {
           <h2 class="text-2xl font-bold text-ink">${propertyName ? h(propertyName) : 'APTracker'}</h2>
           <p class="text-sm text-ink-5 mt-1">${propertyName ? 'APTracker · Landlord login' : 'Apartment Rental Tracker · by Symplife'}</p>
         </div>
-        ${hasPassword ? `
-          <form id="loginForm" class="space-y-4">
-            <div>
-              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Password</label>
-              <input type="password" id="pw" class="input-base" autofocus required />
-            </div>
-            <div id="loginError" class="text-sm text-danger-strong hidden"></div>
-            <button type="submit" class="btn btn-primary w-full justify-center py-2.5">Sign in</button>
-          </form>
-          ${activeTenants().length ? `
-          <div class="border-t border-line my-6"></div>
-          <div class="text-center">
-            <p class="text-xs text-ink-5 mb-2">Tenant access</p>
-            <div class="flex flex-wrap gap-2 justify-center">
-              ${activeTenants().map(t => { const u = t.unitId ? unitById(t.unitId) : null; return `<a href="#/tenant?code=${t.tenantCode}" class="chip chip-info hover:opacity-80">${h(t.name)}${u ? ' · ' + h(u.name) : ''}</a>`; }).join('')}
-            </div>
+        <form id="loginForm" class="space-y-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Password</label>
+            <input type="password" id="pw" class="input-base" autofocus required />
           </div>
-          ` : ''}
-        ` : `
-          <form id="setupForm" class="space-y-4">
-            <div class="banner banner-info text-xs">${icons.info}<div><strong>First-time setup.</strong> Name your property and choose a password for admin access. Everything is stored locally in your browser — nothing is sent anywhere.</div></div>
-            <div>
-              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Property name</label>
-              <input type="text" id="propertyNameInput" class="input-base" value="${h(propertyName)}" autofocus required placeholder="e.g. Cotton Candy Apartments" />
-              <p class="text-[11px] text-ink-5 mt-1">Shown to your tenants on their portal and on statements.</p>
-            </div>
-            <div>
-              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">New password</label>
-              <input type="password" id="pw1" class="input-base" minlength="4" required />
-            </div>
-            <div>
-              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Confirm password</label>
-              <input type="password" id="pw2" class="input-base" minlength="4" required />
-            </div>
-            <div id="setupError" class="text-sm text-danger-strong hidden"></div>
-            <button type="submit" class="btn btn-primary w-full justify-center py-2.5">Create &amp; sign in</button>
-          </form>
-        `}
+          <div id="loginError" class="text-sm text-danger-strong hidden"></div>
+          <button type="submit" class="btn btn-primary w-full justify-center py-2.5">Sign in</button>
+        </form>
+        ${activeTenants().length ? `
+        <div class="border-t border-line my-6"></div>
+        <div class="text-center">
+          <p class="text-xs text-ink-5 mb-2">Tenant access</p>
+          <div class="flex flex-wrap gap-2 justify-center">
+            ${activeTenants().map(t => { const u = t.unitId ? unitById(t.unitId) : null; return `<a href="#/tenant?code=${t.tenantCode}" class="chip chip-info hover:opacity-80">${h(t.name)}${u ? ' · ' + h(u.name) : ''}</a>`; }).join('')}
+          </div>
+        </div>
+        ` : ''}
       </div>
       <p class="text-center text-xs text-ink-5 mt-4">This password is light protection on a static site. For real privacy, host on a private repo.</p>
     </div>
   `;
   $('#app').innerHTML = layoutShell(body);
 
-  if (hasPassword) {
-    $('#loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const hash = await sha256($('#pw').value);
-      if (hash === state.settings.adminPasswordHash) {
-        session = { authed: true, mode: 'admin' };
-        saveSession();
-        navigate('#/');
-      } else {
-        const el = $('#loginError');
-        el.textContent = 'Incorrect password.';
-        el.classList.remove('hidden');
-      }
-    });
-  } else {
-    $('#setupForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = $('#propertyNameInput').value.trim();
-      const p1 = $('#pw1').value, p2 = $('#pw2').value;
-      if (!name) {
-        const el = $('#setupError'); el.textContent = 'Property name is required.'; el.classList.remove('hidden');
-        return;
-      }
-      if (p1 !== p2) {
-        const el = $('#setupError'); el.textContent = 'Passwords do not match.'; el.classList.remove('hidden');
-        return;
-      }
-      state.settings.propertyName = name;
-      state.settings.adminPasswordHash = await sha256(p1);
-      saveState();
+  $('#loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const hash = await sha256($('#pw').value);
+    if (hash === state.settings.adminPasswordHash) {
       session = { authed: true, mode: 'admin' };
       saveSession();
       navigate('#/');
-    });
-  }
+    } else {
+      const el = $('#loginError');
+      el.textContent = 'Incorrect password.';
+      el.classList.remove('hidden');
+    }
+  });
 }
+
+// Fresh device — chooser between Set up new or Sign in to existing
+function renderLoginChooser(propertyName) {
+  const body = `
+    <div class="max-w-md mx-auto mt-10 sm:mt-16 fade-in">
+      <div class="card p-8 sm:p-10">
+        <div class="text-center mb-6">
+          <img src="${APP_LOGO_SRC}" alt="" width="72" height="72" style="width:72px;height:72px;display:inline-block;margin-bottom:12px" />
+          <h2 class="text-2xl font-bold text-ink">APTracker</h2>
+          <p class="text-sm text-ink-5 mt-1">Apartment Rental Tracker · by Symplife</p>
+        </div>
+        <div class="space-y-3">
+          <button onclick="showLoginSignIn()" class="btn btn-primary w-full justify-center py-3" style="font-size:15px">
+            ${icons.check}I already have data — sign in
+          </button>
+          <button onclick="showLoginSetup()" class="btn btn-secondary w-full justify-center py-3" style="font-size:15px">
+            ${icons.plus}Set up a new tracker
+          </button>
+        </div>
+        <div class="mt-5 pt-4 text-[11px] text-ink-5" style="border-top:1px solid #E5E7EB">
+          <strong class="text-ink-4">First time here?</strong> If you've already set this up on another device and want this one to share the same data, choose <em>Sign in</em> and bring your Supabase keys.
+        </div>
+      </div>
+    </div>
+  `;
+  $('#app').innerHTML = layoutShell(body);
+}
+
+// Branch 1: setup form (creates fresh local password — same as before)
+function showLoginSetup() {
+  const propertyName = state.settings.propertyName || '';
+  const body = `
+    <div class="max-w-md mx-auto mt-10 sm:mt-16 fade-in">
+      <div class="card p-8 sm:p-10">
+        <div class="text-center mb-6">
+          <img src="${APP_LOGO_SRC}" alt="" width="72" height="72" style="width:72px;height:72px;display:inline-block;margin-bottom:12px" />
+          <h2 class="text-2xl font-bold text-ink">Set up a new tracker</h2>
+        </div>
+        <form id="setupForm" class="space-y-4">
+          <div class="banner banner-info text-xs">${icons.info}<div><strong>Local first.</strong> This data lives in your browser. To share it across devices, set up Cloud Sync from Settings after.</div></div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Property name</label>
+            <input type="text" id="propertyNameInput" class="input-base" value="${h(propertyName)}" autofocus required placeholder="e.g. Cotton Candy Apartments" />
+            <p class="text-[11px] text-ink-5 mt-1">Shown to your tenants on their portal and on statements.</p>
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">New password</label>
+            <input type="password" id="pw1" class="input-base" minlength="4" required />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Confirm password</label>
+            <input type="password" id="pw2" class="input-base" minlength="4" required />
+          </div>
+          <div id="setupError" class="text-sm text-danger-strong hidden"></div>
+          <button type="submit" class="btn btn-primary w-full justify-center py-2.5">Create &amp; sign in</button>
+          <button type="button" onclick="renderLogin()" class="btn btn-secondary w-full justify-center text-sm">${icons.left}Back</button>
+        </form>
+      </div>
+    </div>
+  `;
+  $('#app').innerHTML = layoutShell(body);
+
+  $('#setupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('#propertyNameInput').value.trim();
+    const p1 = $('#pw1').value, p2 = $('#pw2').value;
+    if (!name) {
+      const el = $('#setupError'); el.textContent = 'Property name is required.'; el.classList.remove('hidden');
+      return;
+    }
+    if (p1 !== p2) {
+      const el = $('#setupError'); el.textContent = 'Passwords do not match.'; el.classList.remove('hidden');
+      return;
+    }
+    state.settings.propertyName = name;
+    state.settings.adminPasswordHash = await sha256(p1);
+    saveStateLocal(); // local-only — no cloud yet on this device
+    session = { authed: true, mode: 'admin' };
+    saveSession();
+    navigate('#/');
+  });
+}
+window.showLoginSetup = showLoginSetup;
+
+// Branch 2: sign in to existing cloud data
+// Step 1: ask for Supabase URL + key, attempt pull, then prompt for password
+function showLoginSignIn() {
+  const body = `
+    <div class="max-w-md mx-auto mt-10 sm:mt-16 fade-in">
+      <div class="card p-8 sm:p-10">
+        <div class="text-center mb-6">
+          <img src="${APP_LOGO_SRC}" alt="" width="72" height="72" style="width:72px;height:72px;display:inline-block;margin-bottom:12px" />
+          <h2 class="text-2xl font-bold text-ink">Sign in</h2>
+          <p class="text-sm text-ink-5 mt-1">Bring your data from another device</p>
+        </div>
+        <form id="signInForm" class="space-y-4">
+          <div class="banner banner-info text-xs">${icons.info}<div><strong>Find these in Supabase.</strong> Settings → API → copy the Project URL and anon public key. They're the same on every device.</div></div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Supabase Project URL</label>
+            <input type="text" id="signInUrl" class="input-base text-xs" style="font-family:'SFMono-Regular','Menlo',monospace" autofocus required placeholder="https://xxxxxxxxxxxx.supabase.co" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Anon (public) Key</label>
+            <input type="password" id="signInKey" class="input-base text-xs" style="font-family:'SFMono-Regular','Menlo',monospace" required placeholder="eyJhbGciOiJIUzI1NiIs…" />
+          </div>
+          <div id="signInError" class="text-sm text-danger-strong hidden"></div>
+          <button type="submit" class="btn btn-primary w-full justify-center py-2.5" id="signInSubmitBtn">${icons.check}Pull data and continue</button>
+          <button type="button" onclick="renderLogin()" class="btn btn-secondary w-full justify-center text-sm">${icons.left}Back</button>
+        </form>
+      </div>
+    </div>
+  `;
+  $('#app').innerHTML = layoutShell(body);
+
+  $('#signInForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const url = $('#signInUrl').value.trim();
+    const key = $('#signInKey').value.trim();
+    const errEl = $('#signInError');
+    const btn = $('#signInSubmitBtn');
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.innerHTML = 'Connecting…';
+
+    const showErr = (msg) => {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.innerHTML = `${icons.check}Pull data and continue`;
+    };
+
+    // Save creds into state.settings so cloudSync helpers can pick them up
+    state.settings.supabaseUrl = url;
+    state.settings.supabaseKey = key;
+    saveStateLocal();
+
+    const ok = await initCloudSync();
+    if (!ok) {
+      showErr(cloudSync.lastError || 'Could not initialize sync.');
+      return;
+    }
+
+    const cloudRow = await cloudPull();
+    if (cloudSync.status === 'error') {
+      const err = cloudSync.lastError || '';
+      if (err.toLowerCase().includes('row-level security') || err.toLowerCase().includes('rls')) {
+        showErr('Connected, but the table has RLS blocking reads. Run the disable-RLS line in setup instructions.');
+      } else if (err.includes('relation') || err.includes('does not exist') || err.includes('schema cache')) {
+        showErr('Connected, but the app_state table is missing in this project.');
+      } else {
+        showErr('Connection failed: ' + err);
+      }
+      return;
+    }
+    if (!cloudRow) {
+      showErr('No data found in this Supabase project. If this is a new project, choose "Set up a new tracker" instead.');
+      return;
+    }
+    if (!cloudRow.state || !cloudRow.state.settings || !cloudRow.state.settings.adminPasswordHash) {
+      showErr('Cloud data found but no password is set on it. Choose "Set up a new tracker" or check that you copied keys from the right project.');
+      return;
+    }
+
+    // Apply pulled data — this also restores the password hash on this device
+    applyCloudData(cloudRow);
+    // Now prompt for password
+    showLoginSignInPassword();
+  });
+}
+window.showLoginSignIn = showLoginSignIn;
+
+// Branch 2 step 2: password prompt against the just-pulled data
+function showLoginSignInPassword() {
+  const propertyName = state.settings.propertyName || 'APTracker';
+  const body = `
+    <div class="max-w-md mx-auto mt-10 sm:mt-16 fade-in">
+      <div class="card p-8 sm:p-10">
+        <div class="text-center mb-6">
+          <img src="${APP_LOGO_SRC}" alt="" width="72" height="72" style="width:72px;height:72px;display:inline-block;margin-bottom:12px" />
+          <h2 class="text-2xl font-bold text-ink">${h(propertyName)}</h2>
+          <p class="text-sm" style="color:#3F9D2D;margin-top:4px">${icons.check} Data pulled from cloud</p>
+        </div>
+        <form id="signInPwForm" class="space-y-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Password</label>
+            <input type="password" id="signInPw" class="input-base" autofocus required />
+            <p class="text-[11px] text-ink-5 mt-1">Use the password you created on your other device.</p>
+          </div>
+          <div id="signInPwError" class="text-sm text-danger-strong hidden"></div>
+          <button type="submit" class="btn btn-primary w-full justify-center py-2.5">Sign in</button>
+        </form>
+      </div>
+    </div>
+  `;
+  $('#app').innerHTML = layoutShell(body);
+
+  $('#signInPwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const hash = await sha256($('#signInPw').value);
+    if (hash === state.settings.adminPasswordHash) {
+      session = { authed: true, mode: 'admin' };
+      saveSession();
+      // Mark a successful sync timestamp so the next manual sync compares cleanly
+      navigate('#/');
+    } else {
+      const el = $('#signInPwError');
+      el.textContent = 'Incorrect password.';
+      el.classList.remove('hidden');
+    }
+  });
+}
+window.showLoginSignInPassword = showLoginSignInPassword;
+window.renderLogin = renderLogin;
 
 function logout() {
   session = { authed: false, mode: 'admin' };
