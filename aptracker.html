@@ -239,6 +239,14 @@
   @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+  /* Ledger responsive: table on desktop, card stack on mobile */
+  .ledger-table { display: block; }
+  .ledger-mobile { display: none; }
+  @media (max-width: 640px) {
+    .ledger-table { display: none; }
+    .ledger-mobile { display: block; }
+  }
+
   /* Modal */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.5); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modal-panel { background: #FFFFFF; border-radius: 12px; max-width: 560px; width: 100%; max-height: 92vh; overflow-y: auto; border: 1px solid #E5E7EB; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.15); }
@@ -484,15 +492,35 @@ function tenantNameForUnit(unitId) {
 }
 
 // Tiered water bill — reads from settings every time.
-function waterBillFrom(cubicMeters, settings=state.settings) {
+// Resolve which water rate applies for a given month. Looks up the latest
+// waterRateHistory entry whose `from` is on or before monthId; falls back to
+// the current settings (waterBaseRate / waterBaseCubic / waterPerExtra).
+function waterRateForMonth(monthId) {
+  const s = state.settings;
+  const history = (Array.isArray(s.waterRateHistory) ? s.waterRateHistory : [])
+    .filter(r => r.from && (!monthId || r.from <= monthId));
+  if (history.length) {
+    history.sort((a,b) => b.from.localeCompare(a.from));
+    const r = history[0];
+    return { baseRate: Number(r.baseRate) || 0, baseCubic: Number(r.baseCubic) || 0, perExtra: Number(r.perExtra) || 0 };
+  }
+  return {
+    baseRate: Number(s.waterBaseRate) || 0,
+    baseCubic: Number(s.waterBaseCubic) || 0,
+    perExtra: Number(s.waterPerExtra) || 0,
+  };
+}
+
+// Compute a water bill from cubic meters. If a monthId is provided, uses the
+// rate that was in effect for that month (so historical bills stay frozen).
+// Otherwise falls back to current settings.
+function waterBillFrom(cubicMeters, monthId) {
   if (cubicMeters == null || isNaN(cubicMeters)) return null;
   const cm = Number(cubicMeters);
   if (cm <= 0) return 0;
-  const base = Number(settings.waterBaseRate) || 0;
-  const baseCubic = Number(settings.waterBaseCubic) || 0;
-  const perExtra = Number(settings.waterPerExtra) || 0;
-  if (cm <= baseCubic) return base;
-  return base + (cm - baseCubic) * perExtra;
+  const r = waterRateForMonth(monthId);
+  if (cm <= r.baseCubic) return r.baseRate;
+  return r.baseRate + (cm - r.baseCubic) * r.perExtra;
 }
 
 // Find the most recent previous reading of a given field for a unit.
@@ -527,7 +555,7 @@ function computeMonthReadings(unitId, monthId) {
   const cubicUsed = (currW != null && prevW.value != null) ? (currW - prevW.value) : null;
 
   const electricBill = (kwUsed != null && rate != null && !isNaN(rate)) ? kwUsed * Number(rate) : null;
-  const waterBill = cubicUsed != null ? waterBillFrom(cubicUsed) : null;
+  const waterBill = cubicUsed != null ? waterBillFrom(cubicUsed, monthId) : null;
 
   return {
     prevElectric: prevE.value, currElectric: currE, kwUsed, rate, electricBill,
@@ -802,12 +830,12 @@ function tenantMonthsForYear(tenant, year) {
   const lo = startMonth > yStart ? startMonth : yStart;
   const hi = endMonth < yEnd ? endMonth : yEnd;
   if (lo > hi) return [];
-  // Enumerate descending
+  // Enumerate ascending (Jan → Dec) so the table reads in calendar order
   const out = [];
-  let cur = hi;
-  while (cur >= lo) {
+  let cur = lo;
+  while (cur <= hi) {
     out.push(cur);
-    cur = prevMonthId(cur);
+    cur = nextMonthId(cur);
   }
   return out;
 }
@@ -839,10 +867,21 @@ function migrateState(old) {
     waterBaseRate: 250,
     waterBaseCubic: 10,
     waterPerExtra: 30,
+    waterRateHistory: [],
     defaultDueDay: 5,
     supabaseUrl: '',
     supabaseKey: '',
   }, s.settings || {});
+
+  // Normalize waterRateHistory: keep only well-formed entries
+  s.settings.waterRateHistory = (Array.isArray(s.settings.waterRateHistory) ? s.settings.waterRateHistory : [])
+    .map(e => ({
+      from: e.from,
+      baseRate: Number(e.baseRate) || 0,
+      baseCubic: Number(e.baseCubic) || 0,
+      perExtra: Number(e.perExtra) || 0,
+    }))
+    .filter(e => /^\d{4}-\d{2}$/.test(e.from || ''));
 
   s.units = s.units || [];
   s.months = s.months || [];
@@ -1028,6 +1067,7 @@ function seedData() {
       waterBaseRate: 250,
       waterBaseCubic: 10,
       waterPerExtra: 30,
+      waterRateHistory: [],
       defaultDueDay: 5,
       supabaseUrl: '',
       supabaseKey: '',
@@ -1580,6 +1620,7 @@ const icons = {
   print:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>',
   download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
   upload:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
+  share:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
   left:     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   right:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
   check:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -2323,7 +2364,7 @@ function wireMonthFormReactivity(monthId) {
       const kwUsed = (newE != null && prevE != null) ? (newE - prevE) : null;
       const cubicUsed = (newW != null && prevW != null) ? (newW - prevW) : null;
       const electricBill = (kwUsed != null && hasRate) ? kwUsed * rate : null;
-      const waterBill = cubicUsed != null ? waterBillFrom(cubicUsed) : null;
+      const waterBill = cubicUsed != null ? waterBillFrom(cubicUsed, monthId) : null;
 
       const hasReading = newE != null || newW != null;
       const otherChargeSum = (u.otherCharges || []).reduce((a,c) => a + (Number(c.amount)||0), 0);
@@ -4345,7 +4386,7 @@ function renderSettings() {
 
       <div class="card p-5">
         <h3 class="section-h mb-1">Water bill formula</h3>
-        <p class="section-sub mb-3">These values drive all water calculations across the app.</p>
+        <p class="section-sub mb-3">These values drive water calculations. Use rate changes when the formula updates over time — historical bills stay frozen at their original rate.</p>
         <div class="grid grid-cols-3 gap-3">
           <div>
             <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Base rate</label>
@@ -4360,8 +4401,19 @@ function renderSettings() {
             <input type="number" step="0.01" id="wExtra" class="input-base" value="${state.settings.waterPerExtra}" />
           </div>
         </div>
-        <p class="text-xs text-ink-5 mt-2">Current formula: ${CURRENCY}${state.settings.waterBaseRate} up to ${state.settings.waterBaseCubic} m³, +${CURRENCY}${state.settings.waterPerExtra} per m³ above.</p>
+        <p class="text-xs text-ink-5 mt-2">Current formula: ${CURRENCY}${state.settings.waterBaseRate} up to ${state.settings.waterBaseCubic} m³, +${CURRENCY}${state.settings.waterPerExtra} per m³ above. <span class="text-ink-5">Applied when no rate-change entry matches.</span></p>
         <button onclick="saveWaterRates()" class="btn btn-primary mt-3">${icons.check}Save</button>
+
+        <div class="rounded-md p-3 mt-4" style="background:#F7F8FA;border:1px solid #E5E7EB">
+          <div class="flex items-center justify-between mb-2 gap-2">
+            <div class="min-w-0">
+              <div class="text-xs font-semibold uppercase tracking-wide text-ink-4">Rate changes over time</div>
+              <p class="text-[11px] text-ink-5 mt-0.5">From a given month, set a new water formula</p>
+            </div>
+            <button type="button" id="wrhToggleAdd" class="btn btn-secondary btn-sm flex-shrink-0">${icons.plus}Add change</button>
+          </div>
+          <div id="waterRateHistoryArea"></div>
+        </div>
       </div>
 
       <div class="card p-5">
@@ -4448,6 +4500,107 @@ function renderSettings() {
     toast('Password updated', 'success');
     render();
   });
+
+  // Water rate history: working copy + render + handlers
+  let waterRateHistory = JSON.parse(JSON.stringify(state.settings.waterRateHistory || []));
+
+  function renderWaterRateHistory() {
+    const area = document.getElementById('waterRateHistoryArea');
+    if (!area) return;
+    if (!waterRateHistory.length) {
+      area.innerHTML = `<div class="text-[11px] text-ink-5 italic py-1">No rate changes recorded.</div>`;
+      return;
+    }
+    // Sort by from descending so newest is on top
+    const sorted = waterRateHistory.slice().sort((a,b) => b.from.localeCompare(a.from));
+    area.innerHTML = sorted.map(entry => `
+      <div class="flex items-center justify-between gap-2 py-1.5 ${sorted.indexOf(entry) > 0 ? 'border-t border-line' : ''}">
+        <div class="flex-1 min-w-0 text-xs">
+          <div class="font-semibold text-ink">From ${monthLabel(entry.from)}</div>
+          <div class="text-ink-5 mt-0.5">${CURRENCY}${fmtNum(entry.baseRate, 0)} up to ${fmtNum(entry.baseCubic, 0)} m³, +${CURRENCY}${fmtNum(entry.perExtra, 0)} per extra m³</div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-icon btn-sm" data-wrh-remove="${entry.from}" title="Remove">${icons.trash}</button>
+      </div>
+    `).join('');
+    // Wire remove buttons
+    area.querySelectorAll('[data-wrh-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const from = btn.dataset.wrhRemove;
+        if (!confirm(`Remove the rate change starting from ${monthLabel(from)}?`)) return;
+        waterRateHistory = waterRateHistory.filter(e => e.from !== from);
+        state.settings.waterRateHistory = JSON.parse(JSON.stringify(waterRateHistory));
+        saveState();
+        toast('Rate change removed', 'success');
+        render();
+      });
+    });
+  }
+
+  if (document.getElementById('wrhToggleAdd')) {
+    renderWaterRateHistory();
+
+    // "Add change" button toggles an inline form right below it
+    const toggleBtn = document.getElementById('wrhToggleAdd');
+    toggleBtn.addEventListener('click', () => {
+      const area = document.getElementById('waterRateHistoryArea');
+      if (!area) return;
+      // If form already visible, do nothing
+      if (area.querySelector('#wrhAddForm')) return;
+      // Default `from` = current month, prefilled with current settings
+      const defaultFrom = currentMonthId();
+      const formHtml = `
+        <div id="wrhAddForm" class="rounded-md p-3 mt-2" style="background:#FFFFFF;border:1px solid #BFDBFE">
+          <div class="text-xs font-semibold text-ink mb-2">New rate change</div>
+          <div class="space-y-2 mb-3">
+            <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Effective from month</label>
+              <input type="month" id="wrhFrom" class="input-base text-sm" value="${defaultFrom}" />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Base rate</label>
+                <input type="number" step="0.01" id="wrhBaseRate" class="input-base text-sm" value="${state.settings.waterBaseRate}" />
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Base m³</label>
+                <input type="number" step="0.1" id="wrhBaseCubic" class="input-base text-sm" value="${state.settings.waterBaseCubic}" />
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Per extra m³</label>
+                <input type="number" step="0.01" id="wrhPerExtra" class="input-base text-sm" value="${state.settings.waterPerExtra}" />
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-2 justify-end">
+            <button type="button" id="wrhCancel" class="btn btn-secondary btn-sm">Cancel</button>
+            <button type="button" id="wrhSave" class="btn btn-primary btn-sm">${icons.check}Save change</button>
+          </div>
+        </div>
+      `;
+      area.insertAdjacentHTML('beforeend', formHtml);
+
+      document.getElementById('wrhCancel').addEventListener('click', () => {
+        document.getElementById('wrhAddForm').remove();
+      });
+      document.getElementById('wrhSave').addEventListener('click', () => {
+        const from = document.getElementById('wrhFrom').value;
+        const baseRate = parseFloat(document.getElementById('wrhBaseRate').value);
+        const baseCubic = parseFloat(document.getElementById('wrhBaseCubic').value);
+        const perExtra = parseFloat(document.getElementById('wrhPerExtra').value);
+        if (!/^\d{4}-\d{2}$/.test(from || '')) { toast('Pick a valid month', 'warn'); return; }
+        if (isNaN(baseRate) || isNaN(baseCubic) || isNaN(perExtra)) { toast('All three values required', 'warn'); return; }
+        // If an entry already exists for that from, replace it
+        const idx = waterRateHistory.findIndex(e => e.from === from);
+        const newEntry = { from, baseRate, baseCubic, perExtra };
+        if (idx >= 0) waterRateHistory[idx] = newEntry;
+        else waterRateHistory.push(newEntry);
+        state.settings.waterRateHistory = JSON.parse(JSON.stringify(waterRateHistory));
+        saveState();
+        toast(idx >= 0 ? 'Rate change updated' : 'Rate change added', 'success');
+        render();
+      });
+    });
+  }
 }
 
 function savePropertyName() {
@@ -4765,16 +4918,16 @@ function renderTenant(code) {
           <div class="font-semibold text-ink mb-2 text-sm">Editing ${monthLabel(mid)}</div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">kWh rate</label>
+              <input type="number" step="0.01" data-field="kwhRate" class="input-base text-sm" value="${kwhRateVal}" placeholder="e.g. 10.50" />
+            </div>
+            <div>
               <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Electric reading (kWh)</label>
               <input type="number" step="0.01" data-field="electricReading" class="input-base text-sm" value="${curElectricVal}" placeholder="prev: ${fmtNum(prevElectric, 0)}" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Water reading (m³)</label>
               <input type="number" step="0.01" data-field="waterReading" class="input-base text-sm" value="${curWaterVal}" placeholder="prev: ${fmtNum(prevWater, 0)}" />
-            </div>
-            <div>
-              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">kWh rate</label>
-              <input type="number" step="0.01" data-field="kwhRate" class="input-base text-sm" value="${kwhRateVal}" placeholder="e.g. 10.50" />
             </div>
           </div>
           <div class="flex justify-between items-center text-sm gap-2 flex-wrap">
@@ -4797,6 +4950,131 @@ function renderTenant(code) {
     `;
   };
 
+  // Mobile card builder — each month becomes a self-contained card, no table.
+  // Same data as desktop but stacked vertically for narrow screens.
+  const buildLedgerCardMobile = (mid) => {
+    const ledgerRow = ledgerByMonth[mid];
+    const ch = computeCharges(u.id, mid);
+    const cm = ch ? ch.cm : computeMonthReadings(u.id, mid);
+    const month = monthById(mid);
+    const r = month ? (month.readings[u.id] || {}) : {};
+    const hasReadings = ch && ch.hasReadings && !ch.vacant;
+    const isVacant = ch && ch.vacant;
+    const isEmpty = !ch || (!ch.hasReadings && !ch.vacant);
+
+    let statusChip;
+    if (isVacant) statusChip = `<span class="chip chip-muted">Vacant</span>`;
+    else if (isEmpty) statusChip = `<span class="chip chip-muted">No readings</span>`;
+    else if (ledgerRow && ledgerRow.endBal > 0.01) statusChip = `<span class="chip chip-unpaid">Unpaid</span>`;
+    else if (ledgerRow && ledgerRow.payments > 0) statusChip = `<span class="chip chip-paid">Paid</span>`;
+    else statusChip = `<span class="chip chip-muted">—</span>`;
+
+    const prevElectric = previousReading(u.id, mid, 'electricReading').value;
+    const prevWater = previousReading(u.id, mid, 'waterReading').value;
+    const curElectricVal = r.electricReading != null ? r.electricReading : '';
+    const curWaterVal = r.waterReading != null ? r.waterReading : '';
+    const kwhRateVal = month && month.kwhRate != null ? month.kwhRate : '';
+
+    const rentAmt = (hasReadings || isEmpty) ? rentForUnit(u.id, mid) : 0;
+    const otherCharges = otherChargesForUnit(u.id, mid) || [];
+    const otherSum = otherCharges.reduce((a,c) => a + (Number(c.amount)||0), 0);
+    const otherLabels = otherCharges.filter(o => Number(o.amount) > 0).map(o => o.label || 'Other').join(', ');
+
+    const totalDisplay = isVacant ? '<span class="text-ink-5">—</span>'
+                       : hasReadings ? fmtMoney(ch.total)
+                       : '<span class="text-ink-5">—</span>';
+
+    const showBalance = ledgerRow && ledgerRow.endBal > 0.01 && ledgerRow.payments > 0;
+
+    const actionsHtml = isAdminView ? `
+      <button onclick="enterLedgerEditMode('${u.id}','${mid}')" class="btn btn-secondary btn-sm" title="Edit readings">${icons.edit}Edit</button>
+      ${hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-sm" title="View bill">${icons.eye}View</button>` : ''}
+    ` : (hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-sm" title="View bill">${icons.eye}View</button>` : '');
+
+    // Build each charge row. On mobile we hide rows with zero amount to save
+    // vertical space — Other in particular is often empty.
+    const chargeRow = (color, label, sublabel, readingTxt, usedTxt, amount, alwaysShow) => {
+      if (!alwaysShow && (amount == null || amount <= 0)) return '';
+      return `
+        <div class="flex items-baseline justify-between gap-2 py-2" style="border-bottom:1px solid #F1F5F9">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>
+              <span class="font-medium text-ink">${label}</span>
+            </div>
+            ${sublabel ? `<div class="text-[11px] text-ink-5 mt-0.5" style="margin-left:16px">${sublabel}</div>` : ''}
+            ${(readingTxt || usedTxt) ? `<div class="text-[11px] text-ink-5 mt-0.5" style="margin-left:16px">${readingTxt}${readingTxt && usedTxt ? ' · ' : ''}${usedTxt}</div>` : ''}
+          </div>
+          <div class="num font-semibold text-ink text-sm">${amount != null ? fmtMoney(amount) : '<span class="text-ink-5">—</span>'}</div>
+        </div>
+      `;
+    };
+
+    const electricSubLabel = kwhRateVal !== '' ? `kWh Rate: ${CURRENCY}${fmtNum(kwhRateVal, 2)}` : '';
+    const electricMeta = (cm && cm.currElectric != null)
+      ? `Reading: ${fmtNum(cm.currElectric, 0)}${cm.kwUsed != null ? ' · Used: ' + fmtNum(cm.kwUsed, 0) + ' kWh' : ''}`
+      : '';
+    const waterMeta = (cm && cm.currWater != null)
+      ? `Reading: ${fmtNum(cm.currWater, 0)}${cm.cubicUsed != null ? ' · Used: ' + fmtNum(cm.cubicUsed, 0) + ' m³' : ''}`
+      : '';
+
+    return `
+      <div class="ledger-month-card mb-3" style="border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;background:#FFFFFF" data-mobile-card="${mid}">
+        <!-- Header: month + total + status + balance -->
+        <div class="flex items-start justify-between gap-3 p-3" style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
+          <div class="font-bold text-ink">${monthLabel(mid)}</div>
+          <div class="text-right">
+            <div class="num font-bold text-ink" style="font-size:15px">${totalDisplay}</div>
+            <div class="mt-1">${statusChip}</div>
+            ${showBalance ? `<div class="text-[11px] mt-1" style="color:#DC2626">Balance <strong class="num">${fmtMoney(ledgerRow.endBal)}</strong></div>` : ''}
+          </div>
+        </div>
+        <!-- Charge rows -->
+        <div class="p-3">
+          ${chargeRow('#4A90E2', 'Rent', '', '', '', rentAmt, true)}
+          ${chargeRow('#E07B0A', 'Electric', electricSubLabel, electricMeta, '', hasReadings ? ch.electricBill : (isEmpty ? null : 0), isEmpty || hasReadings)}
+          ${chargeRow('#0EA5A5', 'Water', '', waterMeta, '', hasReadings ? ch.waterBill : (isEmpty ? null : 0), isEmpty || hasReadings)}
+          ${otherSum > 0 ? chargeRow('#7E3FE3', 'Other', h(otherLabels), '', '', otherSum, true) : ''}
+        </div>
+        <!-- Actions -->
+        ${actionsHtml ? `
+          <div class="px-3 pb-3 flex gap-2">${actionsHtml.replace(/btn-sm/g, 'btn-sm flex-1 justify-center')}</div>
+        ` : ''}
+        <!-- Inline edit (mobile uses same hidden row id pattern via data-ledger-edit) -->
+        <div data-ledger-edit-mobile="${mid}" data-prev-e="${prevElectric}" data-prev-w="${prevWater}" data-unit="${u.id}" class="hidden p-3" style="background:#EFF6FF;border-top:1px solid #BFDBFE">
+          <div class="font-semibold text-ink mb-2 text-sm">Editing ${monthLabel(mid)}</div>
+          <div class="space-y-3 mb-3">
+            <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">kWh rate</label>
+              <input type="number" step="0.01" data-field="kwhRate" class="input-base text-sm" value="${kwhRateVal}" placeholder="e.g. 10.50" />
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Electric reading (kWh)</label>
+              <input type="number" step="0.01" data-field="electricReading" class="input-base text-sm" value="${curElectricVal}" placeholder="prev: ${fmtNum(prevElectric, 0)}" />
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Water reading (m³)</label>
+              <input type="number" step="0.01" data-field="waterReading" class="input-base text-sm" value="${curWaterVal}" placeholder="prev: ${fmtNum(prevWater, 0)}" />
+            </div>
+          </div>
+          <div class="text-xs text-ink-5 mb-2">
+            Electric: <strong class="num text-ink" data-preview="electric">—</strong> ·
+            Water: <strong class="num text-ink" data-preview="water">—</strong> ·
+            Total: <strong class="num text-ink" data-preview="total">—</strong>
+          </div>
+          <label class="flex items-center gap-1.5 text-xs cursor-pointer mb-3">
+            <input type="checkbox" data-field="vacant" ${r.vacant ? 'checked' : ''} />
+            <span>Vacant this month</span>
+          </label>
+          <div class="flex gap-2">
+            <button type="button" onclick="cancelLedgerEdit('${mid}')" class="btn btn-secondary btn-sm flex-1 justify-center">Cancel</button>
+            <button type="button" onclick="saveLedgerRow('${u.id}','${mid}')" class="btn btn-primary btn-sm flex-1 justify-center">${icons.check}Save</button>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
   const ledgerTable = `
     <div class="card mb-6 overflow-hidden" id="ledgerCard">
       <div class="p-4 border-b border-line flex items-center justify-between gap-2 flex-wrap">
@@ -4808,7 +5086,7 @@ function renderTenant(code) {
         <div class="text-xs text-ink-5">${monthsForYear.length} month${monthsForYear.length===1?'':'s'} in tenancy</div>
       </div>
       ${monthsForYear.length === 0 ? `<div class="p-10 text-center text-ink-5 italic">No months in ${selectedYear}.</div>` : `
-        <div class="overflow-x-auto">
+        <div class="ledger-table overflow-x-auto">
           <table class="w-full text-sm" id="ledgerTable" style="border-collapse:collapse">
             <thead>
               <tr style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
@@ -4825,8 +5103,17 @@ function renderTenant(code) {
             </tbody>
           </table>
         </div>
+        <div class="ledger-mobile p-3" style="background:#F9FAFB">
+          ${monthsForYear.map(buildLedgerCardMobile).join('')}
+        </div>
         <div class="px-4 py-2.5 text-[11px] text-ink-5" style="background:#F9FAFB;border-top:1px solid #E5E7EB">
-          <strong>Note:</strong> Water billed ${CURRENCY}${fmtNum(state.settings.waterBaseRate, 0)} base for first ${fmtNum(state.settings.waterBaseCubic, 0)} m³, then +${CURRENCY}${fmtNum(state.settings.waterPerExtra, 0)} per extra m³.
+          ${(() => {
+            // Always show the rate currently in effect for the latest month
+            // shown (or current month if year is past/future).
+            const lastMonth = monthsForYear.length ? monthsForYear[monthsForYear.length - 1] : currentMonthId();
+            const r = waterRateForMonth(lastMonth);
+            return `<strong>Note:</strong> Water billed ${CURRENCY}${fmtNum(r.baseRate, 0)} base for first ${fmtNum(r.baseCubic, 0)} m³, then +${CURRENCY}${fmtNum(r.perExtra, 0)} per extra m³.`;
+          })()}
         </div>
       `}
     </div>
@@ -4842,21 +5129,21 @@ function renderTenant(code) {
         <div style="height:4px;background:${accent.color}"></div>
         <div class="p-5 sm:p-6">
           <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-            <div class="flex sm:block gap-2">
-              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5">Tenant</dt>
+            <div class="flex sm:block items-baseline gap-3">
+              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5" style="min-width:120px;flex-shrink:0">Tenant</dt>
               <dd class="text-ink font-bold text-base">${h(tenant.name)}</dd>
             </div>
-            <div class="flex sm:block gap-2">
-              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5">Unit</dt>
+            <div class="flex sm:block items-baseline gap-3">
+              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5" style="min-width:120px;flex-shrink:0">Unit</dt>
               <dd class="text-ink font-bold text-base">${h(u.name)}</dd>
             </div>
-            <div class="flex sm:block gap-2">
-              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5">Contact Number</dt>
+            <div class="flex sm:block items-baseline gap-3">
+              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5" style="min-width:120px;flex-shrink:0">Contact</dt>
               <dd class="text-ink">${tenant.contactNumber ? h(tenant.contactNumber) : '<span class="text-ink-5">—</span>'}</dd>
             </div>
-            <div class="flex sm:block gap-2">
-              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5">Socials</dt>
-              <dd class="text-ink">${tenant.social ? h(tenant.social) : '<span class="text-ink-5">—</span>'}</dd>
+            <div class="flex sm:block items-baseline gap-3">
+              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5" style="min-width:120px;flex-shrink:0">Socials</dt>
+              <dd class="text-ink truncate">${tenant.social ? h(tenant.social) : '<span class="text-ink-5">—</span>'}</dd>
             </div>
           </dl>
         </div>
@@ -4932,58 +5219,93 @@ function renderTenant(code) {
 // ──────────── Tenant ledger inline edit handlers ────────────
 // Flips a ledger month-block from view → edit mode. The 4 sub-rows hide,
 // the hidden edit row reveals, and a live-preview listener wires up.
+// Handles BOTH desktop (table) and mobile (card) layouts simultaneously,
+// since CSS only renders one at a time. We wire whichever is visible.
 function enterLedgerEditMode(unitId, monthId) {
-  const editRow = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
-  if (!editRow) return;
-  // Hide all 4 view sub-rows for this month
+  const editRowDesktop = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
+  const editPanelMobile = document.querySelector(`[data-ledger-edit-mobile="${monthId}"]`);
+  // Hide all 4 desktop view sub-rows
   document.querySelectorAll(`tr[data-ledger-row="${monthId}"]`).forEach(el => el.classList.add('hidden'));
-  editRow.classList.remove('hidden');
-  // Wire live preview
-  const updatePreview = () => {
-    const prevE = parseFloat(editRow.dataset.prevE) || 0;
-    const prevW = parseFloat(editRow.dataset.prevW) || 0;
-    const newE = parseFloat(editRow.querySelector('[data-field="electricReading"]').value);
-    const newW = parseFloat(editRow.querySelector('[data-field="waterReading"]').value);
-    const rate = parseFloat(editRow.querySelector('[data-field="kwhRate"]').value);
-    const vacant = editRow.querySelector('[data-field="vacant"]').checked;
-    let elec = null, water = null, total = 0;
-    if (!vacant) {
-      if (!isNaN(newE) && !isNaN(rate)) elec = (newE - prevE) * rate;
-      if (!isNaN(newW)) water = waterBillFrom(newW - prevW);
-      const ch = computeCharges(unitId, monthId);
-      const rent = ch ? rentForUnit(unitId, monthId) : 0;
-      const otherSum = ch ? (ch.otherCharges || []).reduce((a,c) => a + (Number(c.amount)||0), 0) : 0;
-      total = rent + otherSum + (elec || 0) + (water || 0);
-    }
-    editRow.querySelector('[data-preview="electric"]').textContent = elec != null ? fmtMoney(elec) : '—';
-    editRow.querySelector('[data-preview="water"]').textContent    = water != null ? fmtMoney(water) : '—';
-    editRow.querySelector('[data-preview="total"]').textContent    = vacant ? 'Vacant' : fmtMoney(total);
+  // Hide the entire mobile card body content (we'll show only the edit panel)
+  const mobileCard = document.querySelector(`[data-mobile-card="${monthId}"]`);
+  if (mobileCard) {
+    mobileCard.querySelectorAll(':scope > div').forEach(child => {
+      if (child !== editPanelMobile) child.classList.add('hidden');
+    });
+  }
+  if (editRowDesktop) editRowDesktop.classList.remove('hidden');
+  if (editPanelMobile) editPanelMobile.classList.remove('hidden');
+
+  // Wire live preview on whichever panel is the active one (or both — only the
+  // visible one renders, but updating both is harmless)
+  const wirePreview = (panel) => {
+    if (!panel) return;
+    const updatePreview = () => {
+      const prevE = parseFloat(panel.dataset.prevE) || 0;
+      const prevW = parseFloat(panel.dataset.prevW) || 0;
+      const newE = parseFloat(panel.querySelector('[data-field="electricReading"]').value);
+      const newW = parseFloat(panel.querySelector('[data-field="waterReading"]').value);
+      const rate = parseFloat(panel.querySelector('[data-field="kwhRate"]').value);
+      const vacant = panel.querySelector('[data-field="vacant"]').checked;
+      let elec = null, water = null, total = 0;
+      if (!vacant) {
+        if (!isNaN(newE) && !isNaN(rate)) elec = (newE - prevE) * rate;
+        if (!isNaN(newW)) water = waterBillFrom(newW - prevW, monthId);
+        const ch = computeCharges(unitId, monthId);
+        const rent = ch ? rentForUnit(unitId, monthId) : 0;
+        const otherSum = ch ? (ch.otherCharges || []).reduce((a,c) => a + (Number(c.amount)||0), 0) : 0;
+        total = rent + otherSum + (elec || 0) + (water || 0);
+      }
+      panel.querySelector('[data-preview="electric"]').textContent = elec != null ? fmtMoney(elec) : '—';
+      panel.querySelector('[data-preview="water"]').textContent    = water != null ? fmtMoney(water) : '—';
+      panel.querySelector('[data-preview="total"]').textContent    = vacant ? 'Vacant' : fmtMoney(total);
+    };
+    panel.querySelectorAll('input').forEach(el => el.addEventListener('input', updatePreview));
+    updatePreview();
   };
-  editRow.querySelectorAll('input').forEach(el => el.addEventListener('input', updatePreview));
-  updatePreview();
-  // Focus the first empty field
-  const firstEmpty = Array.from(editRow.querySelectorAll('input[type="number"]')).find(i => !i.value);
-  (firstEmpty || editRow.querySelector('input')).focus();
+  wirePreview(editRowDesktop);
+  wirePreview(editPanelMobile);
+
+  // Focus the first empty number input in whichever panel is visible
+  const visiblePanel = window.matchMedia('(max-width: 640px)').matches ? editPanelMobile : editRowDesktop;
+  if (visiblePanel) {
+    const firstEmpty = Array.from(visiblePanel.querySelectorAll('input[type="number"]')).find(i => !i.value);
+    (firstEmpty || visiblePanel.querySelector('input'))?.focus();
+  }
 }
 window.enterLedgerEditMode = enterLedgerEditMode;
 
 function cancelLedgerEdit(monthId) {
-  const editRow = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
-  if (editRow) editRow.classList.add('hidden');
-  // Reveal the 4 view sub-rows again
+  const editRowDesktop = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
+  const editPanelMobile = document.querySelector(`[data-ledger-edit-mobile="${monthId}"]`);
+  if (editRowDesktop) editRowDesktop.classList.add('hidden');
+  if (editPanelMobile) editPanelMobile.classList.add('hidden');
+  // Reveal the desktop view sub-rows
   document.querySelectorAll(`tr[data-ledger-row="${monthId}"]`).forEach(el => el.classList.remove('hidden'));
+  // Reveal mobile card body content
+  const mobileCard = document.querySelector(`[data-mobile-card="${monthId}"]`);
+  if (mobileCard) {
+    mobileCard.querySelectorAll(':scope > div').forEach(child => {
+      if (child !== editPanelMobile) child.classList.remove('hidden');
+    });
+  }
 }
 window.cancelLedgerEdit = cancelLedgerEdit;
 
+// saveLedgerRow needs to read inputs from whichever panel is currently visible
 function saveLedgerRow(unitId, monthId) {
-  const editRow = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
-  if (!editRow) return;
-  const newE = parseFloat(editRow.querySelector('[data-field="electricReading"]').value);
-  const newW = parseFloat(editRow.querySelector('[data-field="waterReading"]').value);
-  const rate = parseFloat(editRow.querySelector('[data-field="kwhRate"]').value);
-  const vacant = editRow.querySelector('[data-field="vacant"]').checked;
+  // Pick the visible panel based on viewport
+  const isMobile = window.matchMedia('(max-width: 640px)').matches;
+  const panel = isMobile
+    ? document.querySelector(`[data-ledger-edit-mobile="${monthId}"]`)
+    : document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
+  if (!panel) return;
 
-  // Ensure month exists
+  const newE = parseFloat(panel.querySelector('[data-field="electricReading"]').value);
+  const newW = parseFloat(panel.querySelector('[data-field="waterReading"]').value);
+  const rate = parseFloat(panel.querySelector('[data-field="kwhRate"]').value);
+  const vacant = panel.querySelector('[data-field="vacant"]').checked;
+
   let month = monthById(monthId);
   if (!month) {
     month = { id: monthId, kwhRate: null, actualElectricBill: null, dueDate: null, readings: {}, createdAt: new Date().toISOString() };
@@ -5053,8 +5375,8 @@ function openStatement(unitId, monthId) {
       });
     }
     if (b.waterBill > 0 || (cm && cm.cubicUsed != null)) {
-      const s = state.settings;
-      const rateDesc = `Rate: ${CURRENCY}${fmtNum(s.waterBaseRate, 0)} up to ${fmtNum(s.waterBaseCubic, 0)} m³, then +${CURRENCY}${fmtNum(s.waterPerExtra, 0)} per extra m³`;
+      const wr = waterRateForMonth(monthId);
+      const rateDesc = `Rate: ${CURRENCY}${fmtNum(wr.baseRate, 0)} up to ${fmtNum(wr.baseCubic, 0)} m³, then +${CURRENCY}${fmtNum(wr.perExtra, 0)} per extra m³`;
       const hintParts = [];
       if (cm && cm.cubicUsed != null) hintParts.push(`${fmtNum(cm.cubicUsed, 2)} m³ used`);
       hintParts.push(rateDesc);
@@ -5103,11 +5425,11 @@ function openStatement(unitId, monthId) {
     <div class="fixed inset-0 overflow-y-auto z-50 p-4 sm:p-8" id="statementRoot" style="background:#F7F8FA">
       <div class="max-w-2xl mx-auto">
         <div class="flex justify-between mb-4 no-print">
-          <button onclick="closeStatement()" class="btn btn-secondary">${icons.x}Close</button>
+          <button onclick="closeStatement()" class="btn btn-secondary btn-icon" title="Close" style="color:#9CA3AF">${icons.x}</button>
           <div class="flex gap-2 flex-wrap justify-end">
-            <button onclick="shareStatementJPG(this)" data-filename="${h(filename)}" class="btn btn-secondary hidden" id="shareStatementBtn">${icons.copy}Share</button>
-            <button onclick="downloadStatementJPG(this)" data-filename="${h(filename)}" class="btn btn-secondary" id="dlStatementBtn">${icons.download}Download JPG</button>
-            <button onclick="window.print()" class="btn btn-primary">${icons.print}Print</button>
+            <button onclick="shareStatementJPG(this)" data-filename="${h(filename)}" class="btn btn-secondary btn-icon hidden" id="shareStatementBtn" title="Share">${icons.share}</button>
+            <button onclick="downloadStatementJPG(this)" data-filename="${h(filename)}" class="btn btn-secondary btn-icon" id="dlStatementBtn" title="Download JPG">${icons.download}</button>
+            <button onclick="window.print()" class="btn btn-primary btn-icon" title="Print">${icons.print}</button>
           </div>
         </div>
 
