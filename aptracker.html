@@ -333,7 +333,12 @@ const ACCENT_PALETTE = [
 ];
 
 function unitAccent(unitId) {
-  const idx = state.units.findIndex(u => u.id === unitId);
+  const u = state.units.find(x => x.id === unitId);
+  if (u && u.colorKey) {
+    const found = ACCENT_PALETTE.find(p => p.key === u.colorKey);
+    if (found) return found;
+  }
+  const idx = state.units.findIndex(x => x.id === unitId);
   const i = idx >= 0 ? idx : 0;
   return ACCENT_PALETTE[i % ACCENT_PALETTE.length];
 }
@@ -784,6 +789,40 @@ function unitDueDateFor(unitId, monthId) {
   return `${yy}-${String(mm).padStart(2,'0')}-${String(capped).padStart(2,'0')}`;
 }
 
+// Returns all calendar months YYYY-MM falling within a tenancy in a given year.
+// Bounded by tenancy.moveInDate (incl) → moveOutDate or current month (incl).
+// year is a string '2026'.
+function tenantMonthsForYear(tenant, year) {
+  const startMonth = tenant.moveInDate ? tenant.moveInDate.slice(0,7) : '0000-01';
+  const todayMonth = currentMonthId();
+  const endMonth = tenant.moveOutDate ? tenant.moveOutDate.slice(0,7) : todayMonth;
+  // Year window
+  const yStart = `${year}-01`;
+  const yEnd = `${year}-12`;
+  const lo = startMonth > yStart ? startMonth : yStart;
+  const hi = endMonth < yEnd ? endMonth : yEnd;
+  if (lo > hi) return [];
+  // Enumerate descending
+  const out = [];
+  let cur = hi;
+  while (cur >= lo) {
+    out.push(cur);
+    cur = prevMonthId(cur);
+  }
+  return out;
+}
+
+// Years that have any tenancy month for this tenant. Used for nav arrows.
+function tenantYears(tenant) {
+  const startMonth = tenant.moveInDate ? tenant.moveInDate.slice(0,7) : currentMonthId();
+  const endMonth = tenant.moveOutDate ? tenant.moveOutDate.slice(0,7) : currentMonthId();
+  const startY = parseInt(startMonth.slice(0,4));
+  const endY = parseInt(endMonth.slice(0,4));
+  const years = [];
+  for (let y = startY; y <= endY; y++) years.push(String(y));
+  return years;
+}
+
 // ============================================================================
 // 5. MIGRATIONS
 // ============================================================================
@@ -890,6 +929,7 @@ function migrateState(old) {
       name: u.name || 'Unit',
       rent: Number(u.rent) || 0,
       otherCharges,
+      colorKey: u.colorKey || null,
       startElectric: Number(u.startElectric) || 0,
       startWater: Number(u.startWater) || 0,
       active: u.active !== false,
@@ -1182,12 +1222,122 @@ async function cloudPush() {
     state.meta.lastSyncedAt = now;
     saveStateLocal();
     setSyncStatus('success');
+    // Take a daily snapshot (best-effort; failures don't break the main push).
+    // Snapshot table rotates by a YYYY-MM-DD key — only one row per day.
+    maybeWriteDailySnapshot(stateToPush, now).catch(err => console.warn('Snapshot skipped:', err));
     return true;
   } catch (err) {
     setSyncStatus('error', err.message || String(err));
     return false;
   }
 }
+
+// Write today's snapshot if not already written. Keeps last 7 days only.
+async function maybeWriteDailySnapshot(snapshotState, isoNow) {
+  if (!cloudSync.enabled || !cloudSync.client) return;
+  const dayKey = (isoNow || new Date().toISOString()).slice(0, 10); // YYYY-MM-DD
+  // Upsert today's snapshot — writes once, then quietly skips repeated calls
+  // for the same day because the row already exists with that day key.
+  const { error: upErr } = await cloudSync.client
+    .from('app_state_history')
+    .upsert({ day: dayKey, state: snapshotState, created_at: isoNow });
+  if (upErr) {
+    // Most common case: table doesn't exist yet (user hasn't run the snapshot
+    // table SQL). Silently no-op so existing users aren't surprised.
+    return;
+  }
+  // Trim: keep newest 7 rows. Delete anything older than the 7th most recent day.
+  const { data: keep, error: listErr } = await cloudSync.client
+    .from('app_state_history')
+    .select('day')
+    .order('day', { ascending: false })
+    .limit(7);
+  if (listErr || !keep || keep.length < 7) return;
+  const cutoffDay = keep[keep.length - 1].day;
+  await cloudSync.client.from('app_state_history').delete().lt('day', cutoffDay);
+}
+
+async function cloudListSnapshots() {
+  if (!cloudSync.enabled || !cloudSync.client) return [];
+  const { data, error } = await cloudSync.client
+    .from('app_state_history')
+    .select('day, created_at')
+    .order('day', { ascending: false });
+  if (error) {
+    console.warn('Could not list snapshots:', error.message);
+    return [];
+  }
+  return data || [];
+}
+window.cloudListSnapshots = cloudListSnapshots;
+
+async function cloudRestoreSnapshot(dayKey) {
+  if (!cloudSync.enabled || !cloudSync.client) return false;
+  const { data, error } = await cloudSync.client
+    .from('app_state_history')
+    .select('state, created_at')
+    .eq('day', dayKey)
+    .maybeSingle();
+  if (error || !data) {
+    toast('Could not load that snapshot', 'warn');
+    return false;
+  }
+  applyCloudData({ state: data.state, updated_at: data.created_at });
+  // Push the restored state back as the new "main" so all devices see it
+  await cloudPush();
+  toast(`Restored snapshot from ${fmtDate(dayKey)}`, 'success');
+  render();
+  return true;
+}
+window.cloudRestoreSnapshot = cloudRestoreSnapshot;
+
+// UI wrapper: populates the Backups list in Settings
+async function loadBackupsList() {
+  const wrap = document.getElementById('backupsList');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="italic">Loading…</div>';
+  const snaps = await cloudListSnapshots();
+  if (!snaps.length) {
+    wrap.innerHTML = '<div class="italic">No snapshots yet — they appear after the next push (max 1 per day).</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="rounded-md overflow-hidden" style="border:1px solid #E5E7EB">
+      ${snaps.map(s => `
+        <div class="flex items-center justify-between px-3 py-2.5 ${snaps.indexOf(s) > 0 ? 'border-t border-line' : ''}" style="background:#FFFFFF">
+          <div>
+            <div class="font-semibold text-ink">${fmtDate(s.day)}</div>
+            <div class="text-xs text-ink-5 mt-0.5">Saved ${fmtRelative(s.created_at)}</div>
+          </div>
+          <button onclick="confirmRestoreSnapshot('${s.day}')" class="btn btn-secondary btn-sm">Restore</button>
+        </div>
+      `).join('')}
+    </div>
+    <p class="text-[11px] text-ink-5 mt-2">Restoring will replace your current data on every device. Your current data is pushed to the cloud first as a safety net.</p>
+  `;
+}
+window.loadBackupsList = loadBackupsList;
+
+function confirmRestoreSnapshot(dayKey) {
+  confirmDestructive({
+    title: `Restore from ${fmtDate(dayKey)}?`,
+    message: 'This replaces all current data with the snapshot from that day.',
+    warningList: [
+      'All current data will be replaced',
+      'Other devices will pick up the restored state on next sync',
+      'A push of your CURRENT data is taken first as safety',
+    ],
+    confirmWord: 'RESTORE',
+    onConfirm: async () => {
+      // Take a safety push of current state first (this will become a snapshot
+      // tomorrow if today's already exists, but at least the main row carries
+      // the current data until restore overwrites it).
+      await cloudPush();
+      await cloudRestoreSnapshot(dayKey);
+    }
+  });
+}
+window.confirmRestoreSnapshot = confirmRestoreSnapshot;
 
 // Apply a cloud row to local state. Preserves device-only settings.
 function applyCloudData(cloudRow) {
@@ -1385,9 +1535,17 @@ function renderCloudSyncCard() {
   updated_at timestamptz not null default now()
 );
 
+-- Daily snapshot history (last 7 days) for disaster recovery
+create table if not exists app_state_history (
+  day text primary key,
+  state jsonb not null,
+  created_at timestamptz not null default now()
+);
+
 -- Supabase enables RLS by default; we don't need it here because
 -- the app's admin password is the practical access gate.
-alter table app_state disable row level security;</pre>
+alter table app_state disable row level security;
+alter table app_state_history disable row level security;</pre>
           </li>
           <li>In the left sidebar, click the <strong>gear icon (Settings) → API</strong>.</li>
           <li>Copy the <strong>Project URL</strong> and the <strong>anon public</strong> key. Paste them in the fields above and click <strong>Connect</strong>.</li>
@@ -1545,6 +1703,7 @@ function layoutShell(content) {
       <a class="nav-link ${route.name==='home'||route.name===''||route.name==='month'?'active':''}" href="#/">Dashboard</a>
       <a class="nav-link ${route.name==='units'||route.name==='unit'?'active':''}" href="#/units">Units</a>
       <a class="nav-link ${route.name==='tenants'?'active':''}" href="#/tenants">Tenants</a>
+      <a class="nav-link ${route.name==='reports'?'active':''}" href="#/reports">Reports</a>
       <a class="nav-link ${route.name==='settings'?'active':''}" href="#/settings">Settings</a>
     </nav>
   ` : '';
@@ -1753,6 +1912,69 @@ function renderMonth(monthId) {
   }
   const bannersBlock = banners.length ? `<div class="space-y-2 mb-5">${banners.join('')}</div>` : '';
 
+  // Upcoming due dates (next 14 days from today). For each active tenant
+  // who has unpaid balance, compute their due date for their latest unpaid
+  // month and surface it. Sorted soonest-first.
+  const upcoming = (() => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const horizon = new Date(today.getTime() + 14*24*60*60*1000);
+    const items = [];
+    state.tenants.forEach(t => {
+      if (!t.unitId || t.moveOutDate) return;
+      const outstanding = tenantOutstanding(t.id);
+      if (outstanding < 0.01) return;
+      const monthId = latestUnpaidMonthIdForTenant(t.id);
+      const dueIso = tenantDueDateFor(t.id, monthId);
+      const due = new Date(dueIso); due.setHours(0,0,0,0);
+      const daysOut = Math.round((due.getTime() - today.getTime()) / (24*60*60*1000));
+      // Show overdue (<=0) and within next 14 days
+      if (daysOut > 14) return;
+      const unit = unitById(t.unitId);
+      items.push({ tenant: t, unit, dueIso, daysOut, outstanding });
+    });
+    items.sort((a, b) => a.dueIso.localeCompare(b.dueIso));
+    return items;
+  })();
+
+  const upcomingBlock = upcoming.length ? `
+    <div class="card p-5 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <div class="stat-label">Upcoming due dates</div>
+          <h3 class="section-h">Next 14 days</h3>
+        </div>
+        <span class="chip chip-muted">${upcoming.length} tenant${upcoming.length===1?'':'s'}</span>
+      </div>
+      <div class="space-y-2">
+        ${upcoming.map(it => {
+          const overdue = it.daysOut < 0;
+          const todayDue = it.daysOut === 0;
+          const accent = unitAccent(it.unit.id);
+          let dayBadge;
+          if (overdue) dayBadge = `<span style="color:#DC2626;font-weight:700">${Math.abs(it.daysOut)}d overdue</span>`;
+          else if (todayDue) dayBadge = `<span style="color:#DC2626;font-weight:700">Due today</span>`;
+          else if (it.daysOut <= 3) dayBadge = `<span style="color:#D97706;font-weight:600">In ${it.daysOut}d</span>`;
+          else dayBadge = `<span class="text-ink-5">In ${it.daysOut}d</span>`;
+          return `
+            <div class="flex items-center justify-between gap-3 px-3 py-2 rounded-md" style="background:${overdue || todayDue ? '#FEF2F2' : '#F9FAFB'};border:1px solid ${overdue || todayDue ? '#FECACA' : '#E5E7EB'}">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${accent.color};flex-shrink:0"></span>
+                <div class="min-w-0">
+                  <div class="font-semibold text-ink truncate">${h(it.tenant.name)}</div>
+                  <div class="text-xs text-ink-5">${h(it.unit.name)} · ${fmtDate(it.dueIso)}</div>
+                </div>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <div class="num font-bold text-sm" style="color:#DC2626">${fmtMoney(it.outstanding)}</div>
+                <div class="text-xs">${dayBadge}</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
+
   const statsBlock = `
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       <div class="card card-accent card-accent-purple p-5">
@@ -1805,6 +2027,7 @@ function renderMonth(monthId) {
 
     ${bannersBlock}
     ${statsBlock}
+    ${upcomingBlock}
 
     <div class="flex items-end justify-between mb-3">
       <div>
@@ -1894,8 +2117,15 @@ function renderMonth(monthId) {
     </div>
 
     <div class="border-t border-line pt-6 mb-5">
-      <h3 class="section-h mb-3">Payments — ${monthLabel(monthId)}</h3>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <h3 class="section-h">Payments — ${monthLabel(monthId)}</h3>
+        <div class="inline-flex rounded-md overflow-hidden" style="border:1px solid #E5E7EB" id="paymentsFilter">
+          <button data-filter="all"     class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:#111827;color:#FFFFFF">All</button>
+          <button data-filter="unpaid"  class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:#FFFFFF;color:#374151;border-left:1px solid #E5E7EB">Unpaid only</button>
+          <button data-filter="paid"    class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:#FFFFFF;color:#374151;border-left:1px solid #E5E7EB">Paid only</button>
+        </div>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" id="paymentsGrid">
         ${units.map(u => {
           const ch = computeCharges(u.id, monthId);
           const st = monthPaymentStatus(u.id, monthId);
@@ -1907,7 +2137,7 @@ function renderMonth(monthId) {
                      : st.status === 'vacant'  ? `<span class="chip chip-muted">Vacant</span>`
                      : `<span class="chip chip-muted">—</span>`;
           return `
-            <div class="card overflow-hidden">
+            <div class="card overflow-hidden" data-pay-status="${st.status}">
               <div style="height:3px;background:${accent.color}"></div>
               <div class="p-4">
               <div class="flex items-center justify-between mb-2">
@@ -1943,6 +2173,7 @@ function renderMonth(monthId) {
           `;
         }).join('')}
       </div>
+      <div id="paymentsEmptyMsg" class="hidden text-center py-6 text-sm text-ink-5 italic">No units match this filter.</div>
     </div>
 
     <div class="flex justify-end mb-8">
@@ -1953,6 +2184,36 @@ function renderMonth(monthId) {
   `;
 
   $('#app').innerHTML = layoutShell(body);
+
+  // Wire payments filter (All / Unpaid / Paid). Pure DOM filter — no re-render.
+  const filterRoot = document.getElementById('paymentsFilter');
+  if (filterRoot) {
+    const grid = document.getElementById('paymentsGrid');
+    const empty = document.getElementById('paymentsEmptyMsg');
+    const btns = filterRoot.querySelectorAll('button[data-filter]');
+    btns.forEach(b => {
+      b.addEventListener('click', () => {
+        const filter = b.dataset.filter;
+        // Active state styling
+        btns.forEach(x => {
+          const isActive = x.dataset.filter === filter;
+          x.style.background = isActive ? '#111827' : '#FFFFFF';
+          x.style.color      = isActive ? '#FFFFFF' : '#374151';
+        });
+        // Show/hide cards
+        let visible = 0;
+        grid.querySelectorAll('[data-pay-status]').forEach(card => {
+          const s = card.dataset.payStatus;
+          let show = true;
+          if (filter === 'unpaid') show = (s === 'unpaid' || s === 'partial');
+          else if (filter === 'paid') show = (s === 'paid');
+          card.style.display = show ? '' : 'none';
+          if (show) visible++;
+        });
+        empty.classList.toggle('hidden', visible > 0);
+      });
+    });
+  }
 }
 
 // Does a month have any reading data entered? Used to swap + / Edit button labels.
@@ -2001,7 +2262,16 @@ function buildRecentMonthsTable(excludeMonthId) {
                 statusCount[st.status] = (statusCount[st.status]||0)+1;
                 if (!ch || !ch.hasReadings) return `<td class="num-cell text-ink-5">—</td>`;
                 if (ch.vacant) return `<td class="num-cell text-ink-5 italic">Vacant</td>`;
-                return `<td class="num-cell">${fmtMoney(ch.total)}</td>`;
+                // Find tenant who occupied this unit during this month
+                const occupant = state.tenants.find(t =>
+                  t.unitId === u.id &&
+                  (!t.moveInDate || t.moveInDate.slice(0,7) <= mid) &&
+                  (!t.moveOutDate || t.moveOutDate.slice(0,7) >= mid)
+                );
+                return `<td class="num-cell">
+                  <div>${fmtMoney(ch.total)}</div>
+                  ${occupant ? `<div class="text-[11px] text-ink-5 font-normal mt-0.5" style="font-variant-numeric:normal">${h(occupant.name)}</div>` : ''}
+                </td>`;
               }).join('');
               const allPaid = statusCount.unpaid === 0 && statusCount.partial === 0 && (statusCount.paid + statusCount.vacant) > 0;
               const chip = allPaid ? `<span class="chip chip-paid">${icons.check}All paid</span>` : statusCount.unpaid > 0 ? `<span class="chip chip-unpaid">${statusCount.unpaid} unpaid</span>` : `<span class="chip chip-partial">Partial</span>`;
@@ -2895,6 +3165,20 @@ function openUnitModal(unitId, mode = 'edit') {
             <input type="number" step="0.01" id="startWater" class="input-base" value="${u.startWater}" />
           </div>
         </div>
+        <div class="unit-edit-group">
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Card color</label>
+          <div class="flex flex-wrap gap-2" id="colorSwatches">
+            ${ACCENT_PALETTE.map(p => `
+              <button type="button" data-color-key="${p.key}" class="color-swatch"
+                style="width:32px;height:32px;border-radius:50%;background:${p.color};border:3px solid ${(u.colorKey === p.key) ? '#111827' : 'transparent'};box-shadow:0 0 0 1px #E5E7EB;cursor:pointer"
+                title="${p.key}"></button>
+            `).join('')}
+            <button type="button" data-color-key="" class="color-swatch"
+              style="width:32px;height:32px;border-radius:50%;background:#FFFFFF;border:3px solid ${!u.colorKey ? '#111827' : 'transparent'};box-shadow:0 0 0 1px #E5E7EB;cursor:pointer;font-size:18px;color:#6B7280;display:flex;align-items:center;justify-content:center"
+              title="auto">A</button>
+          </div>
+          <p class="text-[11px] text-ink-5 mt-1">"A" = auto-assigned by unit position. Custom colors stay even if you reorder units.</p>
+        </div>
         <label class="flex items-center gap-2 text-sm cursor-pointer unit-edit-group">
           <input type="checkbox" id="active" ${u.active ? 'checked':''} />
           <span>Active (uncheck to hide from dashboard but keep history)</span>
@@ -2982,6 +3266,23 @@ function openUnitModal(unitId, mode = 'edit') {
     renderOtherChargesList();
   });
 
+  // Color swatch picker
+  let chosenColorKey = u.colorKey || '';
+  const wireSwatches = () => {
+    const wrap = document.getElementById('colorSwatches');
+    if (!wrap) return;
+    wrap.querySelectorAll('.color-swatch').forEach(btn => {
+      btn.onclick = () => {
+        chosenColorKey = btn.dataset.colorKey || '';
+        // Re-render selection rings
+        wrap.querySelectorAll('.color-swatch').forEach(b => {
+          b.style.border = (b.dataset.colorKey === chosenColorKey) ? '3px solid #111827' : '3px solid transparent';
+        });
+      };
+    });
+  };
+  wireSwatches();
+
   $('#unitForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const data = {
@@ -2992,6 +3293,7 @@ function openUnitModal(unitId, mode = 'edit') {
       startElectric: parseFloat($('#startElectric').value) || 0,
       startWater: parseFloat($('#startWater').value) || 0,
       active: $('#active').checked,
+      colorKey: chosenColorKey || null,
       rentHistory: rentHistory,
     };
     if (isNew) {
@@ -3742,6 +4044,279 @@ function renderUnitDetail(unitId) {
 // ============================================================================
 // 17. VIEW: SETTINGS
 // ============================================================================
+// ============================================================================
+// 17.5 REPORTS — annual / YTD summary
+// ============================================================================
+function renderReports() {
+  const allMonthIds = sortedMonthIds();
+  // Available years inferred from data + always include current year
+  const years = new Set();
+  allMonthIds.forEach(id => years.add(id.slice(0, 4)));
+  years.add(String(new Date().getFullYear()));
+  const yearList = Array.from(years).sort().reverse();
+
+  // Read selected year from URL hash query (?year=2026), default to current
+  const selectedYear = parseRoute().query?.year || String(new Date().getFullYear());
+
+  // Filter months in the selected year that are within tenancy / have data
+  const yearMonths = allMonthIds.filter(id => id.startsWith(selectedYear + '-'));
+  const units = state.units; // include inactive units for historical accuracy
+
+  // Aggregate per-unit and overall
+  let totalRent = 0, totalElectric = 0, totalWater = 0, totalOther = 0;
+  let totalBilled = 0, totalCollected = 0;
+  const unitRows = units.map(u => {
+    let uRent = 0, uElectric = 0, uWater = 0, uOther = 0, uBilled = 0, uCollected = 0;
+    const occupiedMonths = [];
+    yearMonths.forEach(mid => {
+      const ch = computeCharges(u.id, mid);
+      if (!ch || ch.vacant || !ch.hasReadings) return;
+      uRent += ch.rent || 0;
+      uElectric += ch.electricBill || 0;
+      uWater += ch.waterBill || 0;
+      uOther += ch.otherCharge || 0;
+      uBilled += ch.total || 0;
+      uCollected += paymentsTotalForUnitMonth(u.id, mid);
+      occupiedMonths.push(mid);
+    });
+    totalRent += uRent;
+    totalElectric += uElectric;
+    totalWater += uWater;
+    totalOther += uOther;
+    totalBilled += uBilled;
+    totalCollected += uCollected;
+    return { u, uRent, uElectric, uWater, uOther, uBilled, uCollected, monthsCount: occupiedMonths.length };
+  });
+
+  const totalOutstanding = totalBilled - totalCollected;
+  const collectionRate = totalBilled > 0 ? (totalCollected / totalBilled * 100) : 0;
+
+  // Per-month breakdown for the year (small table)
+  const monthRows = yearMonths.map(mid => {
+    let billed = 0, collected = 0;
+    units.forEach(u => {
+      const ch = computeCharges(u.id, mid);
+      if (ch && ch.hasReadings && !ch.vacant) billed += ch.total;
+      collected += paymentsTotalForUnitMonth(u.id, mid);
+    });
+    return { mid, billed, collected, balance: billed - collected };
+  });
+
+  // CSV download — all data in selected year
+  const csvRows = [
+    ['Month', 'Unit', 'Tenant', 'Rent', 'Electric', 'Water', 'Other', 'Total Billed', 'Collected', 'Balance']
+  ];
+  yearMonths.forEach(mid => {
+    units.forEach(u => {
+      const ch = computeCharges(u.id, mid);
+      if (!ch || !ch.hasReadings) return;
+      const occupant = state.tenants.find(t =>
+        t.unitId === u.id &&
+        (!t.moveInDate || t.moveInDate.slice(0,7) <= mid) &&
+        (!t.moveOutDate || t.moveOutDate.slice(0,7) >= mid)
+      );
+      const collected = paymentsTotalForUnitMonth(u.id, mid);
+      csvRows.push([
+        mid,
+        u.name,
+        occupant?.name || (ch.vacant ? '(Vacant)' : ''),
+        ch.rent || 0,
+        ch.electricBill || 0,
+        ch.waterBill || 0,
+        ch.otherCharge || 0,
+        ch.total || 0,
+        collected,
+        (ch.total || 0) - collected
+      ]);
+    });
+  });
+
+  const body = `
+    <div>
+      <div class="flex items-end justify-between gap-3 mb-5 flex-wrap">
+        <div>
+          <div class="stat-label">Reports</div>
+          <h2 class="text-2xl font-bold text-ink">Annual summary</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5">Year</label>
+          <select id="reportYear" class="input-base" style="width:auto;min-width:100px">
+            ${yearList.map(y => `<option value="${y}"${y===selectedYear?' selected':''}>${y}</option>`).join('')}
+          </select>
+          <button onclick="downloadReportCsv('${selectedYear}')" class="btn btn-secondary btn-sm">${icons.download}<span class="hidden sm:inline">Download CSV</span></button>
+        </div>
+      </div>
+
+      ${yearMonths.length === 0 ? `
+        <div class="card p-10 text-center">
+          <div class="text-ink-5 italic">No data recorded for ${selectedYear} yet.</div>
+        </div>
+      ` : `
+        <!-- Summary cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div class="card card-accent card-accent-blue p-5">
+            <div class="stat-label">Total billed</div>
+            <div class="stat-value num mt-1">${fmtMoney(totalBilled)}</div>
+            <div class="text-xs text-ink-5 mt-1">${yearMonths.length} month${yearMonths.length===1?'':'s'} of data</div>
+          </div>
+          <div class="card card-accent card-accent-green p-5">
+            <div class="stat-label">Collected</div>
+            <div class="stat-value num mt-1" style="color:#3F9D2D">${fmtMoney(totalCollected)}</div>
+            <div class="text-xs text-ink-5 mt-1">${collectionRate.toFixed(1)}% collection rate</div>
+          </div>
+          <div class="card card-accent card-accent-red p-5">
+            <div class="stat-label">Still outstanding</div>
+            <div class="stat-value num mt-1" style="color:${totalOutstanding > 0.01 ? '#DC2626' : '#111827'}">${fmtMoney(Math.max(0, totalOutstanding))}</div>
+          </div>
+          <div class="card card-accent card-accent-purple p-5">
+            <div class="stat-label">Rent only (gross)</div>
+            <div class="stat-value num mt-1">${fmtMoney(totalRent)}</div>
+            <div class="text-xs text-ink-5 mt-1">Excludes utilities &amp; other</div>
+          </div>
+        </div>
+
+        <!-- Per-unit breakdown -->
+        <div class="card mb-6 overflow-x-auto">
+          <div class="p-5 pb-3"><h3 class="section-h">By unit</h3></div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Unit</th>
+                <th class="num-cell">Months</th>
+                <th class="num-cell">Rent</th>
+                <th class="num-cell">Electric</th>
+                <th class="num-cell">Water</th>
+                <th class="num-cell">Other</th>
+                <th class="num-cell">Billed</th>
+                <th class="num-cell">Collected</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${unitRows.map(r => {
+                const ac = unitAccent(r.u.id);
+                return `
+                  <tr>
+                    <td>
+                      <span class="inline-flex items-center gap-2">
+                        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ac.color}"></span>
+                        ${h(r.u.name)}
+                      </span>
+                    </td>
+                    <td class="num-cell">${r.monthsCount}</td>
+                    <td class="num-cell">${fmtMoney(r.uRent)}</td>
+                    <td class="num-cell">${fmtMoney(r.uElectric)}</td>
+                    <td class="num-cell">${fmtMoney(r.uWater)}</td>
+                    <td class="num-cell">${fmtMoney(r.uOther)}</td>
+                    <td class="num-cell font-semibold">${fmtMoney(r.uBilled)}</td>
+                    <td class="num-cell" style="color:#3F9D2D">${fmtMoney(r.uCollected)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid #111827;font-weight:700">
+                <td>Total</td>
+                <td class="num-cell">—</td>
+                <td class="num-cell">${fmtMoney(totalRent)}</td>
+                <td class="num-cell">${fmtMoney(totalElectric)}</td>
+                <td class="num-cell">${fmtMoney(totalWater)}</td>
+                <td class="num-cell">${fmtMoney(totalOther)}</td>
+                <td class="num-cell">${fmtMoney(totalBilled)}</td>
+                <td class="num-cell" style="color:#3F9D2D">${fmtMoney(totalCollected)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Per-month breakdown -->
+        <div class="card overflow-x-auto">
+          <div class="p-5 pb-3"><h3 class="section-h">By month</h3></div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th class="num-cell">Billed</th>
+                <th class="num-cell">Collected</th>
+                <th class="num-cell">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${monthRows.map(r => `
+                <tr onclick="location.hash='#/month/${r.mid}'" class="cursor-pointer hover:bg-surface-2">
+                  <td class="font-semibold">${monthLabel(r.mid)}</td>
+                  <td class="num-cell">${fmtMoney(r.billed)}</td>
+                  <td class="num-cell" style="color:#3F9D2D">${fmtMoney(r.collected)}</td>
+                  <td class="num-cell" style="color:${r.balance > 0.01 ? '#DC2626' : '#111827'}">${fmtMoney(r.balance)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `}
+    </div>
+  `;
+
+  $('#app').innerHTML = layoutShell(body);
+
+  // Wire year selector
+  const yearSel = document.getElementById('reportYear');
+  if (yearSel) {
+    yearSel.addEventListener('change', () => {
+      location.hash = `#/reports?year=${yearSel.value}`;
+    });
+  }
+}
+
+// CSV download for the selected year. Builds rows on the fly to avoid stale
+// closure data if the user switches years quickly.
+function downloadReportCsv(year) {
+  const allMonthIds = sortedMonthIds().filter(id => id.startsWith(year + '-'));
+  const units = state.units;
+  const rows = [
+    ['Month', 'Unit', 'Tenant', 'Rent', 'Electric', 'Water', 'Other', 'Total Billed', 'Collected', 'Balance']
+  ];
+  allMonthIds.forEach(mid => {
+    units.forEach(u => {
+      const ch = computeCharges(u.id, mid);
+      if (!ch || !ch.hasReadings) return;
+      const occupant = state.tenants.find(t =>
+        t.unitId === u.id &&
+        (!t.moveInDate || t.moveInDate.slice(0,7) <= mid) &&
+        (!t.moveOutDate || t.moveOutDate.slice(0,7) >= mid)
+      );
+      const collected = paymentsTotalForUnitMonth(u.id, mid);
+      rows.push([
+        mid,
+        u.name,
+        occupant?.name || (ch.vacant ? '(Vacant)' : ''),
+        (ch.rent || 0).toFixed(2),
+        (ch.electricBill || 0).toFixed(2),
+        (ch.waterBill || 0).toFixed(2),
+        (ch.otherCharge || 0).toFixed(2),
+        (ch.total || 0).toFixed(2),
+        collected.toFixed(2),
+        ((ch.total || 0) - collected).toFixed(2)
+      ]);
+    });
+  });
+  const csv = rows.map(r => r.map(cell => {
+    const s = String(cell ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `aptracker-report-${year}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV downloaded', 'success');
+}
+window.downloadReportCsv = downloadReportCsv;
+
+
 function renderSettings() {
   const lastSaved = state.meta?.lastSavedAt;
   const lastExp = state.meta?.lastExportedAt;
@@ -3824,6 +4399,19 @@ function renderSettings() {
     </div>
 
     ${renderCloudSyncCard()}
+
+    ${cloudSync.enabled ? `
+      <div class="card p-5 mb-4" id="backupsCard">
+        <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+          <div>
+            <h3 class="section-h">Cloud backups</h3>
+            <p class="section-sub">A snapshot is taken automatically once per day. The last 7 days are kept.</p>
+          </div>
+          <button onclick="loadBackupsList()" class="btn btn-secondary btn-sm">${icons.refresh}Refresh</button>
+        </div>
+        <div id="backupsList" class="text-sm text-ink-5 italic">Click Refresh to load available snapshots.</div>
+      </div>
+    ` : ''}
 
     <div class="card p-5 mb-4">
       <h3 class="section-h mb-3">GitHub Pages hosting</h3>
@@ -3953,9 +4541,11 @@ window.confirmClearData = confirmClearData;
 // 18. VIEW: TENANT
 // ============================================================================
 function renderTenant(code) {
+  const closeBtn = `<div class="max-w-md mx-auto mb-4"><button onclick="goBackFromTenantView()" class="btn btn-secondary btn-sm">${icons.left}Close</button></div>`;
   const tenant = tenantByCode(code);
   if (!tenant) {
     $('#app').innerHTML = layoutShell(`
+      ${closeBtn}
       <div class="max-w-md mx-auto mt-16 card p-10 text-center">
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-2 text-ink-5 mb-4" style="transform:scale(1.5)">${icons.info}</div>
         <h2 class="text-2xl font-bold text-ink mb-2">Tenant not found</h2>
@@ -3967,6 +4557,7 @@ function renderTenant(code) {
   const u = tenant.unitId ? unitById(tenant.unitId) : null;
   if (!u) {
     $('#app').innerHTML = layoutShell(`
+      ${closeBtn}
       <div class="max-w-md mx-auto mt-16 card p-10 text-center">
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-2 text-ink-5 mb-4" style="transform:scale(1.5)">${icons.info}</div>
         <h2 class="text-2xl font-bold text-ink mb-2">Hello, ${h(tenant.name)}</h2>
@@ -4025,254 +4616,217 @@ function renderTenant(code) {
     `;
   }
 
-  // Simplified bill for latest month
-  let billCard = '';
-  if (latest) {
-    const b = latest.breakdown;
-    const cm = latest.cm;
-    const rows = [];
+  // ─── New unified ledger table (replaces bill card + utility history + payment history) ─────
+  // The tenant view now shows a year-paged table with one 2-row group per month:
+  //   Top row: Month / Rent / Other / Total / Status / [✎ admin only][👁]
+  //   Sub row: ↳ Electric usage + bill, ↳ Water usage + bill
+  // Admin can click ✎ to flip a row into inline-edit mode. Tenants see view-only.
 
-    // Previous unpaid (only if > 0)
-    if (latest.prevBal > 0.01) {
-      rows.push(`
-        <div class="flex justify-between items-baseline py-3 border-b border-line">
-          <span class="text-base sm:text-lg text-ink-4">Unpaid from before</span>
-          <span class="num text-lg sm:text-xl font-semibold" style="color:#D97706">${fmtMoney(latest.prevBal)}</span>
-        </div>
-      `);
-    }
+  const isAdminView = session.authed === true;
+  const yearsAvailable = tenantYears(tenant);
+  const currentYear = String(new Date().getFullYear());
+  const requestedYear = parseRoute().query?.year;
+  const selectedYear = (requestedYear && yearsAvailable.includes(requestedYear)) ? requestedYear
+                      : (yearsAvailable.includes(currentYear) ? currentYear : yearsAvailable[yearsAvailable.length-1]);
+  const yearIdx = yearsAvailable.indexOf(selectedYear);
+  const prevYearAvail = yearIdx > 0 ? yearsAvailable[yearIdx - 1] : null;
+  const nextYearAvail = yearIdx < yearsAvailable.length - 1 ? yearsAvailable[yearIdx + 1] : null;
 
-    if (latest.vacant) {
-      rows.push(`<div class="py-4 italic text-ink-5 text-center">Vacant this month — no charges</div>`);
+  const monthsForYear = tenantMonthsForYear(tenant, selectedYear);
+
+  // Build map from monthId → ledger entry (so we can show payments + status)
+  const ledgerByMonth = {};
+  ledger.forEach(r => { ledgerByMonth[r.monthId] = r; });
+
+  // Helper to build one row group for a given monthId
+  const buildLedgerRow = (mid) => {
+    const ledgerRow = ledgerByMonth[mid];
+    const ch = computeCharges(u.id, mid);
+    const cm = ch ? ch.cm : computeMonthReadings(u.id, mid);
+    const month = monthById(mid);
+    const r = month ? (month.readings[u.id] || {}) : {};
+    const hasReadings = ch && ch.hasReadings && !ch.vacant;
+    const isVacant = ch && ch.vacant;
+    const isEmpty = !ch || (!ch.hasReadings && !ch.vacant);
+
+    // Status chip
+    let statusChip;
+    if (isVacant) statusChip = `<span class="chip chip-muted">Vacant</span>`;
+    else if (isEmpty) statusChip = `<span class="chip chip-muted">No readings</span>`;
+    else if (ledgerRow && ledgerRow.endBal > 0.01) statusChip = `<span class="chip chip-unpaid">Unpaid</span>`;
+    else if (ledgerRow && ledgerRow.payments > 0) statusChip = `<span class="chip chip-paid">Paid</span>`;
+    else statusChip = `<span class="chip chip-muted">—</span>`;
+
+    // Pre-fill values for edit mode
+    const prevElectric = previousReading(u.id, mid, 'electricReading').value;
+    const prevWater = previousReading(u.id, mid, 'waterReading').value;
+    const curElectricVal = r.electricReading != null ? r.electricReading : '';
+    const curWaterVal = r.waterReading != null ? r.waterReading : '';
+    const kwhRateVal = month && month.kwhRate != null ? month.kwhRate : '';
+
+    // Rent + Other amounts (resolve via rate-history at this month)
+    const rentAmt = (hasReadings || isEmpty) ? rentForUnit(u.id, mid) : 0;
+    const otherCharges = otherChargesForUnit(u.id, mid) || [];
+    const otherSum = otherCharges.reduce((a,c) => a + (Number(c.amount)||0), 0);
+    const otherLabels = otherCharges.filter(o => Number(o.amount) > 0).map(o => o.label || 'Other').join(', ');
+
+    // Money display helper — muted dash if no value
+    const moneyOrDash = (v) => v != null && v > 0 ? fmtMoney(v) : '<span class="text-ink-5">—</span>';
+
+    // Total display
+    let totalDisplay;
+    if (isVacant) totalDisplay = '<span class="text-ink-5">—</span>';
+    else if (hasReadings) totalDisplay = fmtMoney(ch.total);
+    else totalDisplay = '<span class="text-ink-5">—</span>';
+
+    // Action buttons (admin only) — icon-only, horizontal under Total
+    const actionsHtml = isAdminView ? `
+      <button onclick="enterLedgerEditMode('${u.id}','${mid}')" class="btn btn-secondary btn-icon btn-sm" title="Edit readings">${icons.edit}</button>
+      ${hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-icon btn-sm" title="View bill">${icons.eye}</button>` : ''}
+    ` : (hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-icon btn-sm" title="View bill">${icons.eye}</button>` : '');
+
+    // Each month is a block of 4 sub-rows (Rent / Electric / Water / Other),
+    // with Month / Total+Status+Actions cells spanning all 4 via rowspan.
+    const blockBorder = 'border-bottom:1px solid #E5E7EB';
+    const noBorder = 'border-bottom:none';
+
+    const electricUsedDisplay = (cm && cm.kwUsed != null) ? fmtNum(cm.kwUsed, 0) : '<span class="text-ink-5">—</span>';
+    const waterUsedDisplay = (cm && cm.cubicUsed != null) ? fmtNum(cm.cubicUsed, 0) : '<span class="text-ink-5">—</span>';
+    const electricReadingDisplay = (cm && cm.currElectric != null) ? fmtNum(cm.currElectric, 0) : '<span class="text-ink-5">—</span>';
+    const waterReadingDisplay = (cm && cm.currWater != null) ? fmtNum(cm.currWater, 0) : '<span class="text-ink-5">—</span>';
+
+    // Color dots for charge categories (matches existing bill-card palette)
+    const dotRent = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4A90E2;margin-right:8px;vertical-align:middle"></span>';
+    const dotElec = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E07B0A;margin-right:8px;vertical-align:middle"></span>';
+    const dotWater = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0EA5A5;margin-right:8px;vertical-align:middle"></span>';
+    const dotOther = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7E3FE3;margin-right:8px;vertical-align:middle"></span>';
+
+    // Combined Total + Status + Actions cell. Status appears under the total
+    // amount as a small chip, with optional balance line for partial payments,
+    // and edit/view buttons at the bottom.
+    let totalStatusCell;
+    if (isVacant) {
+      totalStatusCell = `
+        <div class="num text-ink-5">—</div>
+        <div class="mt-1">${statusChip}</div>
+        ${actionsHtml ? `<div class="inline-flex gap-1 mt-2">${actionsHtml}</div>` : ''}
+      `;
+    } else if (hasReadings) {
+      const showBalance = ledgerRow && ledgerRow.endBal > 0.01 && ledgerRow.payments > 0;
+      totalStatusCell = `
+        <div class="num font-bold" style="font-size:15px">${fmtMoney(ch.total)}</div>
+        <div class="mt-1.5">${statusChip}</div>
+        ${showBalance ? `<div class="text-[11px] mt-1" style="color:#DC2626">Balance <strong class="num">${fmtMoney(ledgerRow.endBal)}</strong></div>` : ''}
+        ${actionsHtml ? `<div class="inline-flex gap-1 mt-2">${actionsHtml}</div>` : ''}
+      `;
     } else {
-      if (b.rent > 0) {
-        rows.push(`
-          <div class="flex justify-between items-baseline py-3 border-b border-line">
-            <span class="flex items-center gap-2 text-base sm:text-lg text-ink">
-              <span style="width:8px;height:8px;border-radius:2px;background:#4A90E2;flex-shrink:0"></span>
-              Rent
-            </span>
-            <span class="num text-lg sm:text-xl">${fmtMoney(b.rent)}</span>
-          </div>
-        `);
-      }
-      if (b.electricBill > 0 || (cm && cm.kwUsed != null)) {
-        const noteLines = [];
-        if (cm && cm.kwUsed != null) noteLines.push(`${fmtNum(cm.kwUsed, 2)} kWh used`);
-        if (cm && cm.rate != null) noteLines.push(`Rate: ${CURRENCY}${fmtNum(cm.rate, 2)} per kWh`);
-        const usedNote = noteLines.length ? `<div class="text-sm text-ink-5 mt-0.5 ml-4">${noteLines.join(' · ')}</div>` : '';
-        rows.push(`
-          <div class="flex justify-between items-baseline py-3 border-b border-line">
-            <div>
-              <span class="flex items-center gap-2 text-base sm:text-lg text-ink">
-                <span style="width:8px;height:8px;border-radius:2px;background:#E07B0A;flex-shrink:0"></span>
-                Electricity
-              </span>
-              ${usedNote}
-            </div>
-            <span class="num text-lg sm:text-xl">${fmtMoney(b.electricBill)}</span>
-          </div>
-        `);
-      }
-      if (b.waterBill > 0 || (cm && cm.cubicUsed != null)) {
-        const s = state.settings;
-        const noteLines = [];
-        if (cm && cm.cubicUsed != null) noteLines.push(`${fmtNum(cm.cubicUsed, 2)} m³ used`);
-        noteLines.push(`Rate: ${CURRENCY}${fmtNum(s.waterBaseRate, 0)} up to ${fmtNum(s.waterBaseCubic, 0)} m³, then +${CURRENCY}${fmtNum(s.waterPerExtra, 0)} per extra m³`);
-        const usedNote = `<div class="text-sm text-ink-5 mt-0.5 ml-4">${noteLines.join(' · ')}</div>`;
-        rows.push(`
-          <div class="flex justify-between items-baseline py-3 border-b border-line">
-            <div>
-              <span class="flex items-center gap-2 text-base sm:text-lg text-ink">
-                <span style="width:8px;height:8px;border-radius:2px;background:#0EA5A5;flex-shrink:0"></span>
-                Water
-              </span>
-              ${usedNote}
-            </div>
-            <span class="num text-lg sm:text-xl">${fmtMoney(b.waterBill)}</span>
-          </div>
-        `);
-      }
-      (b.otherCharges || []).forEach(oc => {
-        if ((Number(oc.amount) || 0) <= 0) return;
-        rows.push(`
-          <div class="flex justify-between items-baseline py-3 border-b border-line">
-            <span class="flex items-center gap-2 text-base sm:text-lg text-ink">
-              <span style="width:8px;height:8px;border-radius:2px;background:#7E3FE3;flex-shrink:0"></span>
-              ${h(oc.label || 'Other')}
-            </span>
-            <span class="num text-lg sm:text-xl">${fmtMoney(oc.amount)}</span>
-          </div>
-        `);
-      });
-    }
-
-    // Payments received (only show if > 0)
-    let paymentsRow = '';
-    if (latest.payments > 0.01) {
-      paymentsRow = `
-        <div class="flex justify-between items-baseline py-3 border-b border-line">
-          <span class="text-base sm:text-lg" style="color:#3F9D2D">You paid</span>
-          <span class="num text-lg sm:text-xl font-semibold" style="color:#3F9D2D">−${fmtMoney(latest.payments).replace('−','')}</span>
-        </div>
+      totalStatusCell = `
+        <div class="num text-ink-5">—</div>
+        <div class="mt-1">${statusChip}</div>
+        ${actionsHtml ? `<div class="inline-flex gap-1 mt-2">${actionsHtml}</div>` : ''}
       `;
     }
 
-    const totalColor = latest.endBal > 0.01 ? '#DC2626' : latest.endBal < -0.01 ? '#3F9D2D' : '#111827';
-    const totalLabel = latest.endBal > 0.01 ? 'Amount to pay' : latest.endBal < -0.01 ? 'Credit on your account' : 'Paid in full';
-
-    billCard = `
-      <div class="card p-6 sm:p-8 mb-6">
-        <div class="flex items-start justify-between mb-5 pb-4 border-b-2 border-ink">
-          <div>
-            <div class="text-sm font-semibold uppercase tracking-wider text-ink-5 mb-1">Your bill for</div>
-            <h3 class="text-2xl sm:text-3xl font-bold text-ink">${monthLabel(latest.monthId)}</h3>
+    return `
+      <tr data-ledger-row="${mid}" data-sub="rent">
+        <td rowspan="4" style="font-weight:600;vertical-align:middle;text-align:center;${blockBorder};border-right:1px solid #E5E7EB;padding:8px 12px">${monthLabel(mid)}</td>
+        <td style="${noBorder};padding:8px 12px;font-weight:500">${dotRent}Rent</td>
+        <td style="${noBorder};text-align:center;padding:8px 4px;color:#9CA3AF">—</td>
+        <td style="${noBorder};text-align:center;padding:8px 4px;color:#9CA3AF">—</td>
+        <td class="num" style="${noBorder};text-align:right;padding:8px 12px">${moneyOrDash(rentAmt)}</td>
+        <td rowspan="4" style="${blockBorder};text-align:center;padding:8px 12px;vertical-align:middle;border-left:1px solid #E5E7EB">${totalStatusCell}</td>
+      </tr>
+      <tr data-ledger-row="${mid}" data-sub="electric">
+        <td style="${noBorder};padding:8px 12px">
+          <div style="font-weight:500">${dotElec}Electric</div>
+          ${kwhRateVal !== '' ? `<div class="text-[11px] text-ink-5 mt-0.5" style="margin-left:16px">kWh Rate: ${CURRENCY}${fmtNum(kwhRateVal, 2)}</div>` : ''}
+        </td>
+        <td class="num" style="${noBorder};text-align:center;padding:8px 4px">${electricReadingDisplay}</td>
+        <td class="num" style="${noBorder};text-align:center;padding:8px 4px">${electricUsedDisplay}</td>
+        <td class="num" style="${noBorder};text-align:right;padding:8px 12px">${moneyOrDash(hasReadings ? ch.electricBill : null)}</td>
+      </tr>
+      <tr data-ledger-row="${mid}" data-sub="water">
+        <td style="${noBorder};padding:8px 12px;font-weight:500">${dotWater}Water</td>
+        <td class="num" style="${noBorder};text-align:center;padding:8px 4px">${waterReadingDisplay}</td>
+        <td class="num" style="${noBorder};text-align:center;padding:8px 4px">${waterUsedDisplay}</td>
+        <td class="num" style="${noBorder};text-align:right;padding:8px 12px">${moneyOrDash(hasReadings ? ch.waterBill : null)}</td>
+      </tr>
+      <tr data-ledger-row="${mid}" data-sub="other">
+        <td style="${blockBorder};padding:8px 12px">
+          <div style="font-weight:500">${dotOther}Other</div>
+          ${otherSum > 0 && otherLabels ? `<div class="text-[11px] text-ink-5 mt-0.5" style="margin-left:16px">${h(otherLabels)}</div>` : ''}
+        </td>
+        <td style="${blockBorder};text-align:center;padding:8px 4px;color:#9CA3AF">—</td>
+        <td style="${blockBorder};text-align:center;padding:8px 4px;color:#9CA3AF">—</td>
+        <td class="num" style="${blockBorder};text-align:right;padding:8px 12px">${moneyOrDash(hasReadings ? otherSum : null)}</td>
+      </tr>
+      <tr data-ledger-edit="${mid}" data-prev-e="${prevElectric}" data-prev-w="${prevWater}" data-unit="${u.id}" class="hidden">
+        <td colspan="6" style="background:#EFF6FF;padding:14px 16px;border-bottom:1px solid #E5E7EB">
+          <div class="font-semibold text-ink mb-2 text-sm">Editing ${monthLabel(mid)}</div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Electric reading (kWh)</label>
+              <input type="number" step="0.01" data-field="electricReading" class="input-base text-sm" value="${curElectricVal}" placeholder="prev: ${fmtNum(prevElectric, 0)}" />
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Water reading (m³)</label>
+              <input type="number" step="0.01" data-field="waterReading" class="input-base text-sm" value="${curWaterVal}" placeholder="prev: ${fmtNum(prevWater, 0)}" />
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">kWh rate</label>
+              <input type="number" step="0.01" data-field="kwhRate" class="input-base text-sm" value="${kwhRateVal}" placeholder="e.g. 10.50" />
+            </div>
           </div>
-          <button onclick="openStatement('${u.id}', '${latest.monthId}')" class="btn btn-primary" style="padding:10px 18px;font-size:15px">${icons.print}Print</button>
-        </div>
-
-        ${rows.join('')}
-        ${paymentsRow}
-
-        <div class="flex justify-between items-baseline pt-5 mt-2" style="border-top:3px solid #111827">
-          <span class="text-xl sm:text-2xl font-bold text-ink">${totalLabel}</span>
-          <span class="num font-bold" style="color:${totalColor};font-size:32px;line-height:1.1">${fmtMoney(Math.abs(latest.endBal))}</span>
-        </div>
-      </div>
+          <div class="flex justify-between items-center text-sm gap-2 flex-wrap">
+            <div class="text-ink-5">
+              <span class="mr-3">Electric: <strong class="num text-ink" data-preview="electric">—</strong></span>
+              <span class="mr-3">Water: <strong class="num text-ink" data-preview="water">—</strong></span>
+              <span>Total: <strong class="num text-ink" data-preview="total">—</strong></span>
+            </div>
+            <div class="flex gap-2">
+              <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input type="checkbox" data-field="vacant" ${r.vacant ? 'checked' : ''} />
+                <span>Vacant this month</span>
+              </label>
+              <button type="button" onclick="cancelLedgerEdit('${mid}')" class="btn btn-secondary btn-sm">Cancel</button>
+              <button type="button" onclick="saveLedgerRow('${u.id}','${mid}')" class="btn btn-primary btn-sm">${icons.check}Save</button>
+            </div>
+          </div>
+        </td>
+      </tr>
     `;
-  } else {
-    billCard = `<div class="card p-10 text-center mb-6"><div class="text-lg text-ink-5">No bills yet.</div></div>`;
-  }
+  };
 
-  // Payment history - bigger rows, fewer columns
-  const historyRows = ledger.slice().reverse();
-
-  // Electric + Water history — side-by-side cards, centered values, no totals
-  const electricRows = historyRows.filter(r => r.cm && r.cm.currElectric != null && !r.vacant);
-  const electricHistoryCard = electricRows.length === 0 ? '' : `
-    <div class="card overflow-hidden">
-      <div style="height:3px;background:#E07B0A"></div>
-      <div class="p-5 border-b border-line">
-        <div class="flex items-center gap-3">
-          <div class="stat-icon stat-icon-orange">${icons.bolt}</div>
-          <div>
-            <h3 class="section-h">Electric History</h3>
-            <p class="section-sub">Monthly usage and bill</p>
-          </div>
+  const ledgerTable = `
+    <div class="card mb-6 overflow-hidden" id="ledgerCard">
+      <div class="p-4 border-b border-line flex items-center justify-between gap-2 flex-wrap">
+        <div class="flex items-center gap-2">
+          <button ${prevYearAvail ? `onclick="navigate('#/tenant?code=${tenant.tenantCode}&year=${prevYearAvail}')"` : 'disabled'} class="btn btn-secondary btn-icon" title="Previous year">${icons.left}</button>
+          <h3 class="text-lg font-bold text-ink">${selectedYear}</h3>
+          <button ${nextYearAvail ? `onclick="navigate('#/tenant?code=${tenant.tenantCode}&year=${nextYearAvail}')"` : 'disabled'} class="btn btn-secondary btn-icon" title="Next year">${icons.right}</button>
         </div>
+        <div class="text-xs text-ink-5">${monthsForYear.length} month${monthsForYear.length===1?'':'s'} in tenancy</div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="text-align:center">Month</th>
-              <th style="text-align:center">Reading</th>
-              <th style="text-align:center">Used</th>
-              <th style="text-align:center">Rate</th>
-              <th style="text-align:center">Bill</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${electricRows.map(r => `
-              <tr>
-                <td style="text-align:center"><span class="font-semibold" style="color:#E07B0A">${monthShort(r.monthId)}</span></td>
-                <td class="num" style="text-align:center;color:#4B5563">${fmtNum(r.cm.currElectric, 2)}</td>
-                <td class="num" style="text-align:center">${r.cm.kwUsed != null ? fmtNum(r.cm.kwUsed, 2) : '—'}</td>
-                <td class="num" style="text-align:center;color:#4B5563">${r.cm.rate != null ? fmtNum(r.cm.rate, 2) : '—'}</td>
-                <td class="num" style="text-align:center;font-weight:700;color:#111827">${fmtMoney(r.breakdown.electricBill)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  const waterRows = historyRows.filter(r => r.cm && r.cm.currWater != null && !r.vacant);
-  const s = state.settings;
-  const waterHistoryCard = waterRows.length === 0 ? '' : `
-    <div class="card overflow-hidden">
-      <div style="height:3px;background:#0EA5A5"></div>
-      <div class="p-5 border-b border-line">
-        <div class="flex items-center gap-3">
-          <div class="stat-icon stat-icon-teal">${icons.droplet}</div>
-          <div>
-            <h3 class="section-h">Water History</h3>
-            <p class="section-sub">${CURRENCY}${fmtNum(s.waterBaseRate, 0)} base · +${CURRENCY}${fmtNum(s.waterPerExtra, 0)}/extra m³</p>
-          </div>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="text-align:center">Month</th>
-              <th style="text-align:center">Reading</th>
-              <th style="text-align:center">Used</th>
-              <th style="text-align:center">Bill</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${waterRows.map(r => `
-              <tr>
-                <td style="text-align:center"><span class="font-semibold" style="color:#0EA5A5">${monthShort(r.monthId)}</span></td>
-                <td class="num" style="text-align:center;color:#4B5563">${fmtNum(r.cm.currWater, 2)}</td>
-                <td class="num" style="text-align:center">${r.cm.cubicUsed != null ? fmtNum(r.cm.cubicUsed, 2) : '—'}</td>
-                <td class="num" style="text-align:center;font-weight:700;color:#111827">${fmtMoney(r.breakdown.waterBill)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  // Wrap side-by-side on md+, stacked on small screens
-  const utilityHistorySection = (electricHistoryCard || waterHistoryCard) ? `
-    <div class="grid md:grid-cols-2 gap-4 mb-6">
-      ${electricHistoryCard}
-      ${waterHistoryCard}
-    </div>
-  ` : '';
-
-  const historyCard = `
-    <div class="card mb-6 overflow-hidden">
-      <div class="p-5 border-b border-line">
-        <h3 class="section-h">Payment History</h3>
-        <p class="section-sub">All your past bills</p>
-      </div>
-      ${historyRows.length === 0 ? `<div class="p-10 text-center text-ink-5 italic">No history yet.</div>` : `
+      ${monthsForYear.length === 0 ? `<div class="p-10 text-center text-ink-5 italic">No months in ${selectedYear}.</div>` : `
         <div class="overflow-x-auto">
-          <table class="data-table">
+          <table class="w-full text-sm" id="ledgerTable" style="border-collapse:collapse">
             <thead>
-              <tr>
-                <th style="text-align:center">Month</th>
-                <th style="text-align:center">Bill</th>
-                <th style="text-align:center">Status</th>
+              <tr style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
+                <th style="text-align:center;padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;letter-spacing:0.05em;text-transform:uppercase">Month</th>
+                <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;letter-spacing:0.05em;text-transform:uppercase"></th>
+                <th style="text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:#6B7280;letter-spacing:0.05em;text-transform:uppercase">Reading</th>
+                <th style="text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:#6B7280;letter-spacing:0.05em;text-transform:uppercase">Used</th>
+                <th style="text-align:right;padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;letter-spacing:0.05em;text-transform:uppercase">Amount</th>
+                <th style="text-align:center;padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;letter-spacing:0.05em;text-transform:uppercase">Total</th>
               </tr>
             </thead>
             <tbody>
-              ${historyRows.map(r => {
-                const status = r.vacant ? { chip: 'chip-muted', label: 'Vacant' }
-                             : r.endBal > 0.01 ? { chip: 'chip-unpaid', label: 'Unpaid' }
-                             : r.payments > 0 ? { chip: 'chip-paid', label: 'Paid' }
-                             : { chip: 'chip-muted', label: '—' };
-                const monthPays = paymentsForUnitMonth(u.id, r.monthId);
-                const depositPays = monthPays.filter(p => p.method === 'Deposit');
-                const depositTotal = depositPays.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-                return `
-                  <tr>
-                    <td style="text-align:center">
-                      <div class="font-semibold">${monthLabel(r.monthId)}</div>
-                      ${depositTotal > 0 ? `<div class="text-[11px] mt-0.5" style="color:#92400E">Paid from security deposit · ${fmtMoney(depositTotal)}</div>` : ''}
-                    </td>
-                    <td class="num" style="text-align:center">${r.vacant ? '—' : fmtMoney(r.charges)}</td>
-                    <td style="text-align:center"><span class="chip ${status.chip}">${status.label}</span></td>
-                  </tr>
-                `;
-              }).join('')}
+              ${monthsForYear.map(buildLedgerRow).join('')}
             </tbody>
           </table>
+        </div>
+        <div class="px-4 py-2.5 text-[11px] text-ink-5" style="background:#F9FAFB;border-top:1px solid #E5E7EB">
+          <strong>Note:</strong> Water billed ${CURRENCY}${fmtNum(state.settings.waterBaseRate, 0)} base for first ${fmtNum(state.settings.waterBaseCubic, 0)} m³, then +${CURRENCY}${fmtNum(state.settings.waterPerExtra, 0)} per extra m³.
         </div>
       `}
     </div>
@@ -4309,24 +4863,62 @@ function renderTenant(code) {
       </div>
 
       ${amountBanner}
-      ${billCard}
-      ${utilityHistorySection}
+      ${ledgerTable}
 
-      <div class="card mb-6 overflow-hidden">
-        <div style="height:3px;background:#C9920C"></div>
-        <div class="p-6 sm:p-8">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-sm font-semibold uppercase tracking-wider mb-2" style="color:#C9920C">Your security deposit</div>
-              <div class="num font-bold text-ink" style="font-size:32px;line-height:1.1">${fmtMoney(dep)}</div>
-              <div class="text-sm sm:text-base text-ink-5 mt-2">Held safely by your landlord.</div>
+      ${(() => {
+        const advance = Number(tenant.advance) || 0;
+        const advancePayments = state.payments.filter(p =>
+          p.unitId === u.id &&
+          p.method === 'Advance' &&
+          (!tenant.moveInDate || p.date >= tenant.moveInDate) &&
+          (!tenant.moveOutDate || p.date <= tenant.moveOutDate)
+        );
+        const appliedTotal = advancePayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        const hasAdvance = advance > 0 || appliedTotal > 0;
+
+        // Render the "advance" half based on its state
+        let advanceHalf;
+        if (advance > 0) {
+          advanceHalf = `
+            <div class="flex-1 min-w-0">
+              <div class="text-[11px] font-semibold uppercase tracking-wider mb-1" style="color:#C9920C">Advance payment</div>
+              <div class="num font-bold text-ink" style="font-size:20px;line-height:1.1">${fmtMoney(advance)}</div>
+              <div class="text-[11px] text-ink-5 mt-1">Held — applied to final month's rent at move-out.</div>
             </div>
-            <div class="stat-icon stat-icon-gold">${icons.wallet}</div>
-          </div>
-        </div>
-      </div>
+          `;
+        } else if (appliedTotal > 0) {
+          const appliedTo = advancePayments.map(p => monthLabel(p.monthId)).join(', ');
+          advanceHalf = `
+            <div class="flex-1 min-w-0">
+              <div class="text-[11px] font-semibold uppercase tracking-wider mb-1" style="color:#059669">Advance applied</div>
+              <div class="num font-bold text-ink" style="font-size:20px;line-height:1.1">${fmtMoney(appliedTotal)}</div>
+              <div class="text-[11px] text-ink-5 mt-1">Applied to ${h(appliedTo)} rent.</div>
+            </div>
+          `;
+        } else {
+          // No advance ever recorded — show muted placeholder so layout stays balanced
+          advanceHalf = `
+            <div class="flex-1 min-w-0">
+              <div class="text-[11px] font-semibold uppercase tracking-wider mb-1 text-ink-5">Advance payment</div>
+              <div class="num font-bold text-ink-5" style="font-size:20px;line-height:1.1">—</div>
+              <div class="text-[11px] text-ink-5 mt-1">None on file.</div>
+            </div>
+          `;
+        }
 
-      ${historyCard}
+        return `
+          <div class="card mb-6 p-4 sm:p-5">
+            <div class="grid grid-cols-2 gap-4 sm:gap-6 items-start">
+              <div class="flex-1 min-w-0" style="border-right:1px solid #E5E7EB;padding-right:16px">
+                <div class="text-[11px] font-semibold uppercase tracking-wider mb-1" style="color:#C9920C">Security deposit</div>
+                <div class="num font-bold text-ink" style="font-size:20px;line-height:1.1">${fmtMoney(dep)}</div>
+                <div class="text-[11px] text-ink-5 mt-1">Held by your landlord for damages.</div>
+              </div>
+              ${advanceHalf}
+            </div>
+          </div>
+        `;
+      })()}
 
       <div class="text-center text-sm text-ink-5 mb-4">
         Questions about your bill? Please contact your landlord.
@@ -4336,6 +4928,87 @@ function renderTenant(code) {
 
   $('#app').innerHTML = layoutShell(body);
 }
+
+// ──────────── Tenant ledger inline edit handlers ────────────
+// Flips a ledger month-block from view → edit mode. The 4 sub-rows hide,
+// the hidden edit row reveals, and a live-preview listener wires up.
+function enterLedgerEditMode(unitId, monthId) {
+  const editRow = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
+  if (!editRow) return;
+  // Hide all 4 view sub-rows for this month
+  document.querySelectorAll(`tr[data-ledger-row="${monthId}"]`).forEach(el => el.classList.add('hidden'));
+  editRow.classList.remove('hidden');
+  // Wire live preview
+  const updatePreview = () => {
+    const prevE = parseFloat(editRow.dataset.prevE) || 0;
+    const prevW = parseFloat(editRow.dataset.prevW) || 0;
+    const newE = parseFloat(editRow.querySelector('[data-field="electricReading"]').value);
+    const newW = parseFloat(editRow.querySelector('[data-field="waterReading"]').value);
+    const rate = parseFloat(editRow.querySelector('[data-field="kwhRate"]').value);
+    const vacant = editRow.querySelector('[data-field="vacant"]').checked;
+    let elec = null, water = null, total = 0;
+    if (!vacant) {
+      if (!isNaN(newE) && !isNaN(rate)) elec = (newE - prevE) * rate;
+      if (!isNaN(newW)) water = waterBillFrom(newW - prevW);
+      const ch = computeCharges(unitId, monthId);
+      const rent = ch ? rentForUnit(unitId, monthId) : 0;
+      const otherSum = ch ? (ch.otherCharges || []).reduce((a,c) => a + (Number(c.amount)||0), 0) : 0;
+      total = rent + otherSum + (elec || 0) + (water || 0);
+    }
+    editRow.querySelector('[data-preview="electric"]').textContent = elec != null ? fmtMoney(elec) : '—';
+    editRow.querySelector('[data-preview="water"]').textContent    = water != null ? fmtMoney(water) : '—';
+    editRow.querySelector('[data-preview="total"]').textContent    = vacant ? 'Vacant' : fmtMoney(total);
+  };
+  editRow.querySelectorAll('input').forEach(el => el.addEventListener('input', updatePreview));
+  updatePreview();
+  // Focus the first empty field
+  const firstEmpty = Array.from(editRow.querySelectorAll('input[type="number"]')).find(i => !i.value);
+  (firstEmpty || editRow.querySelector('input')).focus();
+}
+window.enterLedgerEditMode = enterLedgerEditMode;
+
+function cancelLedgerEdit(monthId) {
+  const editRow = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
+  if (editRow) editRow.classList.add('hidden');
+  // Reveal the 4 view sub-rows again
+  document.querySelectorAll(`tr[data-ledger-row="${monthId}"]`).forEach(el => el.classList.remove('hidden'));
+}
+window.cancelLedgerEdit = cancelLedgerEdit;
+
+function saveLedgerRow(unitId, monthId) {
+  const editRow = document.querySelector(`tr[data-ledger-edit="${monthId}"]`);
+  if (!editRow) return;
+  const newE = parseFloat(editRow.querySelector('[data-field="electricReading"]').value);
+  const newW = parseFloat(editRow.querySelector('[data-field="waterReading"]').value);
+  const rate = parseFloat(editRow.querySelector('[data-field="kwhRate"]').value);
+  const vacant = editRow.querySelector('[data-field="vacant"]').checked;
+
+  // Ensure month exists
+  let month = monthById(monthId);
+  if (!month) {
+    month = { id: monthId, kwhRate: null, actualElectricBill: null, dueDate: null, readings: {}, createdAt: new Date().toISOString() };
+    state.months.push(month);
+  }
+  if (!isNaN(rate)) month.kwhRate = rate;
+
+  const existing = month.readings[unitId] || {};
+  if (vacant) {
+    month.readings[unitId] = { electricReading: null, waterReading: null, vacant: true, notes: existing.notes || '' };
+  } else if (isNaN(newE) && isNaN(newW)) {
+    delete month.readings[unitId];
+  } else {
+    month.readings[unitId] = {
+      electricReading: isNaN(newE) ? null : newE,
+      waterReading: isNaN(newW) ? null : newW,
+      vacant: false,
+      notes: existing.notes || ''
+    };
+  }
+  saveState();
+  toast(`${monthLabel(monthId)} saved`, 'success');
+  render();
+}
+window.saveLedgerRow = saveLedgerRow;
 
 // ============================================================================
 // 19. STATEMENT (printable)
@@ -4359,13 +5032,15 @@ function openStatement(unitId, monthId) {
 
   const dueDate = unitDueDateFor(unitId, monthId);
 
-  // Build the simple, senior-friendly line items
+  // Build the simple, senior-friendly line items.
+  // Each line carries a small color dot matching the in-app palette so the
+  // categories are scannable at a glance.
   const lineItems = [];
   if (row.prevBal > 0.01) {
-    lineItems.push({ label: 'Unpaid from before', hint: '', amount: row.prevBal });
+    lineItems.push({ label: 'Unpaid from before', hint: '', amount: row.prevBal, color: '#9CA3AF' });
   }
   if (!row.vacant) {
-    if (b.rent > 0) lineItems.push({ label: 'Rent', hint: '', amount: b.rent });
+    if (b.rent > 0) lineItems.push({ label: 'Rent', hint: '', amount: b.rent, color: '#4A90E2' });
     if (b.electricBill > 0 || (cm && cm.kwUsed != null)) {
       const hintParts = [];
       if (cm && cm.kwUsed != null) hintParts.push(`${fmtNum(cm.kwUsed, 2)} kWh used`);
@@ -4373,7 +5048,8 @@ function openStatement(unitId, monthId) {
       lineItems.push({
         label: 'Electricity',
         hint: hintParts.join(' · '),
-        amount: b.electricBill
+        amount: b.electricBill,
+        color: '#E07B0A'
       });
     }
     if (b.waterBill > 0 || (cm && cm.cubicUsed != null)) {
@@ -4385,11 +5061,12 @@ function openStatement(unitId, monthId) {
       lineItems.push({
         label: 'Water',
         hint: hintParts.join(' · '),
-        amount: b.waterBill
+        amount: b.waterBill,
+        color: '#0EA5A5'
       });
     }
     (b.otherCharges || []).forEach(oc => {
-      if ((Number(oc.amount) || 0) > 0) lineItems.push({ label: oc.label || 'Other', hint: '', amount: oc.amount });
+      if ((Number(oc.amount) || 0) > 0) lineItems.push({ label: oc.label || 'Other', hint: '', amount: oc.amount, color: '#7E3FE3' });
     });
   }
 
@@ -4415,9 +5092,12 @@ function openStatement(unitId, monthId) {
   })();
   const tenantDisplayName = tenantForMonth ? tenantForMonth.name : '(Vacant)';
 
-  // Safe filename for image download (no special chars)
+  // Safe filename for image download (no special chars). Timestamp suffix
+  // prevents collisions when downloading multiple statements for the same
+  // tenant/month in one session.
   const safeName = tenantDisplayName.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tenant';
-  const filename = `statement-${safeName}-${monthId}.jpg`;
+  const ts = new Date().toISOString().slice(0,16).replace(/[:T-]/g, '').slice(2); // yymmddhhmm
+  const filename = `statement-${safeName}-${monthId}-${ts}.jpg`;
 
   const html = `
     <div class="fixed inset-0 overflow-y-auto z-50 p-4 sm:p-8" id="statementRoot" style="background:#F7F8FA">
@@ -4478,8 +5158,11 @@ function openStatement(unitId, monthId) {
                   ${lineItems.map(it => `
                     <tr style="border-bottom:1px solid #E5E7EB">
                       <td style="padding:10px 0;vertical-align:top">
-                        <div style="color:#111827;font-weight:600">${h(it.label)}</div>
-                        ${it.hint ? `<div style="font-size:12px;color:#6B7280;margin-top:2px;font-weight:500">${h(it.hint)}</div>` : ''}
+                        <div style="color:#111827;font-weight:600;display:flex;align-items:center;gap:8px">
+                          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${it.color || '#9CA3AF'};flex-shrink:0"></span>
+                          <span>${h(it.label)}</span>
+                        </div>
+                        ${it.hint ? `<div style="font-size:12px;color:#6B7280;margin-top:2px;font-weight:500;margin-left:16px">${h(it.hint)}</div>` : ''}
                       </td>
                       <td style="padding:10px 0;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;vertical-align:top">${fmtMoney(it.amount)}</td>
                     </tr>
@@ -4674,6 +5357,7 @@ function render() {
     case 'units':    renderUnits(); break;
     case 'unit':     renderUnitDetail(route.parts[1]); break;
     case 'tenants':  renderTenants(); break;
+    case 'reports':  renderReports(); break;
     case 'settings': renderSettings(); break;
     default:         renderMonth(currentMonthId());
   }
