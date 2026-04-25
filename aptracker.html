@@ -1916,7 +1916,7 @@ function layoutShell(content) {
     ? `${renderSyncIndicator()}
        <button onclick="refreshApp()" class="btn btn-secondary no-print" title="Reload the app (pulls the latest version)">${icons.refresh}<span class="hidden sm:inline">Refresh</span></button>
        <button onclick="logout()" class="btn btn-secondary no-print">${icons.logout}<span class="hidden sm:inline">Logout</span></button>`
-    : (session.mode === 'tenant' ? `<span class="chip chip-muted">Tenant · Read-only</span>` : '');
+    : '';
 
   return `
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -3118,6 +3118,208 @@ function markTenantAsPaid(tenantId) {
 }
 window.markTenantAsPaid = markTenantAsPaid;
 
+// Quick action: enter readings for a tenant's unit for any month within their
+// tenancy. Opens a modal pre-filled with the current month's data (if any) and
+// shows live computed totals as the admin types.
+function openAddReadingsModal(tenantId) {
+  const t = tenantById(tenantId);
+  if (!t || !t.unitId) { toast('Tenant has no unit assigned', 'warn'); return; }
+  const u = unitById(t.unitId);
+  if (!u) { toast('Unit not found', 'warn'); return; }
+
+  // Build month options: from move-in to current month (or move-out)
+  const startMonth = (t.moveInDate || '0000-01').slice(0,7);
+  const today = currentMonthId();
+  const endMonth = t.moveOutDate ? t.moveOutDate.slice(0,7) : today;
+  const opts = [];
+  let cur = endMonth;
+  while (cur >= startMonth) {
+    opts.push(cur);
+    cur = prevMonthId(cur);
+    if (opts.length > 60) break; // safety
+  }
+  if (!opts.length) opts.push(today);
+  const defaultMonth = opts[0]; // most recent first
+
+  // Helper: render the body content for a given monthId; called when modal
+  // first opens AND when the user switches months in the dropdown.
+  const renderBody = (monthId) => {
+    const month = monthById(monthId);
+    const r = month ? (month.readings[u.id] || {}) : {};
+    const prevElectric = previousReading(u.id, monthId, 'electricReading').value;
+    const prevWater = previousReading(u.id, monthId, 'waterReading').value;
+    const curElectricVal = r.electricReading != null ? r.electricReading : '';
+    const curWaterVal = r.waterReading != null ? r.waterReading : '';
+    // Default rate: per-unit override (if set), else month rate, else last
+    // month's rate (so admin doesn't have to retype unchanging rates).
+    let kwhRateVal = '';
+    if (month) {
+      if (month.kwhRateByUnit && month.kwhRateByUnit[u.id] != null) {
+        kwhRateVal = month.kwhRateByUnit[u.id];
+      } else if (month.kwhRate != null) {
+        kwhRateVal = month.kwhRate;
+      }
+    }
+    if (kwhRateVal === '') {
+      // Look back for the last month with a rate
+      let prevId = prevMonthId(monthId);
+      while (prevId >= startMonth) {
+        const pm = monthById(prevId);
+        if (pm && pm.kwhRate != null) { kwhRateVal = pm.kwhRate; break; }
+        prevId = prevMonthId(prevId);
+      }
+    }
+    const hasOverride = !!(month && month.kwhRateByUnit && month.kwhRateByUnit[u.id] != null);
+
+    return `
+      <div class="text-xs text-ink-5 mb-3 grid grid-cols-2 gap-2">
+        <div><div class="font-semibold text-ink-4">Previous electric</div><div class="num">${prevElectric != null ? fmtNum(prevElectric, 0) : '—'} kWh</div></div>
+        <div><div class="font-semibold text-ink-4">Previous water</div><div class="num">${prevWater != null ? fmtNum(prevWater, 0) : '—'} m³</div></div>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">kWh rate</label>
+          <input type="number" step="0.01" id="arKwhRate" class="input-base" value="${kwhRateVal}" placeholder="e.g. 10.50" />
+          <label class="flex items-center gap-1.5 text-[11px] cursor-pointer mt-1.5 text-ink-5">
+            <input type="checkbox" id="arApplyAll" ${hasOverride ? '' : 'checked'} />
+            <span>Apply to all units this month</span>
+          </label>
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Electric reading (kWh)</label>
+          <input type="number" step="0.01" id="arElectric" class="input-base" value="${curElectricVal}" placeholder="prev: ${fmtNum(prevElectric || 0, 0)}" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Water reading (m³)</label>
+          <input type="number" step="0.01" id="arWater" class="input-base" value="${curWaterVal}" placeholder="prev: ${fmtNum(prevWater || 0, 0)}" />
+        </div>
+        <label class="flex items-center gap-1.5 text-xs cursor-pointer text-ink-4">
+          <input type="checkbox" id="arVacant" ${r.vacant ? 'checked' : ''} />
+          <span>Vacant this month</span>
+        </label>
+      </div>
+      <!-- Live preview -->
+      <div class="rounded-md p-3 mt-3 text-sm" style="background:#F0F9FF;border:1px solid #BFDBFE">
+        <div class="text-[11px] font-semibold uppercase tracking-wide mb-2" style="color:#1E40AF">Live preview</div>
+        <div class="grid grid-cols-2 gap-y-1 text-xs">
+          <span class="text-ink-5">Rent</span>
+          <span class="text-right num font-semibold" id="arRent">${fmtMoney(rentForUnit(u.id, monthId))}</span>
+          <span class="text-ink-5">Electric</span>
+          <span class="text-right num font-semibold" id="arElectricPrev">—</span>
+          <span class="text-ink-5">Water</span>
+          <span class="text-right num font-semibold" id="arWaterPrev">—</span>
+          <span class="text-ink-5">Other</span>
+          <span class="text-right num font-semibold" id="arOther">${fmtMoney((otherChargesForUnit(u.id, monthId)||[]).reduce((a,o) => a + (Number(o.amount)||0), 0))}</span>
+          <span class="text-ink font-bold pt-2 border-t border-line">Total</span>
+          <span class="text-right num font-bold pt-2 border-t border-line" id="arTotalPrev" style="color:#1E40AF">—</span>
+        </div>
+      </div>
+    `;
+  };
+
+  showModal(`
+    <div class="p-6">
+      <h3 class="text-lg font-bold text-ink mb-1">Add readings</h3>
+      <p class="text-sm text-ink-5 mb-4"><strong class="text-ink">${h(t.name)}</strong> · ${h(u.name)}</p>
+      <div class="mb-3">
+        <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Month</label>
+        <select id="arMonth" class="input-base">
+          ${opts.map(m => `<option value="${m}"${m===defaultMonth?' selected':''}>${monthLabel(m)}${m===today?' (current)':''}</option>`).join('')}
+        </select>
+      </div>
+      <div id="arBody">${renderBody(defaultMonth)}</div>
+      <div class="flex gap-2 justify-end mt-5">
+        <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="arSaveBtn" class="btn btn-primary">${icons.check}Save readings</button>
+      </div>
+    </div>
+  `);
+
+  const wirePreview = () => {
+    const monthId = $('#arMonth').value;
+    const newE = parseFloat($('#arElectric').value);
+    const newW = parseFloat($('#arWater').value);
+    const rate = parseFloat($('#arKwhRate').value);
+    const vacant = $('#arVacant').checked;
+    const prevE = previousReading(u.id, monthId, 'electricReading').value || 0;
+    const prevW = previousReading(u.id, monthId, 'waterReading').value || 0;
+
+    let elec = null, water = null;
+    if (!vacant) {
+      if (!isNaN(newE) && !isNaN(rate)) elec = (newE - prevE) * rate;
+      if (!isNaN(newW)) water = waterBillFrom(newW - prevW, monthId);
+    }
+    const rent = vacant ? 0 : rentForUnit(u.id, monthId);
+    const otherSum = vacant ? 0 : (otherChargesForUnit(u.id, monthId)||[]).reduce((a,o) => a + (Number(o.amount)||0), 0);
+    const total = vacant ? 0 : (rent + otherSum + (elec || 0) + (water || 0));
+
+    $('#arRent').textContent = fmtMoney(rent);
+    $('#arOther').textContent = fmtMoney(otherSum);
+    $('#arElectricPrev').textContent = elec != null ? fmtMoney(elec) : '—';
+    $('#arWaterPrev').textContent = water != null ? fmtMoney(water) : '—';
+    $('#arTotalPrev').textContent = vacant ? 'Vacant' : fmtMoney(total);
+  };
+
+  // Wire month change → re-render body, then re-wire inputs
+  const wireInputs = () => {
+    ['arElectric', 'arWater', 'arKwhRate', 'arVacant'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', wirePreview);
+      if (el) el.addEventListener('change', wirePreview);
+    });
+    wirePreview();
+  };
+  wireInputs();
+  $('#arMonth').addEventListener('change', () => {
+    const newMid = $('#arMonth').value;
+    document.getElementById('arBody').innerHTML = renderBody(newMid);
+    wireInputs();
+  });
+
+  // Save handler
+  $('#arSaveBtn').addEventListener('click', () => {
+    const monthId = $('#arMonth').value;
+    const newE = parseFloat($('#arElectric').value);
+    const newW = parseFloat($('#arWater').value);
+    const rate = parseFloat($('#arKwhRate').value);
+    const vacant = $('#arVacant').checked;
+    const applyAll = $('#arApplyAll')?.checked ?? true;
+
+    let month = monthById(monthId);
+    if (!month) {
+      month = { id: monthId, kwhRate: null, actualElectricBill: null, dueDate: null, readings: {}, createdAt: new Date().toISOString() };
+      state.months.push(month);
+    }
+    if (!isNaN(rate)) {
+      if (applyAll) {
+        month.kwhRate = rate;
+        if (month.kwhRateByUnit) delete month.kwhRateByUnit;
+      } else {
+        if (!month.kwhRateByUnit) month.kwhRateByUnit = {};
+        month.kwhRateByUnit[u.id] = rate;
+      }
+    }
+    const existing = month.readings[u.id] || {};
+    if (vacant) {
+      month.readings[u.id] = { electricReading: null, waterReading: null, vacant: true, notes: existing.notes || '' };
+    } else if (isNaN(newE) && isNaN(newW)) {
+      delete month.readings[u.id];
+    } else {
+      month.readings[u.id] = {
+        electricReading: isNaN(newE) ? null : newE,
+        waterReading: isNaN(newW) ? null : newW,
+        vacant: false,
+        notes: existing.notes || ''
+      };
+    }
+    saveState();
+    closeModal();
+    toast(`Readings saved for ${monthLabel(monthId)}`, 'success');
+    render();
+  });
+}
+window.openAddReadingsModal = openAddReadingsModal;
+
 // Quick action: set tenant's move-out date without going through full edit modal.
 function openMoveOutModal(tenantId) {
   const t = tenantById(tenantId);
@@ -3561,6 +3763,18 @@ function openUnitModal(unitId, mode = 'edit') {
         rentHistory.push(entry);
       }
       rhMode = 'idle'; rhEditIdx = -1; rhWorking = null;
+      // Persist immediately to state so closing the modal doesn't lose the
+      // change (was a previous UX bug — users expected the inline Save
+      // button to actually save). The rest of the modal (color, name, base
+      // rent) still commits via the outer Save button.
+      if (!isNew) {
+        const i = state.units.findIndex(x => x.id === u.id);
+        if (i >= 0) {
+          state.units[i] = Object.assign({}, state.units[i], { rentHistory: JSON.parse(JSON.stringify(rentHistory)) });
+          saveState();
+          toast('Rate change saved', 'success');
+        }
+      }
       renderRentHistoryList();
     };
   };
@@ -3570,6 +3784,16 @@ function openUnitModal(unitId, mode = 'edit') {
     rentHistory.splice(idx, 1);
     if (rhMode === 'editing' && rhEditIdx === idx) {
       rhMode = 'idle'; rhEditIdx = -1; rhWorking = null;
+    }
+    // Persist immediately (same reasoning as inline Save handler — user
+    // expects rate-change actions to take effect right away).
+    if (!isNew) {
+      const i = state.units.findIndex(x => x.id === u.id);
+      if (i >= 0) {
+        state.units[i] = Object.assign({}, state.units[i], { rentHistory: JSON.parse(JSON.stringify(rentHistory)) });
+        saveState();
+        toast('Rate change removed', 'success');
+      }
     }
     renderRentHistoryList();
   };
@@ -3960,6 +4184,7 @@ function renderTenants() {
                   <button onclick="copyTenantUrl('${t.tenantCode}')" class="btn btn-secondary btn-icon" title="Copy link">${icons.copy}</button>
                 </div>
                 <a href="#/tenant?code=${t.tenantCode}" class="btn btn-secondary w-full justify-center btn-sm mt-2">${icons.eye}View bills &amp; payment</a>
+                ${!movedOut && unit ? `<button onclick="openAddReadingsModal('${t.id}')" class="btn btn-primary w-full justify-center btn-sm mt-2">${icons.plus}Add readings</button>` : ''}
               </div>
 
               <div class="flex gap-2 mt-3">
@@ -4220,7 +4445,14 @@ function openDepositModal(tenantId) {
   const u = t.unitId ? unitById(t.unitId) : null;
   const heldBalance = depositBalance(t.id);
   const curMonth = currentMonthId();
-  const curRent = u ? rentForUnit(u.id, curMonth) : 0;
+  // Tenancy window for the month picker — prevents applying deposit to a
+  // month outside the tenant's stay (which would silently fail to reduce
+  // their outstanding balance because aggregation filters by tenancy).
+  const tenancyStart = t.moveInDate ? t.moveInDate.slice(0,7) : null;
+  const tenancyEnd = t.moveOutDate ? t.moveOutDate.slice(0,7) : null;
+  // Default to the latest month with an unpaid balance, or current month if none
+  const defaultMonth = (u ? latestUnpaidMonthIdForTenant(t.id) : curMonth) || curMonth;
+  const initRent = u ? rentForUnit(u.id, defaultMonth) : 0;
 
   showModal(`
     <div class="p-6">
@@ -4243,20 +4475,21 @@ function openDepositModal(tenantId) {
 
         <div id="depMonthWrap" class="hidden">
           <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Month covered</label>
-          <input type="month" id="depMonth" class="input-base" value="${curMonth}" style="max-width:240px" />
+          <input type="month" id="depMonth" class="input-base" value="${defaultMonth}" style="max-width:240px"${tenancyStart ? ` min="${tenancyStart}"` : ''}${tenancyEnd ? ` max="${tenancyEnd}"` : ''} />
+          <p class="text-[11px] text-ink-5 mt-1">${tenancyStart || tenancyEnd ? `Limited to tenancy window: ${tenancyStart ? monthLabel(tenancyStart) : '?'} – ${tenancyEnd ? monthLabel(tenancyEnd) : 'present'}` : ''}</p>
         </div>
 
         <div id="depWarning" class="hidden rounded-md p-3" style="background:#FEF3C7;border:1px solid #FCD34D">
           <div class="flex items-start gap-2 text-sm" style="color:#92400E">
             <span class="flex-shrink-0">${icons.alert}</span>
             <div>
-              <strong>Heads up:</strong> The security deposit will be reduced by the rent amount and the selected month will be marked as paid for rent. Top up the deposit later if you want to keep the same security level.
+              <strong>Heads up:</strong> The security deposit will be reduced by the rent amount and that month's rent will be marked as paid. Utilities for that month remain due separately. Top up the deposit later if you want to keep the same security level.
             </div>
           </div>
           <div class="mt-2 pt-2 text-xs space-y-1" style="border-top:1px solid #FCD34D;color:#92400E">
-            <div class="flex justify-between"><span>Rent for selected month</span><strong class="num" id="depRentPreview">${fmtMoney(curRent)}</strong></div>
+            <div class="flex justify-between"><span>Rent for selected month</span><strong class="num" id="depRentPreview">${fmtMoney(initRent)}</strong></div>
             <div class="flex justify-between"><span>Deposit before</span><strong class="num">${fmtMoney(heldBalance)}</strong></div>
-            <div class="flex justify-between"><span>Deposit after</span><strong class="num" id="depAfterPreview">${fmtMoney(heldBalance - curRent)}</strong></div>
+            <div class="flex justify-between"><span>Deposit after</span><strong class="num" id="depAfterPreview">${fmtMoney(heldBalance - initRent)}</strong></div>
           </div>
         </div>
 
@@ -4278,7 +4511,7 @@ function openDepositModal(tenantId) {
 
   const updateRentPreview = () => {
     if (!u) return;
-    const monthId = $('#depMonth').value || curMonth;
+    const monthId = $('#depMonth').value || defaultMonth;
     const rent = rentForUnit(u.id, monthId);
     const after = heldBalance - rent;
     $('#depRentPreview').textContent = fmtMoney(rent);
@@ -4312,6 +4545,18 @@ function openDepositModal(tenantId) {
       if (!u) { toast('Tenant has no unit assigned', 'warn'); return; }
       const monthId = $('#depMonth').value;
       if (!monthId) { toast('Pick a month covered', 'warn'); return; }
+      // Guard against picking a month outside the tenancy window. Without
+      // this, the payment would be silently ignored by tenant balance
+      // calculations (which filter by tenancy), but the deposit would still
+      // be drawn down — leaving the balance unchanged AND the deposit empty.
+      if (tenancyStart && monthId < tenancyStart) {
+        toast(`This tenant moved in ${monthLabel(tenancyStart)} — pick that month or later`, 'warn');
+        return;
+      }
+      if (tenancyEnd && monthId > tenancyEnd) {
+        toast(`This tenant moved out ${monthLabel(tenancyEnd)} — pick that month or earlier`, 'warn');
+        return;
+      }
       const rent = rentForUnit(u.id, monthId);
       if (!(rent > 0)) { toast('No rent set for this month', 'warn'); return; }
       if (rent > heldBalance + 0.01) {
@@ -4334,7 +4579,8 @@ function openDepositModal(tenantId) {
         date,
         notes: notes || `Used for ${monthLabel(monthId)} rent`,
       });
-      // 2) Record a payment so the month's bill reflects the rent as paid
+      // 2) Record a payment so the month's rent reflects as paid (utilities
+      // remain owed separately — tenant pays those normally).
       state.payments.push({
         id: uid('pay'),
         unitId: u.id,
@@ -4342,7 +4588,7 @@ function openDepositModal(tenantId) {
         amount: rent,
         date,
         method: 'Deposit',
-        notes: notes || `Paid from security deposit`,
+        notes: notes || `Rent paid from security deposit`,
         createdAt: new Date().toISOString()
       });
       saveState();
@@ -4638,11 +4884,10 @@ function renderExpenses() {
 
   const total = expenseTotalForMonth(selectedMonth);
 
-  // Recent expenses snapshot for the table at the bottom
+  // All expense records, newest first
   const recent = state.expenses
     .slice()
-    .sort((a,b) => b.monthId.localeCompare(a.monthId))
-    .slice(0, 12);
+    .sort((a,b) => b.monthId.localeCompare(a.monthId));
 
   const body = `
     <div>
@@ -4699,34 +4944,69 @@ function renderExpenses() {
       </div>
 
       ${recent.length ? `
-        <div class="card overflow-x-auto">
-          <div class="p-5 pb-3"><h3 class="section-h">Recent expenses</h3></div>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th class="num-cell">Electric</th>
-                <th class="num-cell">Water</th>
-                <th class="num-cell">Other</th>
-                <th class="num-cell">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${recent.map(e => {
-                const others = (e.otherExpenses||[]).reduce((a,c) => a + (Number(c.amount)||0), 0);
-                const tot = (Number(e.electricBill)||0) + (Number(e.waterBill)||0) + others;
-                return `
-                  <tr onclick="navigate('#/expenses?month=${e.monthId}')" class="cursor-pointer">
-                    <td class="font-semibold">${monthLabel(e.monthId)}</td>
-                    <td class="num-cell">${fmtMoney(e.electricBill)}</td>
-                    <td class="num-cell">${fmtMoney(e.waterBill)}</td>
-                    <td class="num-cell">${fmtMoney(others)}</td>
-                    <td class="num-cell font-semibold">${fmtMoney(tot)}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
+        <div class="card mb-6 overflow-hidden">
+          <div class="p-5 pb-3"><h3 class="section-h">Monthly expense records</h3></div>
+          <!-- Desktop table -->
+          <div class="overflow-x-auto ledger-table">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th class="num-cell">Electric</th>
+                  <th class="num-cell">Water</th>
+                  <th class="num-cell">Other</th>
+                  <th class="num-cell">Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${recent.map(e => {
+                  const others = (e.otherExpenses||[]).reduce((a,c) => a + (Number(c.amount)||0), 0);
+                  const tot = (Number(e.electricBill)||0) + (Number(e.waterBill)||0) + others;
+                  return `
+                    <tr>
+                      <td class="font-semibold">${monthLabel(e.monthId)}</td>
+                      <td class="num-cell">${fmtMoney(e.electricBill)}</td>
+                      <td class="num-cell">${fmtMoney(e.waterBill)}</td>
+                      <td class="num-cell">${fmtMoney(others)}</td>
+                      <td class="num-cell font-semibold">${fmtMoney(tot)}</td>
+                      <td style="text-align:right;white-space:nowrap">
+                        <div class="inline-flex gap-1">
+                          <button onclick="navigate('#/expenses?month=${e.monthId}')" class="btn btn-secondary btn-icon btn-sm" title="Edit">${icons.edit}</button>
+                          <button onclick="deleteExpense('${e.monthId}')" class="btn btn-icon btn-sm" title="Delete" style="background:#FEF2F2;border-color:#FECACA;color:#991B1B">${icons.trash}</button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <!-- Mobile cards -->
+          <div class="ledger-mobile p-3" style="background:#F9FAFB">
+            ${recent.map(e => {
+              const othersArr = e.otherExpenses || [];
+              const others = othersArr.reduce((a,c) => a + (Number(c.amount)||0), 0);
+              const tot = (Number(e.electricBill)||0) + (Number(e.waterBill)||0) + others;
+              return `
+                <div class="mb-2" style="border:1px solid #E5E7EB;border-radius:8px;background:#FFFFFF;padding:12px">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="font-semibold text-ink">${monthLabel(e.monthId)}</div>
+                    <div class="num font-bold text-ink">${fmtMoney(tot)}</div>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2 text-xs pt-2 mb-2" style="border-top:1px solid #F1F5F9">
+                    <div><div class="text-ink-5">Electric</div><div class="num">${fmtMoney(e.electricBill)}</div></div>
+                    <div><div class="text-ink-5">Water</div><div class="num">${fmtMoney(e.waterBill)}</div></div>
+                    <div><div class="text-ink-5">Other</div><div class="num">${fmtMoney(others)}</div></div>
+                  </div>
+                  <div class="flex gap-2 mt-2">
+                    <button onclick="navigate('#/expenses?month=${e.monthId}')" class="btn btn-secondary btn-sm flex-1 justify-center">${icons.edit}Edit</button>
+                    <button onclick="deleteExpense('${e.monthId}')" class="btn btn-sm flex-1 justify-center" style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B">${icons.trash}Delete</button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
         </div>
       ` : ''}
     </div>
