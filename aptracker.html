@@ -542,7 +542,11 @@ function computeMonthReadings(unitId, monthId) {
   const unit = unitById(unitId);
   if (!month || !unit) return null;
   const r = month.readings[unitId] || {};
-  const rate = month.kwhRate;
+  // Per-unit kWh rate override takes precedence over month-level rate.
+  // Set when the user unchecks "Apply to all units" in the ledger edit panel.
+  const rate = (month.kwhRateByUnit && month.kwhRateByUnit[unitId] != null)
+    ? month.kwhRateByUnit[unitId]
+    : month.kwhRate;
 
   const prevE = previousReading(unitId, monthId, 'electricReading');
   const prevW = previousReading(unitId, monthId, 'waterReading');
@@ -696,14 +700,21 @@ function rentForUnit(unitId, monthId) {
 }
 
 // Effective other-charges for a unit in a given month. Honors snapshots inside
-// unit.rentHistory entries; falls back to unit.otherCharges (the base/current).
+// unit.rentHistory entries; falls back to unit.otherCharges (the current value)
+// if a history entry exists but has no otherCharges snapshot — this prevents
+// silently dropping Other charges for older rate-history entries created
+// before the per-entry otherCharges feature, or entries saved with an empty
+// snapshot.
 function otherChargesForUnit(unitId, monthId) {
   const u = unitById(unitId);
   if (!u) return [];
   const history = (u.rentHistory || []).filter(r => r.from && r.from <= monthId);
   if (history.length) {
     history.sort((a,b) => b.from.localeCompare(a.from));
-    if (Array.isArray(history[0].otherCharges)) return history[0].otherCharges;
+    const snapshot = history[0].otherCharges;
+    // Only use the historical snapshot if it actually has entries.
+    // An empty array or missing field means "no per-entry override" → use current.
+    if (Array.isArray(snapshot) && snapshot.length > 0) return snapshot;
   }
   return Array.isArray(u.otherCharges) ? u.otherCharges : [];
 }
@@ -716,6 +727,90 @@ function lifetimeRentForUnit(unitId) {
     if (ch && !ch.vacant && ch.hasReadings) total += ch.rent || 0;
   }
   return total;
+}
+
+// ─── Expenses helpers ───────────────────────────────────────────────────
+function expenseForMonth(monthId) {
+  return state.expenses.find(e => e.monthId === monthId) || null;
+}
+function expenseTotalForMonth(monthId) {
+  const e = expenseForMonth(monthId);
+  if (!e) return 0;
+  const otherSum = (e.otherExpenses || []).reduce((a,o) => a + (Number(o.amount)||0), 0);
+  return (Number(e.electricBill)||0) + (Number(e.waterBill)||0) + otherSum;
+}
+
+// ─── Dashboard aggregation ──────────────────────────────────────────────
+// Computes billed/collected/outstanding/rent/expenses for a set of monthIds.
+// monthIds: array of YYYY-MM strings to include. Empty = no data.
+function aggregateForMonths(monthIds) {
+  const set = new Set(monthIds);
+  let billed = 0, collected = 0, rent = 0, expenses = 0;
+  let unitBilled = {}, unitRent = {}, unitUtilOther = {}, unitCollected = {};
+  state.units.forEach(u => {
+    unitBilled[u.id] = 0; unitRent[u.id] = 0; unitUtilOther[u.id] = 0; unitCollected[u.id] = 0;
+  });
+  for (const mid of set) {
+    state.units.forEach(u => {
+      const ch = computeCharges(u.id, mid);
+      if (ch && ch.hasReadings && !ch.vacant) {
+        const utilOther = (ch.electricBill || 0) + (ch.waterBill || 0) + (ch.otherCharge || 0);
+        billed += ch.total;
+        rent += ch.rent || 0;
+        unitBilled[u.id] += ch.total;
+        unitRent[u.id] += ch.rent || 0;
+        unitUtilOther[u.id] += utilOther;
+      }
+      const paid = paymentsTotalForUnitMonth(u.id, mid);
+      collected += paid;
+      unitCollected[u.id] += paid;
+    });
+    expenses += expenseTotalForMonth(mid);
+  }
+  return {
+    billed, collected, rent, expenses,
+    outstanding: Math.max(0, billed - collected),
+    netIncome: collected - expenses, // cash-basis: realized income minus expenses
+    unitBilled, unitRent, unitUtilOther, unitCollected,
+  };
+}
+
+// Per-month aggregates within a year (for the By Month table)
+function aggregatePerMonthInYear(year) {
+  const monthIds = sortedMonthIds().filter(id => id.startsWith(year + '-'));
+  return monthIds.map(mid => {
+    let billed = 0, collected = 0, rent = 0, utilOther = 0;
+    state.units.forEach(u => {
+      const ch = computeCharges(u.id, mid);
+      if (ch && ch.hasReadings && !ch.vacant) {
+        billed += ch.total;
+        rent += ch.rent || 0;
+        utilOther += (ch.electricBill || 0) + (ch.waterBill || 0) + (ch.otherCharge || 0);
+      }
+      collected += paymentsTotalForUnitMonth(u.id, mid);
+    });
+    return { mid, billed, collected, rent, utilOther, expenses: expenseTotalForMonth(mid) };
+  });
+}
+
+// Get the expense entry for a given month, or null if none recorded.
+function expenseForMonth(monthId) {
+  return state.expenses.find(e => e.monthId === monthId) || null;
+}
+
+// Sum of expenses for a month: electric + water + sum of otherExpenses array
+function expenseTotalForMonth(monthId) {
+  const e = expenseForMonth(monthId);
+  if (!e) return 0;
+  const electric = Number(e.electricBill) || 0;
+  const water = Number(e.waterBill) || 0;
+  const others = Array.isArray(e.otherExpenses) ? e.otherExpenses.reduce((a,c) => a + (Number(c.amount) || 0), 0) : 0;
+  return electric + water + others;
+}
+
+// Sum of expenses across multiple month ids
+function expensesSum(monthIds) {
+  return (monthIds || []).reduce((acc, id) => acc + expenseTotalForMonth(id), 0);
 }
 
 // Outstanding balance for a tenant — running balance across their tenancy window
@@ -888,6 +983,18 @@ function migrateState(old) {
   s.payments = s.payments || [];
   s.depositMovements = s.depositMovements || [];
   s.tenants = s.tenants || [];
+  s.expenses = (Array.isArray(s.expenses) ? s.expenses : []).map(e => ({
+    id: e.id || uid('exp'),
+    monthId: e.monthId,
+    electricBill: Number(e.electricBill) || 0,
+    waterBill: Number(e.waterBill) || 0,
+    otherExpenses: Array.isArray(e.otherExpenses)
+      ? e.otherExpenses.filter(x => x && x.label).map(x => ({ label: String(x.label), amount: Number(x.amount) || 0 }))
+      : [],
+    notes: e.notes || '',
+    createdAt: e.createdAt || new Date().toISOString(),
+  })).filter(e => /^\d{4}-\d{2}$/.test(e.monthId || ''));
+  s.expenses = Array.isArray(s.expenses) ? s.expenses : [];
 
   // v1 → v2: water reading migration + houseBill strip
   const ids = s.months.map(m => m.id).sort();
@@ -1077,6 +1184,7 @@ function seedData() {
     months: [],
     payments: [],
     depositMovements: [],
+    expenses: [],
   };
 }
 
@@ -1502,13 +1610,21 @@ async function connectCloudSync() {
 window.connectCloudSync = connectCloudSync;
 
 function disconnectCloudSync() {
-  if (!confirm('Disconnect cloud sync? Your local data is kept; nothing is deleted from the cloud.')) return;
-  state.settings.supabaseUrl = '';
-  state.settings.supabaseKey = '';
-  disableCloudSync();
-  saveStateLocal();
-  toast('Cloud sync disconnected', 'success');
-  render();
+  confirmModal({
+    title: 'Disconnect cloud sync?',
+    message: 'Your local data on this device is kept. Nothing is deleted from the cloud.',
+    confirmLabel: 'Disconnect',
+    cancelLabel: 'Keep connected',
+    tone: 'warn',
+    onConfirm: () => {
+      state.settings.supabaseUrl = '';
+      state.settings.supabaseKey = '';
+      disableCloudSync();
+      saveStateLocal();
+      toast('Cloud sync disconnected', 'success');
+      render();
+    }
+  });
 }
 window.disconnectCloudSync = disconnectCloudSync;
 
@@ -1621,6 +1737,7 @@ const icons = {
   download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
   upload:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
   share:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
+  undo:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>',
   left:     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   right:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
   check:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -1685,6 +1802,52 @@ function toast(msg, kind='info') {
 }
 
 // Two-step destructive confirmation with backup offer.
+// Lightweight confirm modal — replaces native confirm() with a centered,
+// styled dialog. Use for routine confirmations (delete payment, undo, remove
+// rate-change entry, disconnect cloud). For high-stakes destructive actions
+// requiring typed confirmation, use confirmDestructive() instead.
+//
+// Options:
+//   title         — bold heading
+//   message       — body text (one or two short sentences)
+//   detailsHtml   — optional pre-formatted HTML block (e.g., a small summary card)
+//   confirmLabel  — label for confirm button (default "Confirm")
+//   cancelLabel   — label for cancel button (default "Cancel")
+//   tone          — 'danger' (red) | 'warn' (amber) | 'primary' (blue, default)
+//   onConfirm     — function called when user confirms
+function confirmModal({ title, message, detailsHtml='', confirmLabel='Confirm', cancelLabel='Cancel', tone='primary', onConfirm }) {
+  const toneStyles = {
+    danger:  { btn: 'btn-danger',  iconColor: '#DC2626', icon: icons.alert },
+    warn:    { btn: 'btn-primary', iconColor: '#92400E', icon: icons.alert, btnStyle: 'background:#D97706;border-color:#D97706' },
+    primary: { btn: 'btn-primary', iconColor: '#1D4ED8', icon: icons.info },
+  };
+  const t = toneStyles[tone] || toneStyles.primary;
+  showModal(`
+    <div class="p-6">
+      <div class="flex items-start gap-3 mb-3">
+        <div style="color:${t.iconColor};margin-top:2px;flex-shrink:0">${t.icon}</div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-lg font-bold text-ink">${h(title)}</h3>
+          ${message ? `<p class="text-sm text-ink-4 mt-1">${h(message)}</p>` : ''}
+        </div>
+      </div>
+      ${detailsHtml ? `<div class="mt-3 mb-1">${detailsHtml}</div>` : ''}
+      <div class="flex justify-end gap-2 mt-5">
+        <button onclick="closeModal()" class="btn btn-secondary">${h(cancelLabel)}</button>
+        <button id="confirmModalBtn" class="btn ${t.btn}"${t.btnStyle ? ` style="${t.btnStyle}"` : ''}>${h(confirmLabel)}</button>
+      </div>
+    </div>
+  `);
+  const btn = document.getElementById('confirmModalBtn');
+  btn.addEventListener('click', () => {
+    closeModal();
+    if (typeof onConfirm === 'function') onConfirm();
+  });
+  // Auto-focus the confirm button so keyboard users can hit Enter
+  setTimeout(() => btn.focus(), 50);
+}
+window.confirmModal = confirmModal;
+
 function confirmDestructive({ title, message, warningList=[], confirmWord='DELETE', onConfirm }) {
   const lastExp = state.meta?.lastExportedAt;
   const expAgo = lastExp ? fmtRelative(lastExp) : 'never';
@@ -1744,7 +1907,7 @@ function layoutShell(content) {
       <a class="nav-link ${route.name==='home'||route.name===''||route.name==='month'?'active':''}" href="#/">Dashboard</a>
       <a class="nav-link ${route.name==='units'||route.name==='unit'?'active':''}" href="#/units">Units</a>
       <a class="nav-link ${route.name==='tenants'?'active':''}" href="#/tenants">Tenants</a>
-      <a class="nav-link ${route.name==='reports'?'active':''}" href="#/reports">Reports</a>
+      <a class="nav-link ${route.name==='expenses'?'active':''}" href="#/expenses">Expenses</a>
       <a class="nav-link ${route.name==='settings'?'active':''}" href="#/settings" title="Settings" style="display:inline-flex;align-items:center;gap:6px">${icons.settings}<span class="hidden sm:inline">Settings</span></a>
     </nav>
   ` : '';
@@ -2080,76 +2243,71 @@ window.refreshApp = refreshApp;
 // 12. VIEW: DASHBOARD (readings, payments, recent months) (readings entry + payments)
 // ============================================================================
 function renderMonth(monthId) {
-  if (!monthId) monthId = currentMonthId();
-  let month = monthById(monthId);
-  if (!month) {
-    month = { id: monthId, kwhRate: null, actualElectricBill: null, dueDate: null, readings: {}, createdAt: new Date().toISOString() };
-    state.months.push(month);
-    saveState();
+  // The merged Dashboard. Three view modes: monthly | yearly | all-time.
+  // Reads view state from URL: #/?mode=monthly&month=YYYY-MM | ?mode=yearly&year=YYYY | ?mode=all
+  // Backwards-compat: if called with a monthId arg, treat as monthly view of that month.
+  const route = parseRoute();
+  let mode = route.query?.mode || 'monthly';
+  if (!['monthly', 'yearly', 'all'].includes(mode)) mode = 'monthly';
+  let selectedMonth = route.query?.month || monthId || currentMonthId();
+  let selectedYear = route.query?.year || String(new Date().getFullYear());
+  if (!/^\d{4}-\d{2}$/.test(selectedMonth)) selectedMonth = currentMonthId();
+  if (!/^\d{4}$/.test(selectedYear)) selectedYear = String(new Date().getFullYear());
+
+  // Determine the set of monthIds in scope for the current view
+  const allMonthIds = sortedMonthIds();
+  let scopeMonthIds;
+  if (mode === 'monthly') {
+    scopeMonthIds = [selectedMonth];
+  } else if (mode === 'yearly') {
+    scopeMonthIds = allMonthIds.filter(id => id.startsWith(selectedYear + '-'));
+    // Ensure a contiguous Jan-current span if year is current; otherwise Jan-Dec
+    const yNow = String(new Date().getFullYear());
+    const upTo = (selectedYear === yNow) ? currentMonthId().slice(5,7) : '12';
+    const fullSpan = [];
+    const upN = parseInt(upTo);
+    for (let m = 1; m <= upN; m++) fullSpan.push(`${selectedYear}-${String(m).padStart(2,'0')}`);
+    // Use full span if the year is selected (to show empty months too)
+    scopeMonthIds = fullSpan;
+  } else {
+    // all-time: every month from earliest data to current
+    if (allMonthIds.length === 0) scopeMonthIds = [currentMonthId()];
+    else {
+      const start = allMonthIds[0];
+      const end = currentMonthId();
+      scopeMonthIds = [];
+      let cur = start;
+      while (cur <= end) { scopeMonthIds.push(cur); cur = nextMonthId(cur); }
+    }
   }
-  const units = activeUnits();
 
-  // ─── Empty state: no units yet ────────────────────────────────────────────
-  if (!units.length) {
-    $('#app').innerHTML = layoutShell(`
-      <div class="card p-12 text-center">
-        <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-surface-2 text-ink-5 mb-3">${icons.building}</div>
-        <h3 class="text-lg font-bold text-ink mb-1">No units yet</h3>
-        <p class="text-sm text-ink-5 mb-4">Add your first unit to start tracking rent and utilities.</p>
-        <a href="#/units" class="btn btn-primary">${icons.plus}Add unit</a>
-      </div>
-    `);
-    return;
-  }
+  const units = state.units;
+  const activeOnes = activeUnits();
 
-  const prevId = prevMonthId(monthId);
-  const nextId = nextMonthId(monthId);
-  const isCurrentMonth = monthId === currentMonthId();
+  // ─── Banners (system-warning, missing readings, etc.) ───
+  const bannersBlock = (() => {
+    const banners = [];
+    const todaysMonth = monthById(currentMonthId());
+    const hasCurrentReadings = todaysMonth && Object.keys(todaysMonth.readings || {}).length > 0;
+    const today = new Date();
+    if (today.getDate() >= 25 && !hasCurrentReadings) {
+      banners.push(`<div class="banner banner-warn">${icons.alert}<div><strong>Reminder:</strong> No readings entered for ${monthLabel(currentMonthId())} yet. Open a tenant to enter their readings.</div></div>`);
+    }
+    return banners.join('');
+  })();
 
-  // ─── Dashboard-style stats + banners (only for current month) ────────────
-  // Month-level summary (current / selected month charges / payments)
-  let monthBilled = 0, monthCollected = 0;
-  units.forEach(u => {
-    const ch = computeCharges(u.id, monthId);
-    if (ch && ch.hasReadings && !ch.vacant) monthBilled += ch.total;
-    monthCollected += paymentsTotalForUnitMonth(u.id, monthId);
-  });
-
-  // Lifetime outstanding
-  let totalOutstanding = 0, unpaidUnitsCount = 0, missingCount = 0;
-  units.forEach(u => {
-    const ledger = computeLedger(u.id);
-    const outstanding = ledger.length ? ledger[ledger.length-1].endBal : 0;
-    if (outstanding > 0.01) { totalOutstanding += outstanding; unpaidUnitsCount++; }
-    const monthRow = ledger.find(r => r.monthId === monthId);
-    if (!monthRow) missingCount++;
-  });
-
-  const banners = [];
-  if (unpaidUnitsCount > 0) {
-    banners.push(`<div class="banner banner-danger"><span>${icons.alert}</span><div><strong>${unpaidUnitsCount} unit${unpaidUnitsCount===1?'':'s'}</strong> with an outstanding balance · total <strong class="num">${fmtMoney(totalOutstanding)}</strong></div></div>`);
-  }
-  if (missingCount > 0 && isCurrentMonth) {
-    banners.push(`<div class="banner banner-warn"><span>${icons.info}</span><div><strong>${missingCount} unit${missingCount===1?'':'s'}</strong> missing readings for ${monthLabel(monthId)} — enter them below.</div></div>`);
-  }
-  const bannersBlock = banners.length ? `<div class="space-y-2 mb-5">${banners.join('')}</div>` : '';
-
-  // Upcoming due dates (next 14 days from today). For each active tenant
-  // who has unpaid balance, compute their due date for their latest unpaid
-  // month and surface it. Sorted soonest-first.
+  // ─── Upcoming due dates widget ───
   const upcoming = (() => {
     const today = new Date(); today.setHours(0,0,0,0);
-    const horizon = new Date(today.getTime() + 14*24*60*60*1000);
     const items = [];
     state.tenants.forEach(t => {
       if (!t.unitId || t.moveOutDate) return;
       const outstanding = tenantOutstanding(t.id);
       if (outstanding < 0.01) return;
-      const monthId = latestUnpaidMonthIdForTenant(t.id);
-      const dueIso = tenantDueDateFor(t.id, monthId);
+      const monthIdU = latestUnpaidMonthIdForTenant(t.id);
+      const dueIso = tenantDueDateFor(t.id, monthIdU);
       const due = new Date(dueIso); due.setHours(0,0,0,0);
       const daysOut = Math.round((due.getTime() - today.getTime()) / (24*60*60*1000));
-      // Show overdue (<=0) and within next 14 days
       if (daysOut > 14) return;
       const unit = unitById(t.unitId);
       items.push({ tenant: t, unit, dueIso, daysOut, outstanding });
@@ -2197,248 +2355,305 @@ function renderMonth(monthId) {
     </div>
   ` : '';
 
-  const statsBlock = `
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-      <div class="card card-accent card-accent-purple p-5">
-        <div class="flex items-start justify-between">
-          <div>
-            <div class="stat-label">Selected Month</div>
-            <div class="text-xl font-bold text-ink mt-1">${monthLabel(monthId)}</div>
-            <div class="text-xs text-ink-5 mt-0.5">${units.length} active unit${units.length===1?'':'s'}</div>
-          </div>
-          <div class="stat-icon stat-icon-purple">${icons.calendar}</div>
+  // ─── View toggle (Monthly · Yearly · All-Time) + period selector ───
+  const yearsAvail = (() => {
+    const years = new Set();
+    allMonthIds.forEach(id => years.add(id.slice(0,4)));
+    state.expenses.forEach(e => years.add(e.monthId.slice(0,4)));
+    years.add(String(new Date().getFullYear()));
+    return Array.from(years).sort().reverse();
+  })();
+  // Month options for monthly view: include any with data, plus +/- 12 around now
+  const monthIdsSet = new Set(allMonthIds);
+  state.expenses.forEach(e => monthIdsSet.add(e.monthId));
+  let cur = currentMonthId();
+  for (let i = 0; i < 12; i++) { monthIdsSet.add(cur); cur = prevMonthId(cur); }
+  monthIdsSet.add(selectedMonth);
+  const monthOptions = Array.from(monthIdsSet).sort().reverse();
+
+  const viewToggleBlock = `
+    <div class="card p-4 mb-6">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="inline-flex rounded-md overflow-hidden" style="border:1px solid #E5E7EB" id="dashViewToggle">
+          <button data-view="monthly" class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:${mode==='monthly'?'#111827':'#FFFFFF'};color:${mode==='monthly'?'#FFFFFF':'#374151'}">Monthly</button>
+          <button data-view="yearly" class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:${mode==='yearly'?'#111827':'#FFFFFF'};color:${mode==='yearly'?'#FFFFFF':'#374151'};border-left:1px solid #E5E7EB">Yearly</button>
+          <button data-view="all" class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:${mode==='all'?'#111827':'#FFFFFF'};color:${mode==='all'?'#FFFFFF':'#374151'};border-left:1px solid #E5E7EB">All-Time</button>
         </div>
-      </div>
-      <div class="card card-accent card-accent-blue p-5">
-        <div class="flex items-start justify-between">
-          <div>
-            <div class="stat-label">Billed this Month</div>
-            <div class="stat-value num mt-1">${fmtMoney(monthBilled)}</div>
-          </div>
-          <div class="stat-icon stat-icon-blue">${icons.wallet}</div>
-        </div>
-      </div>
-      <div class="card card-accent card-accent-green p-5">
-        <div class="flex items-start justify-between">
-          <div>
-            <div class="stat-label">Collected</div>
-            <div class="stat-value num mt-1" style="color:#3F9D2D">${fmtMoney(monthCollected)}</div>
-          </div>
-          <div class="stat-icon stat-icon-green">${icons.check}</div>
-        </div>
-      </div>
-      <div class="card card-accent card-accent-red p-5">
-        <div class="flex items-start justify-between">
-          <div>
-            <div class="stat-label">Outstanding (lifetime)</div>
-            <div class="stat-value num mt-1" style="color:${totalOutstanding > 0.01 ? '#DC2626' : '#111827'}">${fmtMoney(totalOutstanding)}</div>
-            <div class="text-xs text-ink-5 mt-0.5">${unpaidUnitsCount} unit${unpaidUnitsCount===1?'':'s'} owing</div>
-          </div>
-          <div class="stat-icon stat-icon-red">${icons.alert}</div>
-        </div>
+        ${mode === 'monthly' ? `
+          <select id="dashMonthSel" class="input-base" style="width:auto;min-width:160px">
+            ${monthOptions.map(m => `<option value="${m}"${m===selectedMonth?' selected':''}>${monthLabel(m)}</option>`).join('')}
+          </select>
+        ` : mode === 'yearly' ? `
+          <select id="dashYearSel" class="input-base" style="width:auto;min-width:120px">
+            ${yearsAvail.map(y => `<option value="${y}"${y===selectedYear?' selected':''}>${y}</option>`).join('')}
+          </select>
+        ` : `<span class="text-xs text-ink-5">All recorded data</span>`}
       </div>
     </div>
   `;
 
-  const body = `
-    <div class="flex items-center gap-2 mb-5">
-      <a href="#/month/${prevId}" class="btn btn-secondary btn-icon" title="Previous month">${icons.left}</a>
-      <h2 class="text-2xl font-bold text-ink leading-tight flex-1 text-center" style="letter-spacing:-0.01em">${monthLabel(monthId)}</h2>
-      <a href="#/month/${nextId}" class="btn btn-secondary btn-icon" title="Next month">${icons.right}</a>
-    </div>
+  // ─── SNAPSHOT cards ───
+  // Compute totals over scopeMonthIds
+  let totalRent = 0, totalElectric = 0, totalWater = 0, totalOther = 0;
+  let totalBilled = 0, totalCollected = 0;
+  scopeMonthIds.forEach(mid => {
+    units.forEach(u => {
+      const ch = computeCharges(u.id, mid);
+      if (ch && ch.hasReadings && !ch.vacant) {
+        totalRent += ch.rent || 0;
+        totalElectric += ch.electricBill || 0;
+        totalWater += ch.waterBill || 0;
+        totalOther += ch.otherCharge || 0;
+        totalBilled += ch.total || 0;
+      }
+      totalCollected += paymentsTotalForUnitMonth(u.id, mid);
+    });
+  });
+  const totalOutstanding = totalBilled - totalCollected;
+  const totalExpenses = expensesSum(scopeMonthIds);
+  const netIncome = totalCollected - totalExpenses;
+  const collectionRate = totalBilled > 0 ? (totalCollected / totalBilled * 100) : 0;
 
-    ${bannersBlock}
-    ${statsBlock}
-    ${upcomingBlock}
-
-    <div class="flex items-end justify-between mb-3">
-      <div>
-        <div class="stat-label">Meter readings · payments</div>
-        <h3 class="section-h">${monthLabel(monthId)}</h3>
+  const snapshotBlock = `
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+      <div class="card card-accent card-accent-blue p-4">
+        <div class="stat-label">Billed</div>
+        <div class="num font-bold text-ink mt-1" style="font-size:20px">${fmtMoney(totalBilled)}</div>
+      </div>
+      <div class="card card-accent card-accent-green p-4">
+        <div class="stat-label">Collected</div>
+        <div class="num font-bold mt-1" style="font-size:20px;color:#3F9D2D">${fmtMoney(totalCollected)}</div>
+        ${totalBilled>0 ? `<div class="text-[11px] text-ink-5 mt-0.5">${collectionRate.toFixed(1)}% rate</div>` : ''}
+      </div>
+      <div class="card card-accent card-accent-red p-4">
+        <div class="stat-label">Outstanding</div>
+        <div class="num font-bold mt-1" style="font-size:20px;color:${totalOutstanding>0.01?'#DC2626':'#111827'}">${fmtMoney(Math.max(0, totalOutstanding))}</div>
+      </div>
+      <div class="card card-accent card-accent-purple p-4">
+        <div class="stat-label">Rent only</div>
+        <div class="num font-bold text-ink mt-1" style="font-size:20px">${fmtMoney(totalRent)}</div>
+      </div>
+      <div class="card card-accent card-accent-pink p-4">
+        <div class="stat-label">Expenses</div>
+        <div class="num font-bold mt-1" style="font-size:20px;color:#DC2626">${fmtMoney(totalExpenses)}</div>
+        <a href="#/expenses" class="text-[11px] text-ink-5 underline">Manage</a>
+      </div>
+      <div class="card card-accent card-accent-teal p-4">
+        <div class="stat-label">Net Income</div>
+        <div class="num font-bold mt-1" style="font-size:20px;color:${netIncome>=0?'#3F9D2D':'#DC2626'}">${fmtMoney(netIncome)}</div>
+        <div class="text-[11px] text-ink-5 mt-0.5">Collected − Expenses</div>
       </div>
     </div>
+  `;
 
-    <div class="card p-5 mb-5">
-      <div class="flex items-start justify-between gap-3 flex-wrap">
-        <div class="flex-1 min-w-0">
-          <h3 class="section-h mb-1">Month details</h3>
-          <div class="flex flex-wrap gap-2 mt-2 text-sm">
-            <span class="chip chip-muted">kWh rate: <strong class="num ml-1">${month.kwhRate != null ? fmtNum(month.kwhRate, 2) : '—'}</strong></span>
-            <span class="chip chip-muted">Actual electric: <strong class="num ml-1">${month.actualElectricBill != null ? fmtMoney(month.actualElectricBill) : '—'}</strong></span>
-          </div>
-        </div>
-        <button onclick="openMonthEntryModal('${monthId}')" class="btn btn-primary">
-          ${hasAnyReadings(monthId) ? `${icons.edit}Edit readings` : `${icons.plus}Enter readings`}
-        </button>
+  // ─── REPORTS: By Unit + By Month ───
+  // By Unit: aggregate across scopeMonthIds
+  const byUnitRows = units.map(u => {
+    let rent = 0, util = 0, billed = 0, collected = 0;
+    scopeMonthIds.forEach(mid => {
+      const ch = computeCharges(u.id, mid);
+      if (ch && ch.hasReadings && !ch.vacant) {
+        rent += ch.rent || 0;
+        util += (ch.electricBill || 0) + (ch.waterBill || 0) + (ch.otherCharge || 0);
+        billed += ch.total || 0;
+      }
+      collected += paymentsTotalForUnitMonth(u.id, mid);
+    });
+    return { u, rent, util, billed, collected };
+  });
+
+  const byUnitBlock = `
+    <div class="card mb-6">
+      <div class="p-4 pb-3"><h3 class="section-h">By Unit</h3></div>
+      <!-- Desktop -->
+      <div class="ledger-table overflow-x-auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Unit</th>
+              <th class="num-cell">Rent</th>
+              <th class="num-cell">Utilities + Other</th>
+              <th class="num-cell">Billed</th>
+              <th class="num-cell">Collected</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${byUnitRows.length === 0 ? `<tr><td colspan="5" class="text-center py-6 text-ink-5 italic">No units yet</td></tr>` : byUnitRows.map(r => {
+              const ac = unitAccent(r.u.id);
+              return `
+                <tr>
+                  <td><span class="inline-flex items-center gap-2"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ac.color}"></span>${h(r.u.name)}</span></td>
+                  <td class="num-cell">${fmtMoney(r.rent)}</td>
+                  <td class="num-cell">${fmtMoney(r.util)}</td>
+                  <td class="num-cell font-semibold">${fmtMoney(r.billed)}</td>
+                  <td class="num-cell" style="color:#3F9D2D">${fmtMoney(r.collected)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+          ${byUnitRows.length ? `<tfoot>
+            <tr style="border-top:2px solid #111827;font-weight:700">
+              <td>Total</td>
+              <td class="num-cell">${fmtMoney(totalRent)}</td>
+              <td class="num-cell">${fmtMoney(totalElectric + totalWater + totalOther)}</td>
+              <td class="num-cell">${fmtMoney(totalBilled)}</td>
+              <td class="num-cell" style="color:#3F9D2D">${fmtMoney(totalCollected)}</td>
+            </tr>
+          </tfoot>` : ''}
+        </table>
       </div>
-    </div>
-
-    <div class="card overflow-x-auto mb-5">
-      ${(() => { const anyOther = units.some(u => { const ch = computeCharges(u.id, monthId); return ch && ch.otherCharge > 0; }); return `
-      <table class="entry-table">
-        <thead>
-          <tr class="group-row">
-            <th></th>
-            <th class="col-div"></th>
-            <th colspan="3" class="group-electric col-div">${icons.bolt} Electric</th>
-            <th colspan="3" class="group-water col-div">${icons.droplet} Water</th>
-            ${anyOther ? '<th class="col-div"></th>' : ''}
-            <th class="col-div"></th>
-            <th class="col-div"></th>
-          </tr>
-          <tr>
-            <th>Unit</th>
-            <th class="col-div" style="text-align:center">Rent</th>
-            <th class="col-div" style="text-align:center">Prev kWh</th>
-            <th style="text-align:center">New kWh</th>
-            <th style="text-align:center">Electric ${CURRENCY}</th>
-            <th class="col-div" style="text-align:center">Prev m³</th>
-            <th style="text-align:center">New m³</th>
-            <th style="text-align:center">Water ${CURRENCY}</th>
-            ${anyOther ? '<th class="col-div" style="text-align:center">Other</th>' : ''}
-            <th class="col-div" style="text-align:center">Total</th>
-            <th class="col-div" style="text-align:center">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${units.map(u => {
-            const r = month.readings[u.id] || {};
-            const prevE = previousReading(u.id, monthId, 'electricReading');
-            const prevW = previousReading(u.id, monthId, 'waterReading');
-            const ch = computeCharges(u.id, monthId);
-            const accent = unitAccent(u.id);
-            const hasR = ch && ch.hasReadings && !ch.vacant;
-            const vacantFlag = r.vacant;
-            return `
-              <tr data-unit-id="${u.id}">
-                <td class="mobile-header">
-                  <div class="flex items-center gap-2">
-                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${accent.color};flex-shrink:0"></span>
-                    <div>
-                      <div class="font-semibold">${h(u.name)}</div>
-                      <div class="text-xs text-ink-5">${h(tenantNameForUnit(u.id) || '(Vacant)')}</div>
-                    </div>
-                  </div>
-                </td>
-                <td data-label="Rent" class="td-bill col-div mobile-sep num" style="text-align:center;font-weight:600">${hasR ? fmtMoney(ch.rent) : '—'}</td>
-                <td data-label="Prev kWh" class="td-electric col-div mobile-sep num" style="text-align:center;color:#6B7280">${fmtNum(prevE.value, 2)}</td>
-                <td data-label="New kWh" class="td-electric num" style="text-align:center;font-weight:600">${r.electricReading != null ? fmtNum(r.electricReading, 2) : '—'}</td>
-                <td data-label="Electric ${CURRENCY}" class="td-electric num" style="text-align:center">${hasR ? fmtMoney(ch.electricBill) : '—'}</td>
-                <td data-label="Prev m³" class="td-water col-div mobile-sep num" style="text-align:center;color:#6B7280">${fmtNum(prevW.value, 2)}</td>
-                <td data-label="New m³" class="td-water num" style="text-align:center;font-weight:600">${r.waterReading != null ? fmtNum(r.waterReading, 2) : '—'}</td>
-                <td data-label="Water ${CURRENCY}" class="td-water num" style="text-align:center">${hasR ? fmtMoney(ch.waterBill) : '—'}</td>
-                ${anyOther ? `<td data-label="Other" class="td-bill col-div mobile-sep num" style="text-align:center;color:#6B7280">${hasR && ch.otherCharge > 0 ? fmtMoney(ch.otherCharge) : '—'}</td>` : ''}
-                <td data-label="Total" class="td-bill total-cell num" style="text-align:center">${hasR ? fmtMoney(ch.total) : '—'}</td>
-                <td data-label="Status" class="col-div mobile-sep" style="text-align:center">${vacantFlag ? '<span class="chip chip-muted">Vacant</span>' : hasR ? '<span class="chip chip-paid">'+icons.check+'</span>' : '<span class="chip chip-muted">—</span>'}</td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-      `; })()}
-    </div>
-
-    <div class="border-t border-line pt-6 mb-5">
-      <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
-        <h3 class="section-h">Payments — ${monthLabel(monthId)}</h3>
-        <div class="inline-flex rounded-md overflow-hidden" style="border:1px solid #E5E7EB" id="paymentsFilter">
-          <button data-filter="all"     class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:#111827;color:#FFFFFF">All</button>
-          <button data-filter="unpaid"  class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:#FFFFFF;color:#374151;border-left:1px solid #E5E7EB">Unpaid only</button>
-          <button data-filter="paid"    class="px-3 py-1.5 text-xs font-semibold transition-colors" style="background:#FFFFFF;color:#374151;border-left:1px solid #E5E7EB">Paid only</button>
-        </div>
-      </div>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" id="paymentsGrid">
-        ${units.map(u => {
-          const ch = computeCharges(u.id, monthId);
-          const st = monthPaymentStatus(u.id, monthId);
-          const pays = paymentsForUnitMonth(u.id, monthId);
-          const accent = unitAccent(u.id);
-          const chip = st.status === 'paid'    ? `<span class="chip chip-paid">${icons.check}Paid</span>`
-                     : st.status === 'partial' ? `<span class="chip chip-partial">Partial</span>`
-                     : st.status === 'unpaid'  ? `<span class="chip chip-unpaid">Unpaid</span>`
-                     : st.status === 'vacant'  ? `<span class="chip chip-muted">Vacant</span>`
-                     : `<span class="chip chip-muted">—</span>`;
+      <!-- Mobile -->
+      <div class="ledger-mobile p-3" style="background:#F9FAFB">
+        ${byUnitRows.length === 0 ? `<div class="text-center py-6 text-ink-5 italic text-sm">No units yet</div>` : byUnitRows.map(r => {
+          const ac = unitAccent(r.u.id);
           return `
-            <div class="card overflow-hidden" data-pay-status="${st.status}">
-              <div style="height:3px;background:${accent.color}"></div>
-              <div class="p-4">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${accent.color};flex-shrink:0"></span>
-                  <div>
-                    <div class="font-semibold text-ink">${h(u.name)}</div>
-                    <div class="text-xs text-ink-5">${h(tenantNameForUnit(u.id) || '(Vacant)')}</div>
-                  </div>
-                </div>
-                ${chip}
+            <div class="mb-2" style="border:1px solid #E5E7EB;border-radius:8px;background:#FFFFFF;padding:12px">
+              <div class="flex items-center gap-2 mb-2">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ac.color}"></span>
+                <div class="font-semibold text-ink">${h(r.u.name)}</div>
+                <div class="num font-bold text-ink ml-auto">${fmtMoney(r.billed)}</div>
               </div>
-              ${ch && ch.hasReadings && !ch.vacant ? `
-                <div class="text-xs text-ink-5 mb-2">Bill <span class="num">${fmtMoney(ch.total)}</span> · Paid <span class="num" style="color:#3F9D2D">${fmtMoney(st.paid)}</span>${st.balance > 0.01 ? ` · <span class="cell-danger">Owes ${fmtMoney(st.balance)}</span>`:''}</div>
-              ` : ch && ch.vacant ? `<div class="text-xs text-ink-5 italic mb-2">Vacant — no charges</div>`
-                 : `<div class="text-xs text-ink-5 italic mb-2">No readings yet</div>`}
-              ${pays.length ? `
-                <div class="space-y-1 mb-3 text-xs">
-                  ${pays.map(p => `
-                    <div class="flex items-center justify-between bg-surface-2 rounded px-2 py-1">
-                      <span>${h(p.date)}${p.method ? ` · ${h(p.method)}`:''}</span>
-                      <span class="flex items-center gap-2">
-                        <span class="num font-semibold">${fmtMoney(p.amount)}</span>
-                        <button onclick="deletePayment('${p.id}')" class="text-danger-strong hover:opacity-70" title="Delete">${icons.x}</button>
-                      </span>
-                    </div>
-                  `).join('')}
-                </div>
-              ` : ''}
-              ${ch && !ch.vacant ? `<button onclick="addPaymentModal('${u.id}','${monthId}')" class="btn btn-secondary w-full justify-center btn-sm">${icons.plus}Record payment</button>` : ''}
+              <div class="grid grid-cols-2 gap-2 text-xs pt-2" style="border-top:1px solid #F1F5F9">
+                <div><div class="text-ink-5">Rent</div><div class="num font-semibold">${fmtMoney(r.rent)}</div></div>
+                <div><div class="text-ink-5">Util + Other</div><div class="num font-semibold">${fmtMoney(r.util)}</div></div>
+              </div>
+              <div class="flex justify-between text-xs mt-2 pt-2" style="border-top:1px solid #F1F5F9">
+                <span class="text-ink-5">Collected</span>
+                <span class="num font-semibold" style="color:#3F9D2D">${fmtMoney(r.collected)}</span>
               </div>
             </div>
           `;
         }).join('')}
+        ${byUnitRows.length ? `
+          <div style="border:1px solid #E5E7EB;border-radius:8px;background:#F0F9FF;padding:12px" class="mt-3">
+            <div class="font-bold text-ink mb-2">Totals</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div><div class="text-ink-5">Rent</div><div class="num font-semibold">${fmtMoney(totalRent)}</div></div>
+              <div><div class="text-ink-5">Util + Other</div><div class="num font-semibold">${fmtMoney(totalElectric+totalWater+totalOther)}</div></div>
+              <div><div class="text-ink-5">Billed</div><div class="num font-semibold">${fmtMoney(totalBilled)}</div></div>
+              <div><div class="text-ink-5">Collected</div><div class="num font-semibold" style="color:#3F9D2D">${fmtMoney(totalCollected)}</div></div>
+            </div>
+          </div>
+        ` : ''}
       </div>
-      <div id="paymentsEmptyMsg" class="hidden text-center py-6 text-sm text-ink-5 italic">No units match this filter.</div>
     </div>
+  `;
 
-    <div class="flex justify-end mb-8">
-      <button onclick="confirmClearMonth('${monthId}')" class="btn btn-secondary" style="color:#DC2626">${icons.trash}Clear month data</button>
+  // By Month: only show in yearly + all-time modes
+  const byMonthBlock = (mode === 'monthly') ? '' : (() => {
+    const monthRows = scopeMonthIds.map(mid => {
+      let rent = 0, util = 0, billed = 0, collected = 0;
+      units.forEach(u => {
+        const ch = computeCharges(u.id, mid);
+        if (ch && ch.hasReadings && !ch.vacant) {
+          rent += ch.rent || 0;
+          util += (ch.electricBill || 0) + (ch.waterBill || 0) + (ch.otherCharge || 0);
+          billed += ch.total || 0;
+        }
+        collected += paymentsTotalForUnitMonth(u.id, mid);
+      });
+      return { mid, rent, util, billed, collected };
+    });
+    return `
+      <div class="card mb-6">
+        <div class="p-4 pb-3"><h3 class="section-h">By Month</h3></div>
+        <!-- Desktop -->
+        <div class="ledger-table overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th class="num-cell">Rent</th>
+                <th class="num-cell">Utilities + Other</th>
+                <th class="num-cell">Billed</th>
+                <th class="num-cell">Collected</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${monthRows.map(r => `
+                <tr onclick="navigate('#/?mode=monthly&month=${r.mid}')" class="cursor-pointer">
+                  <td class="font-semibold">${monthLabel(r.mid)}</td>
+                  <td class="num-cell">${fmtMoney(r.rent)}</td>
+                  <td class="num-cell">${fmtMoney(r.util)}</td>
+                  <td class="num-cell font-semibold">${fmtMoney(r.billed)}</td>
+                  <td class="num-cell" style="color:#3F9D2D">${fmtMoney(r.collected)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid #111827;font-weight:700">
+                <td>Total</td>
+                <td class="num-cell">${fmtMoney(totalRent)}</td>
+                <td class="num-cell">${fmtMoney(totalElectric + totalWater + totalOther)}</td>
+                <td class="num-cell">${fmtMoney(totalBilled)}</td>
+                <td class="num-cell" style="color:#3F9D2D">${fmtMoney(totalCollected)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <!-- Mobile -->
+        <div class="ledger-mobile p-3" style="background:#F9FAFB">
+          ${monthRows.map(r => `
+            <div onclick="navigate('#/?mode=monthly&month=${r.mid}')" class="cursor-pointer mb-2" style="border:1px solid #E5E7EB;border-radius:8px;background:#FFFFFF;padding:12px">
+              <div class="flex items-center mb-2">
+                <div class="font-semibold text-ink">${monthLabel(r.mid)}</div>
+                <div class="num font-bold text-ink ml-auto">${fmtMoney(r.billed)}</div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs pt-2" style="border-top:1px solid #F1F5F9">
+                <div><div class="text-ink-5">Rent</div><div class="num font-semibold">${fmtMoney(r.rent)}</div></div>
+                <div><div class="text-ink-5">Util + Other</div><div class="num font-semibold">${fmtMoney(r.util)}</div></div>
+              </div>
+              <div class="flex justify-between text-xs mt-2 pt-2" style="border-top:1px solid #F1F5F9">
+                <span class="text-ink-5">Collected</span>
+                <span class="num font-semibold" style="color:#3F9D2D">${fmtMoney(r.collected)}</span>
+              </div>
+            </div>
+          `).join('')}
+          <div style="border:1px solid #E5E7EB;border-radius:8px;background:#F0F9FF;padding:12px" class="mt-3">
+            <div class="font-bold text-ink mb-2">Totals (${mode==='yearly' ? selectedYear : 'All time'})</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div><div class="text-ink-5">Rent</div><div class="num font-semibold">${fmtMoney(totalRent)}</div></div>
+              <div><div class="text-ink-5">Util + Other</div><div class="num font-semibold">${fmtMoney(totalElectric+totalWater+totalOther)}</div></div>
+              <div><div class="text-ink-5">Billed</div><div class="num font-semibold">${fmtMoney(totalBilled)}</div></div>
+              <div><div class="text-ink-5">Collected</div><div class="num font-semibold" style="color:#3F9D2D">${fmtMoney(totalCollected)}</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  })();
+
+  const body = `
+    <div class="mb-5">
+      <div class="stat-label">Dashboard</div>
+      <h2 class="text-2xl font-bold text-ink">${state.settings.propertyName ? h(state.settings.propertyName) : 'APTracker'}</h2>
     </div>
-
-    ${buildRecentMonthsTable(monthId)}
+    ${bannersBlock}
+    ${upcomingBlock}
+    ${viewToggleBlock}
+    ${snapshotBlock}
+    ${byUnitBlock}
+    ${byMonthBlock}
   `;
 
   $('#app').innerHTML = layoutShell(body);
 
-  // Wire payments filter (All / Unpaid / Paid). Pure DOM filter — no re-render.
-  const filterRoot = document.getElementById('paymentsFilter');
-  if (filterRoot) {
-    const grid = document.getElementById('paymentsGrid');
-    const empty = document.getElementById('paymentsEmptyMsg');
-    const btns = filterRoot.querySelectorAll('button[data-filter]');
-    btns.forEach(b => {
-      b.addEventListener('click', () => {
-        const filter = b.dataset.filter;
-        // Active state styling
-        btns.forEach(x => {
-          const isActive = x.dataset.filter === filter;
-          x.style.background = isActive ? '#111827' : '#FFFFFF';
-          x.style.color      = isActive ? '#FFFFFF' : '#374151';
-        });
-        // Show/hide cards
-        let visible = 0;
-        grid.querySelectorAll('[data-pay-status]').forEach(card => {
-          const s = card.dataset.payStatus;
-          let show = true;
-          if (filter === 'unpaid') show = (s === 'unpaid' || s === 'partial');
-          else if (filter === 'paid') show = (s === 'paid');
-          card.style.display = show ? '' : 'none';
-          if (show) visible++;
-        });
-        empty.classList.toggle('hidden', visible > 0);
-      });
+  // Wire view toggle
+  document.querySelectorAll('#dashViewToggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.view;
+      if (v === 'monthly') navigate(`#/?mode=monthly&month=${selectedMonth}`);
+      else if (v === 'yearly') navigate(`#/?mode=yearly&year=${selectedYear}`);
+      else navigate(`#/?mode=all`);
     });
-  }
+  });
+  // Wire period selector
+  const monthSel = document.getElementById('dashMonthSel');
+  if (monthSel) monthSel.addEventListener('change', (e) => navigate(`#/?mode=monthly&month=${e.target.value}`));
+  const yearSel = document.getElementById('dashYearSel');
+  if (yearSel) yearSel.addEventListener('change', (e) => navigate(`#/?mode=yearly&year=${e.target.value}`));
 }
 
-// Does a month have any reading data entered? Used to swap + / Edit button labels.
 function hasAnyReadings(monthId) {
   const m = monthById(monthId);
   if (!m) return false;
@@ -2823,6 +3038,19 @@ function addPaymentModal(unitId, monthId) {
   const st = monthPaymentStatus(unitId, monthId);
   const u = unitById(unitId);
   const suggested = Math.max(0, st.balance || (ch?.total || 0));
+  // Default to the statement's due date for that unit/month — falls back to
+  // today if no due date can be derived.
+  const tenantThisMonth = state.tenants.find(t =>
+    t.unitId === unitId &&
+    (!t.moveInDate || t.moveInDate.slice(0,7) <= monthId) &&
+    (!t.moveOutDate || t.moveOutDate.slice(0,7) >= monthId)
+  );
+  const defaultDate = tenantThisMonth
+    ? tenantDueDateFor(tenantThisMonth.id, monthId)
+    : unitDueDateFor(unitId, monthId);
+  const dateValue = (defaultDate && /^\d{4}-\d{2}-\d{2}$/.test(defaultDate))
+    ? defaultDate
+    : new Date().toISOString().slice(0,10);
 
   showModal(`
     <div class="p-6">
@@ -2840,8 +3068,8 @@ function addPaymentModal(unitId, monthId) {
           <input type="number" step="0.01" id="payAmount" class="input-base" value="${suggested.toFixed(2)}" required />
         </div>
         <div>
-          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Date</label>
-          <input type="date" id="payDate" class="input-base" value="${new Date().toISOString().slice(0,10)}" required />
+          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Date <span class="text-ink-5 font-normal normal-case">· defaults to due date</span></label>
+          <input type="date" id="payDate" class="input-base" value="${dateValue}" required />
         </div>
         <div>
           <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Method (optional)</label>
@@ -2984,12 +3212,74 @@ function goBackFromTenantView() {
 window.goBackFromTenantView = goBackFromTenantView;
 
 function deletePayment(paymentId) {
-  if (!confirm('Delete this payment?')) return;
-  state.payments = state.payments.filter(p => p.id !== paymentId);
-  saveState();
-  render();
+  const p = state.payments.find(x => x.id === paymentId);
+  if (!p) return;
+  const u = unitById(p.unitId);
+  const detailsHtml = `
+    <div class="rounded-md p-3" style="background:#FEF2F2;border:1px solid #FECACA">
+      <div class="text-xs space-y-1">
+        <div class="flex justify-between"><span class="text-ink-4">Unit · Month</span><span>${u ? h(u.name) : '—'} · ${monthLabel(p.monthId)}</span></div>
+        <div class="flex justify-between"><span class="text-ink-4">Amount</span><span class="num font-semibold">${fmtMoney(p.amount)}</span></div>
+        <div class="flex justify-between"><span class="text-ink-4">Date${p.method ? ' · Method' : ''}</span><span>${fmtDate(p.date)}${p.method ? ' · ' + h(p.method) : ''}</span></div>
+      </div>
+    </div>
+  `;
+  confirmModal({
+    title: 'Delete this payment?',
+    message: 'The payment record will be permanently removed.',
+    detailsHtml,
+    confirmLabel: 'Delete',
+    tone: 'danger',
+    onConfirm: () => {
+      state.payments = state.payments.filter(x => x.id !== paymentId);
+      saveState();
+      toast('Payment deleted', 'success');
+      render();
+    }
+  });
 }
 window.deletePayment = deletePayment;
+
+// Undo "Mark as paid" for a unit/month — removes ALL payments recorded for
+// that month, after confirmation showing the count and total. Used by the
+// ledger row's revert button.
+function unmarkPaymentForMonth(unitId, monthId) {
+  const pays = paymentsForUnitMonth(unitId, monthId);
+  if (!pays.length) { toast('No payments to undo for this month', 'warn'); return; }
+  const total = pays.reduce((a,p) => a + (Number(p.amount) || 0), 0);
+  // Build a small summary card listing each payment for context
+  const detailsHtml = `
+    <div class="rounded-md p-3" style="background:#FFFBEB;border:1px solid #FDE68A">
+      <div class="text-xs font-semibold uppercase tracking-wide mb-2" style="color:#92400E">Payment${pays.length===1?'':'s'} to remove</div>
+      <div class="space-y-1.5 text-sm">
+        ${pays.map(p => `
+          <div class="flex justify-between">
+            <span class="text-ink-4">${fmtDate(p.date)}${p.method ? ' · ' + h(p.method) : ''}</span>
+            <span class="num font-semibold">${fmtMoney(p.amount)}</span>
+          </div>
+        `).join('')}
+        ${pays.length > 1 ? `<div class="flex justify-between pt-1.5 border-t" style="border-color:#FDE68A"><strong>Total</strong><strong class="num">${fmtMoney(total)}</strong></div>` : ''}
+      </div>
+    </div>
+  `;
+  confirmModal({
+    title: `Undo payment for ${monthLabel(monthId)}?`,
+    message: pays.length === 1
+      ? 'This will remove the payment record. The month will go back to Unpaid.'
+      : `This will remove all ${pays.length} payments for this month. The month will go back to Unpaid.`,
+    detailsHtml,
+    confirmLabel: 'Yes, undo',
+    tone: 'warn',
+    onConfirm: () => {
+      const idsToRemove = new Set(pays.map(p => p.id));
+      state.payments = state.payments.filter(p => !idsToRemove.has(p.id));
+      saveState();
+      toast('Payment undone', 'success');
+      render();
+    }
+  });
+}
+window.unmarkPaymentForMonth = unmarkPaymentForMonth;
 
 // ============================================================================
 // 14. VIEW: UNITS  (physical properties — rent, occupancy, lifetime total)
@@ -3635,7 +3925,6 @@ function renderTenants() {
 
               <div class="space-y-1.5 text-sm">
                 ${t.contactNumber ? `<div class="flex justify-between"><span class="text-ink-5">Contact</span><span class="num text-sm">${h(t.contactNumber)}</span></div>` : ''}
-                ${t.social ? `<div class="flex justify-between gap-2"><span class="text-ink-5">Social</span><span class="text-sm text-right truncate" style="max-width:60%" title="${h(t.social)}">${h(t.social)}</span></div>` : ''}
                 <div class="flex justify-between"><span class="text-ink-5">Move-in</span><span>${t.moveInDate ? fmtDate(t.moveInDate) : '—'}</span></div>
                 ${t.moveOutDate ? `<div class="flex justify-between"><span class="text-ink-5">Move-out</span><span>${fmtDate(t.moveOutDate)}</span></div>` : ''}
                 <div class="flex justify-between pt-1.5 border-t border-line"><span class="text-ink-5 font-semibold">Security deposit</span><span class="num font-bold" style="color:#C9920C">${fmtMoney(dep)}</span></div>
@@ -3660,8 +3949,6 @@ function renderTenants() {
                 <div class="w-full mt-3 px-4 py-2.5 rounded-md text-center font-semibold text-sm flex items-center justify-center gap-2" style="background:#ECFDF5;border:1.5px solid #A7F3D0;color:#065F46">
                   ${icons.check}Paid in full
                 </div>
-              ` : !movedOut && unit ? `
-                <button onclick="markTenantAsPaid('${t.id}')" class="btn btn-primary w-full justify-center mt-3" style="background:#3F9D2D;border-color:#3F9D2D">${icons.check}Mark as paid</button>
               ` : ''}
 
               <div class="border-t border-line my-3"></div>
@@ -3732,10 +4019,6 @@ function openTenantModal(tenantId) {
           <div>
             <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Contact number</label>
             <input type="tel" id="tenantContact" class="input-base" value="${h(t.contactNumber || '')}" placeholder="+63 …" />
-          </div>
-          <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Social (FB / IG / URL)</label>
-            <input type="text" id="tenantSocial" class="input-base" value="${h(t.social || '')}" placeholder="@handle or link" />
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -3851,7 +4134,6 @@ function openTenantModal(tenantId) {
       id: t.id,
       name: $('#tenantName').value,
       contactNumber: $('#tenantContact').value,
-      social: $('#tenantSocial').value,
       deposit: parseFloat($('#deposit').value) || 0,
       advance: parseFloat($('#advance')?.value || t.advance || 0) || 0,
       dueDay: (() => {
@@ -4104,7 +4386,7 @@ function renderUnitDetail(unitId) {
   const dep = depositBalance(unitId);
 
   const body = `
-    <a href="#/units" class="inline-flex items-center gap-1 text-sm text-ink-5 hover:text-ink mb-3">${icons.left}Back to units</a>
+    <div class="mb-4"><button onclick="navigate('#/units')" class="btn btn-secondary btn-sm">${icons.left}Close</button></div>
     <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
       <div class="flex items-start gap-3">
         <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${unitAccent(u.id).color};margin-top:10px;flex-shrink:0"></span>
@@ -4335,225 +4617,237 @@ function renderUnitDetail(unitId) {
 // ============================================================================
 // 17.5 REPORTS — annual / YTD summary
 // ============================================================================
-function renderReports() {
-  const allMonthIds = sortedMonthIds();
-  // Available years inferred from data + always include current year
-  const years = new Set();
-  allMonthIds.forEach(id => years.add(id.slice(0, 4)));
-  years.add(String(new Date().getFullYear()));
-  const yearList = Array.from(years).sort().reverse();
+function renderExpenses() {
+  // Determine selected month from URL ?month= or default to current
+  const requestedMonth = parseRoute().query?.month;
+  const selectedMonth = requestedMonth && /^\d{4}-\d{2}$/.test(requestedMonth) ? requestedMonth : currentMonthId();
 
-  // Read selected year from URL hash query (?year=2026), default to current
-  const selectedYear = parseRoute().query?.year || String(new Date().getFullYear());
+  // Build month options from existing months + recent fallback
+  const monthIdsSet = new Set(state.months.map(m => m.id));
+  state.expenses.forEach(e => monthIdsSet.add(e.monthId));
+  monthIdsSet.add(selectedMonth);
+  // Add current and last 11 months as candidates
+  let cur = currentMonthId();
+  for (let i = 0; i < 12; i++) { monthIdsSet.add(cur); cur = prevMonthId(cur); }
+  const monthOptions = Array.from(monthIdsSet).sort().reverse();
 
-  // Filter months in the selected year that are within tenancy / have data
-  const yearMonths = allMonthIds.filter(id => id.startsWith(selectedYear + '-'));
-  const units = state.units; // include inactive units for historical accuracy
+  const existing = expenseForMonth(selectedMonth);
+  const electricVal = existing ? (existing.electricBill ?? '') : '';
+  const waterVal = existing ? (existing.waterBill ?? '') : '';
+  const others = existing && Array.isArray(existing.otherExpenses) ? existing.otherExpenses : [];
 
-  // Aggregate per-unit and overall
-  let totalRent = 0, totalElectric = 0, totalWater = 0, totalOther = 0;
-  let totalBilled = 0, totalCollected = 0;
-  const unitRows = units.map(u => {
-    let uRent = 0, uElectric = 0, uWater = 0, uOther = 0, uBilled = 0, uCollected = 0;
-    const occupiedMonths = [];
-    yearMonths.forEach(mid => {
-      const ch = computeCharges(u.id, mid);
-      if (!ch || ch.vacant || !ch.hasReadings) return;
-      uRent += ch.rent || 0;
-      uElectric += ch.electricBill || 0;
-      uWater += ch.waterBill || 0;
-      uOther += ch.otherCharge || 0;
-      uBilled += ch.total || 0;
-      uCollected += paymentsTotalForUnitMonth(u.id, mid);
-      occupiedMonths.push(mid);
-    });
-    totalRent += uRent;
-    totalElectric += uElectric;
-    totalWater += uWater;
-    totalOther += uOther;
-    totalBilled += uBilled;
-    totalCollected += uCollected;
-    return { u, uRent, uElectric, uWater, uOther, uBilled, uCollected, monthsCount: occupiedMonths.length };
-  });
+  const total = expenseTotalForMonth(selectedMonth);
 
-  const totalOutstanding = totalBilled - totalCollected;
-  const collectionRate = totalBilled > 0 ? (totalCollected / totalBilled * 100) : 0;
-
-  // Per-month breakdown for the year (small table)
-  const monthRows = yearMonths.map(mid => {
-    let billed = 0, collected = 0;
-    units.forEach(u => {
-      const ch = computeCharges(u.id, mid);
-      if (ch && ch.hasReadings && !ch.vacant) billed += ch.total;
-      collected += paymentsTotalForUnitMonth(u.id, mid);
-    });
-    return { mid, billed, collected, balance: billed - collected };
-  });
-
-  // CSV download — all data in selected year
-  const csvRows = [
-    ['Month', 'Unit', 'Tenant', 'Rent', 'Electric', 'Water', 'Other', 'Total Billed', 'Collected', 'Balance']
-  ];
-  yearMonths.forEach(mid => {
-    units.forEach(u => {
-      const ch = computeCharges(u.id, mid);
-      if (!ch || !ch.hasReadings) return;
-      const occupant = state.tenants.find(t =>
-        t.unitId === u.id &&
-        (!t.moveInDate || t.moveInDate.slice(0,7) <= mid) &&
-        (!t.moveOutDate || t.moveOutDate.slice(0,7) >= mid)
-      );
-      const collected = paymentsTotalForUnitMonth(u.id, mid);
-      csvRows.push([
-        mid,
-        u.name,
-        occupant?.name || (ch.vacant ? '(Vacant)' : ''),
-        ch.rent || 0,
-        ch.electricBill || 0,
-        ch.waterBill || 0,
-        ch.otherCharge || 0,
-        ch.total || 0,
-        collected,
-        (ch.total || 0) - collected
-      ]);
-    });
-  });
+  // Recent expenses snapshot for the table at the bottom
+  const recent = state.expenses
+    .slice()
+    .sort((a,b) => b.monthId.localeCompare(a.monthId))
+    .slice(0, 12);
 
   const body = `
     <div>
-      <div class="flex items-end justify-between gap-3 mb-5 flex-wrap">
-        <div>
-          <div class="stat-label">Reports</div>
-          <h2 class="text-2xl font-bold text-ink">Annual summary</h2>
-        </div>
-        <div class="flex items-center gap-2">
-          <label class="text-xs font-semibold uppercase tracking-wide text-ink-5">Year</label>
-          <select id="reportYear" class="input-base" style="width:auto;min-width:100px">
-            ${yearList.map(y => `<option value="${y}"${y===selectedYear?' selected':''}>${y}</option>`).join('')}
-          </select>
-          <button onclick="downloadReportCsv('${selectedYear}')" class="btn btn-secondary btn-sm">${icons.download}<span class="hidden sm:inline">Download CSV</span></button>
-        </div>
+      <div class="mb-5">
+        <div class="stat-label">Expenses</div>
+        <h2 class="text-2xl font-bold text-ink">Track property expenses</h2>
+        <p class="text-sm text-ink-5 mt-1">Record actual bills you pay (Meralco, water, etc.) so you can track net income on the dashboard.</p>
       </div>
 
-      ${yearMonths.length === 0 ? `
-        <div class="card p-10 text-center">
-          <div class="text-ink-5 italic">No data recorded for ${selectedYear} yet.</div>
-        </div>
-      ` : `
-        <!-- Summary cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <div class="card card-accent card-accent-blue p-5">
-            <div class="stat-label">Total billed</div>
-            <div class="stat-value num mt-1">${fmtMoney(totalBilled)}</div>
-            <div class="text-xs text-ink-5 mt-1">${yearMonths.length} month${yearMonths.length===1?'':'s'} of data</div>
+      <div class="card p-5 mb-6">
+        <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
+          <div>
+            <h3 class="section-h">Month</h3>
+            <p class="section-sub">Pick a month to record or edit expenses.</p>
           </div>
-          <div class="card card-accent card-accent-green p-5">
-            <div class="stat-label">Collected</div>
-            <div class="stat-value num mt-1" style="color:#3F9D2D">${fmtMoney(totalCollected)}</div>
-            <div class="text-xs text-ink-5 mt-1">${collectionRate.toFixed(1)}% collection rate</div>
-          </div>
-          <div class="card card-accent card-accent-red p-5">
-            <div class="stat-label">Still outstanding</div>
-            <div class="stat-value num mt-1" style="color:${totalOutstanding > 0.01 ? '#DC2626' : '#111827'}">${fmtMoney(Math.max(0, totalOutstanding))}</div>
-          </div>
-          <div class="card card-accent card-accent-purple p-5">
-            <div class="stat-label">Rent only (gross)</div>
-            <div class="stat-value num mt-1">${fmtMoney(totalRent)}</div>
-            <div class="text-xs text-ink-5 mt-1">Excludes utilities &amp; other</div>
-          </div>
+          <select id="expMonthSel" class="input-base" style="width:auto;min-width:160px">
+            ${monthOptions.map(m => `<option value="${m}"${m===selectedMonth?' selected':''}>${monthLabel(m)}</option>`).join('')}
+          </select>
         </div>
 
-        <!-- Per-unit breakdown -->
-        <div class="card mb-6 overflow-x-auto">
-          <div class="p-5 pb-3"><h3 class="section-h">By unit</h3></div>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Unit</th>
-                <th class="num-cell">Months</th>
-                <th class="num-cell">Rent</th>
-                <th class="num-cell">Electric</th>
-                <th class="num-cell">Water</th>
-                <th class="num-cell">Other</th>
-                <th class="num-cell">Billed</th>
-                <th class="num-cell">Collected</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${unitRows.map(r => {
-                const ac = unitAccent(r.u.id);
-                return `
-                  <tr>
-                    <td>
-                      <span class="inline-flex items-center gap-2">
-                        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ac.color}"></span>
-                        ${h(r.u.name)}
-                      </span>
-                    </td>
-                    <td class="num-cell">${r.monthsCount}</td>
-                    <td class="num-cell">${fmtMoney(r.uRent)}</td>
-                    <td class="num-cell">${fmtMoney(r.uElectric)}</td>
-                    <td class="num-cell">${fmtMoney(r.uWater)}</td>
-                    <td class="num-cell">${fmtMoney(r.uOther)}</td>
-                    <td class="num-cell font-semibold">${fmtMoney(r.uBilled)}</td>
-                    <td class="num-cell" style="color:#3F9D2D">${fmtMoney(r.uCollected)}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-            <tfoot>
-              <tr style="border-top:2px solid #111827;font-weight:700">
-                <td>Total</td>
-                <td class="num-cell">—</td>
-                <td class="num-cell">${fmtMoney(totalRent)}</td>
-                <td class="num-cell">${fmtMoney(totalElectric)}</td>
-                <td class="num-cell">${fmtMoney(totalWater)}</td>
-                <td class="num-cell">${fmtMoney(totalOther)}</td>
-                <td class="num-cell">${fmtMoney(totalBilled)}</td>
-                <td class="num-cell" style="color:#3F9D2D">${fmtMoney(totalCollected)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <form id="expenseForm" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Actual Electric Bill</label>
+              <input type="number" step="0.01" id="expElectric" class="input-base" value="${electricVal}" placeholder="From Meralco bill" />
+              <p class="text-[11px] text-ink-5 mt-1">The full bill you pay to the electric company.</p>
+            </div>
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Actual Water Bill</label>
+              <input type="number" step="0.01" id="expWater" class="input-base" value="${waterVal}" placeholder="From water company bill" />
+              <p class="text-[11px] text-ink-5 mt-1">The full bill you pay to the water utility.</p>
+            </div>
+          </div>
 
-        <!-- Per-month breakdown -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-semibold uppercase tracking-wide text-ink-5">Other Expenses</label>
+              <button type="button" id="expAddOther" class="btn btn-secondary btn-sm">${icons.plus}Add</button>
+            </div>
+            <div id="expOtherArea" class="space-y-2"></div>
+          </div>
+
+          <div class="flex justify-between items-center pt-3" style="border-top:1px solid #E5E7EB">
+            <div class="text-sm">
+              <span class="text-ink-5">Total this month:</span>
+              <strong class="num text-ink ml-2" id="expTotalPreview" style="font-size:16px">${fmtMoney(total)}</strong>
+            </div>
+            <div class="flex gap-2">
+              ${existing ? `<button type="button" onclick="deleteExpense('${selectedMonth}')" class="btn btn-secondary btn-sm" style="color:#991B1B">Delete</button>` : ''}
+              <button type="submit" class="btn btn-primary">${icons.check}Save expenses</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      ${recent.length ? `
         <div class="card overflow-x-auto">
-          <div class="p-5 pb-3"><h3 class="section-h">By month</h3></div>
+          <div class="p-5 pb-3"><h3 class="section-h">Recent expenses</h3></div>
           <table class="data-table">
             <thead>
               <tr>
                 <th>Month</th>
-                <th class="num-cell">Billed</th>
-                <th class="num-cell">Collected</th>
-                <th class="num-cell">Balance</th>
+                <th class="num-cell">Electric</th>
+                <th class="num-cell">Water</th>
+                <th class="num-cell">Other</th>
+                <th class="num-cell">Total</th>
               </tr>
             </thead>
             <tbody>
-              ${monthRows.map(r => `
-                <tr onclick="location.hash='#/month/${r.mid}'" class="cursor-pointer hover:bg-surface-2">
-                  <td class="font-semibold">${monthLabel(r.mid)}</td>
-                  <td class="num-cell">${fmtMoney(r.billed)}</td>
-                  <td class="num-cell" style="color:#3F9D2D">${fmtMoney(r.collected)}</td>
-                  <td class="num-cell" style="color:${r.balance > 0.01 ? '#DC2626' : '#111827'}">${fmtMoney(r.balance)}</td>
-                </tr>
-              `).join('')}
+              ${recent.map(e => {
+                const others = (e.otherExpenses||[]).reduce((a,c) => a + (Number(c.amount)||0), 0);
+                const tot = (Number(e.electricBill)||0) + (Number(e.waterBill)||0) + others;
+                return `
+                  <tr onclick="navigate('#/expenses?month=${e.monthId}')" class="cursor-pointer">
+                    <td class="font-semibold">${monthLabel(e.monthId)}</td>
+                    <td class="num-cell">${fmtMoney(e.electricBill)}</td>
+                    <td class="num-cell">${fmtMoney(e.waterBill)}</td>
+                    <td class="num-cell">${fmtMoney(others)}</td>
+                    <td class="num-cell font-semibold">${fmtMoney(tot)}</td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
-      `}
+      ` : ''}
     </div>
   `;
 
   $('#app').innerHTML = layoutShell(body);
 
-  // Wire year selector
-  const yearSel = document.getElementById('reportYear');
-  if (yearSel) {
-    yearSel.addEventListener('change', () => {
-      location.hash = `#/reports?year=${yearSel.value}`;
+  // Working copy of "other expenses" for inline editing
+  let otherExpenses = others.map(o => ({ label: o.label || '', amount: Number(o.amount) || 0 }));
+
+  function renderOthers() {
+    const area = document.getElementById('expOtherArea');
+    if (!area) return;
+    if (!otherExpenses.length) {
+      area.innerHTML = `<div class="text-[11px] text-ink-5 italic py-1">No other expenses recorded for this month.</div>`;
+      return;
+    }
+    area.innerHTML = otherExpenses.map((o, idx) => `
+      <div class="flex gap-2 items-center">
+        <input type="text" data-other-label="${idx}" class="input-base text-sm flex-1" value="${h(o.label)}" placeholder="e.g. Repairs" />
+        <input type="number" step="0.01" data-other-amount="${idx}" class="input-base text-sm" style="width:140px" value="${o.amount}" placeholder="0.00" />
+        <button type="button" data-other-remove="${idx}" class="btn btn-secondary btn-icon btn-sm" title="Remove">${icons.trash}</button>
+      </div>
+    `).join('');
+    // Wire change handlers
+    area.querySelectorAll('[data-other-label]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        otherExpenses[Number(inp.dataset.otherLabel)].label = inp.value;
+        recomputePreview();
+      });
+    });
+    area.querySelectorAll('[data-other-amount]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        otherExpenses[Number(inp.dataset.otherAmount)].amount = parseFloat(inp.value) || 0;
+        recomputePreview();
+      });
+    });
+    area.querySelectorAll('[data-other-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        otherExpenses.splice(Number(btn.dataset.otherRemove), 1);
+        renderOthers();
+        recomputePreview();
+      });
     });
   }
+
+  function recomputePreview() {
+    const elec = parseFloat(document.getElementById('expElectric').value) || 0;
+    const water = parseFloat(document.getElementById('expWater').value) || 0;
+    const others = otherExpenses.reduce((a,o) => a + (Number(o.amount) || 0), 0);
+    document.getElementById('expTotalPreview').textContent = fmtMoney(elec + water + others);
+  }
+
+  document.getElementById('expElectric').addEventListener('input', recomputePreview);
+  document.getElementById('expWater').addEventListener('input', recomputePreview);
+  document.getElementById('expAddOther').addEventListener('click', () => {
+    otherExpenses.push({ label: '', amount: 0 });
+    renderOthers();
+    recomputePreview();
+  });
+  document.getElementById('expMonthSel').addEventListener('change', (e) => {
+    navigate(`#/expenses?month=${e.target.value}`);
+  });
+
+  document.getElementById('expenseForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const elec = parseFloat(document.getElementById('expElectric').value);
+    const water = parseFloat(document.getElementById('expWater').value);
+    // Strip empty rows
+    const cleanedOthers = otherExpenses
+      .map(o => ({ label: (o.label || '').trim(), amount: Number(o.amount) || 0 }))
+      .filter(o => o.label || o.amount > 0);
+    const idx = state.expenses.findIndex(x => x.monthId === selectedMonth);
+    const entry = {
+      id: idx >= 0 ? state.expenses[idx].id : uid('exp'),
+      monthId: selectedMonth,
+      electricBill: isNaN(elec) ? null : elec,
+      waterBill: isNaN(water) ? null : water,
+      otherExpenses: cleanedOthers,
+      updatedAt: new Date().toISOString(),
+    };
+    if (idx >= 0) state.expenses[idx] = entry;
+    else state.expenses.push(entry);
+    saveState();
+    toast('Expenses saved', 'success');
+    render();
+  });
+
+  renderOthers();
 }
+window.renderExpenses = renderExpenses;
+
+function deleteExpense(monthId) {
+  const e = expenseForMonth(monthId);
+  if (!e) return;
+  const total = expenseTotalForMonth(monthId);
+  const detailsHtml = `
+    <div class="rounded-md p-3" style="background:#FEF2F2;border:1px solid #FECACA">
+      <div class="text-xs space-y-1">
+        ${e.electricBill > 0 ? `<div class="flex justify-between"><span class="text-ink-4">Electric bill</span><span class="num">${fmtMoney(e.electricBill)}</span></div>` : ''}
+        ${e.waterBill > 0 ? `<div class="flex justify-between"><span class="text-ink-4">Water bill</span><span class="num">${fmtMoney(e.waterBill)}</span></div>` : ''}
+        ${(e.otherExpenses || []).map(o => `<div class="flex justify-between"><span class="text-ink-4">${h(o.label)}</span><span class="num">${fmtMoney(o.amount)}</span></div>`).join('')}
+        <div class="flex justify-between pt-1.5 border-t" style="border-color:#FECACA"><strong>Total</strong><strong class="num">${fmtMoney(total)}</strong></div>
+      </div>
+    </div>
+  `;
+  confirmModal({
+    title: `Delete expenses for ${monthLabel(monthId)}?`,
+    message: 'All expense lines for this month will be removed.',
+    detailsHtml,
+    confirmLabel: 'Delete',
+    tone: 'danger',
+    onConfirm: () => {
+      state.expenses = state.expenses.filter(x => x.monthId !== monthId);
+      saveState();
+      toast('Expenses deleted', 'success');
+      render();
+    }
+  });
+}
+window.deleteExpense = deleteExpense;
 
 // CSV download for the selected year. Builds rows on the fly to avoid stale
 // closure data if the user switches years quickly.
@@ -4773,12 +5067,30 @@ function renderSettings() {
     area.querySelectorAll('[data-wrh-remove]').forEach(btn => {
       btn.addEventListener('click', () => {
         const from = btn.dataset.wrhRemove;
-        if (!confirm(`Remove the rate change starting from ${monthLabel(from)}?`)) return;
-        waterRateHistory = waterRateHistory.filter(e => e.from !== from);
-        state.settings.waterRateHistory = JSON.parse(JSON.stringify(waterRateHistory));
-        saveState();
-        toast('Rate change removed', 'success');
-        render();
+        const entry = waterRateHistory.find(e => e.from === from);
+        const detailsHtml = entry ? `
+          <div class="rounded-md p-3" style="background:#FEF2F2;border:1px solid #FECACA">
+            <div class="text-xs space-y-1">
+              <div class="flex justify-between"><span class="text-ink-4">Effective from</span><span>${monthLabel(entry.from)}</span></div>
+              <div class="flex justify-between"><span class="text-ink-4">Base rate</span><span class="num">${CURRENCY}${fmtNum(entry.baseRate, 0)} up to ${fmtNum(entry.baseCubic, 0)} m³</span></div>
+              <div class="flex justify-between"><span class="text-ink-4">Per extra m³</span><span class="num">+${CURRENCY}${fmtNum(entry.perExtra, 0)}</span></div>
+            </div>
+          </div>
+        ` : '';
+        confirmModal({
+          title: `Remove this rate change?`,
+          message: `Bills from ${monthLabel(from)} onwards will fall back to the previous rate (or current settings if none).`,
+          detailsHtml,
+          confirmLabel: 'Remove',
+          tone: 'danger',
+          onConfirm: () => {
+            waterRateHistory = waterRateHistory.filter(e => e.from !== from);
+            state.settings.waterRateHistory = JSON.parse(JSON.stringify(waterRateHistory));
+            saveState();
+            toast('Rate change removed', 'success');
+            render();
+          }
+        });
       });
     });
   }
@@ -5062,7 +5374,8 @@ function renderTenant(code) {
     const prevWater = previousReading(u.id, mid, 'waterReading').value;
     const curElectricVal = r.electricReading != null ? r.electricReading : '';
     const curWaterVal = r.waterReading != null ? r.waterReading : '';
-    const kwhRateVal = month && month.kwhRate != null ? month.kwhRate : '';
+    const kwhRateVal = month ? ((month.kwhRateByUnit && month.kwhRateByUnit[u.id] != null) ? month.kwhRateByUnit[u.id] : (month.kwhRate != null ? month.kwhRate : '')) : '';
+    const kwhHasOverride = !!(month && month.kwhRateByUnit && month.kwhRateByUnit[u.id] != null);
 
     // Rent + Other amounts (resolve via rate-history at this month)
     const rentAmt = (hasReadings || isEmpty) ? rentForUnit(u.id, mid) : 0;
@@ -5079,8 +5392,18 @@ function renderTenant(code) {
     else if (hasReadings) totalDisplay = fmtMoney(ch.total);
     else totalDisplay = '<span class="text-ink-5">—</span>';
 
-    // Action buttons (admin only) — icon-only, horizontal under Total
+    // Action buttons (admin only) — icon-only, horizontal under Total.
+    // Mark Paid / Undo: green check when unpaid; amber undo arrow when paid
+    // (lets you revert an accidental click). Hidden on vacant or no-reading rows.
+    const isFullyPaid = hasReadings && ledgerRow && ledgerRow.endBal <= 0.01 && ledgerRow.payments > 0;
+    const canMarkPaid = isAdminView && hasReadings && !isFullyPaid && !isVacant;
+    const markPaidBtn = canMarkPaid
+      ? `<button onclick="addPaymentModal('${u.id}','${mid}')" class="btn btn-icon btn-sm" title="Mark as paid" style="background:#ECFDF5;border-color:#A7F3D0;color:#065F46">${icons.check}</button>`
+      : (isFullyPaid && isAdminView
+        ? `<button onclick="unmarkPaymentForMonth('${u.id}','${mid}')" class="btn btn-icon btn-sm" title="Undo payment" style="background:#FEF3C7;border-color:#FDE68A;color:#92400E">${icons.undo}</button>`
+        : '');
     const actionsHtml = isAdminView ? `
+      ${markPaidBtn}
       <button onclick="enterLedgerEditMode('${u.id}','${mid}')" class="btn btn-secondary btn-icon btn-sm" title="Edit readings">${icons.edit}</button>
       ${hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-icon btn-sm" title="View bill">${icons.eye}</button>` : ''}
     ` : (hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-icon btn-sm" title="View bill">${icons.eye}</button>` : '');
@@ -5167,6 +5490,10 @@ function renderTenant(code) {
             <div>
               <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">kWh rate</label>
               <input type="number" step="0.01" data-field="kwhRate" class="input-base text-sm" value="${kwhRateVal}" placeholder="e.g. 10.50" />
+              <label class="flex items-center gap-1.5 text-[11px] cursor-pointer mt-1.5 text-ink-5">
+                <input type="checkbox" data-field="kwhApplyAll" ${kwhHasOverride ? "" : "checked"} />
+                <span>Apply to all units this month</span>
+              </label>
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Electric reading (kWh)</label>
@@ -5220,7 +5547,8 @@ function renderTenant(code) {
     const prevWater = previousReading(u.id, mid, 'waterReading').value;
     const curElectricVal = r.electricReading != null ? r.electricReading : '';
     const curWaterVal = r.waterReading != null ? r.waterReading : '';
-    const kwhRateVal = month && month.kwhRate != null ? month.kwhRate : '';
+    const kwhRateVal = month ? ((month.kwhRateByUnit && month.kwhRateByUnit[u.id] != null) ? month.kwhRateByUnit[u.id] : (month.kwhRate != null ? month.kwhRate : '')) : '';
+    const kwhHasOverride = !!(month && month.kwhRateByUnit && month.kwhRateByUnit[u.id] != null);
 
     const rentAmt = (hasReadings || isEmpty) ? rentForUnit(u.id, mid) : 0;
     const otherCharges = otherChargesForUnit(u.id, mid) || [];
@@ -5232,8 +5560,16 @@ function renderTenant(code) {
                        : '<span class="text-ink-5">—</span>';
 
     const showBalance = ledgerRow && ledgerRow.endBal > 0.01 && ledgerRow.payments > 0;
+    const isFullyPaidMob = hasReadings && ledgerRow && ledgerRow.endBal <= 0.01 && ledgerRow.payments > 0;
+    const canMarkPaidMob = isAdminView && hasReadings && !isFullyPaidMob && !isVacant;
+    const markPaidBtnMob = canMarkPaidMob
+      ? `<button onclick="addPaymentModal('${u.id}','${mid}')" class="btn btn-sm" title="Mark as paid" style="background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46">${icons.check}Pay</button>`
+      : (isFullyPaidMob && isAdminView
+        ? `<button onclick="unmarkPaymentForMonth('${u.id}','${mid}')" class="btn btn-sm" title="Undo payment" style="background:#FEF3C7;border:1px solid #FDE68A;color:#92400E">${icons.undo}Undo</button>`
+        : '');
 
     const actionsHtml = isAdminView ? `
+      ${markPaidBtnMob}
       <button onclick="enterLedgerEditMode('${u.id}','${mid}')" class="btn btn-secondary btn-sm" title="Edit readings">${icons.edit}Edit</button>
       ${hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-sm" title="View bill">${icons.eye}View</button>` : ''}
     ` : (hasReadings ? `<button onclick="openStatement('${u.id}','${mid}')" class="btn btn-secondary btn-sm" title="View bill">${icons.eye}View</button>` : '');
@@ -5294,6 +5630,10 @@ function renderTenant(code) {
             <div>
               <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">kWh rate</label>
               <input type="number" step="0.01" data-field="kwhRate" class="input-base text-sm" value="${kwhRateVal}" placeholder="e.g. 10.50" />
+              <label class="flex items-center gap-1.5 text-[11px] cursor-pointer mt-1.5 text-ink-5">
+                <input type="checkbox" data-field="kwhApplyAll" ${kwhHasOverride ? "" : "checked"} />
+                <span>Apply to all units this month</span>
+              </label>
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase text-ink-5 block mb-1">Electric reading (kWh)</label>
@@ -5367,11 +5707,19 @@ function renderTenant(code) {
   `;
 
   const accent = unitAccent(u.id);
+  const adminBanner = isAdminView ? `
+    <div class="mb-4 px-4 py-2.5 rounded-md flex items-center gap-2 text-sm" style="background:#FEF3C7;border:1px solid #FDE68A;color:#92400E">
+      ${icons.info}
+      <span><strong>Landlord · Admin Access</strong> — you can edit readings and record payments. Tenants see a read-only view.</span>
+    </div>
+  ` : '';
+
   const body = `
     <div class="max-w-3xl mx-auto">
       <div class="mb-4">
         <button onclick="goBackFromTenantView()" class="btn btn-secondary btn-sm">${icons.left}Close</button>
       </div>
+      ${adminBanner}
       <div class="card mb-5 overflow-hidden">
         <div style="height:4px;background:${accent.color}"></div>
         <div class="p-5 sm:p-6">
@@ -5389,8 +5737,8 @@ function renderTenant(code) {
               <dd class="text-ink">${tenant.contactNumber ? h(tenant.contactNumber) : '<span class="text-ink-5">—</span>'}</dd>
             </div>
             <div class="flex sm:block items-baseline gap-3">
-              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5" style="min-width:120px;flex-shrink:0">Socials</dt>
-              <dd class="text-ink truncate">${tenant.social ? h(tenant.social) : '<span class="text-ink-5">—</span>'}</dd>
+              <dt class="text-ink-5 font-semibold uppercase tracking-wider text-xs sm:mb-0.5" style="min-width:120px;flex-shrink:0">Move-in</dt>
+              <dd class="text-ink">${tenant.moveInDate ? fmtDate(tenant.moveInDate) : '<span class="text-ink-5">—</span>'}</dd>
             </div>
           </dl>
         </div>
@@ -5552,13 +5900,27 @@ function saveLedgerRow(unitId, monthId) {
   const newW = parseFloat(panel.querySelector('[data-field="waterReading"]').value);
   const rate = parseFloat(panel.querySelector('[data-field="kwhRate"]').value);
   const vacant = panel.querySelector('[data-field="vacant"]').checked;
+  const applyAll = panel.querySelector('[data-field="kwhApplyAll"]')?.checked ?? true;
 
   let month = monthById(monthId);
   if (!month) {
     month = { id: monthId, kwhRate: null, actualElectricBill: null, dueDate: null, readings: {}, createdAt: new Date().toISOString() };
     state.months.push(month);
   }
-  if (!isNaN(rate)) month.kwhRate = rate;
+  // kWh rate handling:
+  //   applyAll=true (default) → save as month-level rate; clear any per-unit overrides
+  //   applyAll=false → save as a per-unit override; leave month.kwhRate alone
+  // Both branches gracefully no-op if the rate input is empty.
+  if (!isNaN(rate)) {
+    if (applyAll) {
+      month.kwhRate = rate;
+      // If switching back to all-units mode, drop any per-unit overrides
+      if (month.kwhRateByUnit) delete month.kwhRateByUnit;
+    } else {
+      if (!month.kwhRateByUnit) month.kwhRateByUnit = {};
+      month.kwhRateByUnit[unitId] = rate;
+    }
+  }
 
   const existing = month.readings[unitId] || {};
   if (vacant) {
@@ -5926,7 +6288,7 @@ function render() {
     case 'units':    renderUnits(); break;
     case 'unit':     renderUnitDetail(route.parts[1]); break;
     case 'tenants':  renderTenants(); break;
-    case 'reports':  renderReports(); break;
+    case 'expenses': renderExpenses(); break;
     case 'settings': renderSettings(); break;
     default:         renderMonth(currentMonthId());
   }
