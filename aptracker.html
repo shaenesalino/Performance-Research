@@ -938,21 +938,37 @@ function migrateState(old) {
     }
   });
 
-  // Reconcile advance: if a tenant carries advance > 0 but a payment with
-  // method 'Advance' already exists for their unit during the tenancy,
-  // they're a legacy record from when we auto-created that payment. Zero
-  // out the advance so it doesn't get applied twice by the new logic.
-  s.tenants.forEach(t => {
-    if (!(t.advance > 0) || !t.unitId) return;
-    const start = t.moveInDate || '1970-01-01';
-    const end = t.moveOutDate || '9999-12-31';
-    const hasAdvancePayment = (s.payments || []).some(p =>
-      p.unitId === t.unitId &&
-      p.method === 'Advance' &&
-      p.date >= start && p.date <= end
-    );
-    if (hasAdvancePayment) t.advance = 0;
-  });
+  // Reverse the previous auto-applied advance payments (the old behavior
+  // applied the advance to the move-in calendar month, which was incorrect —
+  // the advance covers the FINAL month of tenancy, not the first). Find any
+  // payment with method='Advance' and notes referencing "move-in", remove it,
+  // and restore the amount back onto the tenant's advance field.
+  if (Array.isArray(s.payments) && s.payments.length) {
+    const survivors = [];
+    s.payments.forEach(p => {
+      const isAutoMoveInAdvance =
+        p.method === 'Advance' &&
+        typeof p.notes === 'string' &&
+        /move-in/i.test(p.notes);
+      if (!isAutoMoveInAdvance) {
+        survivors.push(p);
+        return;
+      }
+      // Find the tenant this belongs to
+      const tenant = s.tenants.find(tt =>
+        tt.unitId === p.unitId &&
+        (tt.moveInDate || '1970-01-01') <= (p.date || '9999-12-31') &&
+        (tt.moveOutDate || '9999-12-31') >= (p.date || '0000-01-01')
+      );
+      if (tenant) {
+        tenant.advance = (Number(tenant.advance) || 0) + (Number(p.amount) || 0);
+      } else {
+        // No tenant matched — keep the payment to avoid losing data
+        survivors.push(p);
+      }
+    });
+    s.payments = survivors;
+  }
 
   s.meta.schemaVersion = SCHEMA_VERSION;
   return s;
@@ -2097,60 +2113,34 @@ function wireMonthFormReactivity(monthId) {
   recompute();
 }
 
-// After readings are saved for a month, scan for tenants whose advance
-// hasn't been applied yet and apply it to the move-in calendar month.
-// "First cycle" = the move-in month — the advance covers ~one month of rent
-// from the move-in date. Once applied, tenant.advance is zeroed so it's a
-// one-time thing.
-function applyPendingAdvances() {
-  let appliedCount = 0;
-  state.tenants.forEach(t => {
-    if (!(t.advance > 0)) return;
-    if (!t.unitId || !t.moveInDate) return;
-    const moveInMonth = t.moveInDate.slice(0, 7); // YYYY-MM
-    // Only apply once any month with readings exists for this unit at or
-    // after move-in (otherwise the bill hasn't been raised yet).
-    const hasBilledMonth = state.months.some(m => {
-      if (m.id < moveInMonth) return false;
-      if (!m.readings || !m.readings[t.unitId]) return false;
-      return Object.keys(m.readings[t.unitId]).length > 0;
+// Applies a tenant's advance payment to a specific month's rent. Called from
+// the Move Out modal — when a tenant is moving out, their pre-paid advance
+// covers their final month's rent. The deposit stays separate for damages.
+//
+// Side effects: creates a payment record (method='Advance') and zeros out
+// tenant.advance. Returns true on success, false if there's nothing to apply.
+function applyAdvanceForFinalMonth(tenantId, monthId) {
+  const t = tenantById(tenantId);
+  if (!t || !(t.advance > 0) || !t.unitId) return false;
+  // Make sure the target month exists so the payment has somewhere to land
+  if (!monthById(monthId)) {
+    state.months.push({
+      id: monthId, kwhRate: null, actualElectricBill: null,
+      dueDate: null, readings: {}, createdAt: new Date().toISOString()
     });
-    if (!hasBilledMonth) return;
-    // Belt-and-suspenders guard: if an Advance payment somehow exists in the
-    // tenancy window already, just zero out the advance and move on.
-    const start = t.moveInDate || '1970-01-01';
-    const end = t.moveOutDate || '9999-12-31';
-    const existsAdvance = state.payments.some(p =>
-      p.unitId === t.unitId &&
-      p.method === 'Advance' &&
-      p.date >= start && p.date <= end
-    );
-    if (existsAdvance) {
-      t.advance = 0;
-      return;
-    }
-    // Make sure the move-in month exists as a state.months entry so the
-    // payment has somewhere to land.
-    if (!monthById(moveInMonth)) {
-      state.months.push({
-        id: moveInMonth, kwhRate: null, actualElectricBill: null,
-        dueDate: null, readings: {}, createdAt: new Date().toISOString()
-      });
-    }
-    state.payments.push({
-      id: uid('pay'),
-      unitId: t.unitId,
-      monthId: moveInMonth,
-      amount: t.advance,
-      date: t.moveInDate,
-      method: 'Advance',
-      notes: 'Advance payment (move-in)',
-      createdAt: new Date().toISOString()
-    });
-    t.advance = 0;
-    appliedCount++;
+  }
+  state.payments.push({
+    id: uid('pay'),
+    unitId: t.unitId,
+    monthId: monthId,
+    amount: t.advance,
+    date: t.moveOutDate || new Date().toISOString().slice(0,10),
+    method: 'Advance',
+    notes: `Advance payment applied to final month (${monthLabel(monthId)})`,
+    createdAt: new Date().toISOString()
   });
-  return appliedCount;
+  t.advance = 0;
+  return true;
 }
 
 function saveMonthForm(monthId) {
@@ -2186,11 +2176,8 @@ function saveMonthForm(monthId) {
     }
   });
 
-  // Auto-apply any pending advance payments now that readings have been entered
-  const advancesApplied = applyPendingAdvances();
-
   saveState();
-  toast(advancesApplied > 0 ? `Month saved · ${advancesApplied} advance payment${advancesApplied===1?'':'s'} applied` : 'Month saved', 'success');
+  toast('Month saved', 'success');
   render();
 }
 window.saveMonthForm = saveMonthForm;
@@ -2417,6 +2404,8 @@ function openMoveOutModal(tenantId) {
   if (!t) return;
   const dep = depositBalance(tenantId);
   const outstanding = tenantOutstanding(tenantId);
+  const advance = Number(t.advance) || 0;
+  const todayMonth = currentMonthId();
   showModal(`
     <div class="p-6">
       <h3 class="text-lg font-bold text-ink mb-1">Mark tenant as moved out</h3>
@@ -2426,13 +2415,43 @@ function openMoveOutModal(tenantId) {
           <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Move-out date</label>
           <input type="date" id="moveOutDate" class="input-base" value="${new Date().toISOString().slice(0,10)}" required />
         </div>
+
+        ${advance > 0 && t.unitId ? `
+          <div class="rounded-md p-3" style="background:#F0FDF4;border:1px solid #BBF7D0">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="applyAdvance" checked class="mt-0.5" />
+              <div class="flex-1 text-sm">
+                <div class="font-semibold" style="color:#166534">Apply advance payment to final month's rent</div>
+                <div class="text-xs mt-1" style="color:#166534">
+                  ${fmtMoney(advance)} will be recorded as a payment toward
+                  <select id="finalMonthId" class="input-base text-xs inline-block py-0.5 px-1.5 ml-1" style="width:auto;min-width:140px;display:inline-block" onclick="event.stopPropagation()">
+                    ${(() => {
+                      // Build options: tenancy window months that exist or current/this month
+                      const start = (t.moveInDate || '').slice(0,7) || '0000-00';
+                      const candidates = new Set();
+                      // Add all months in state that fall in tenancy
+                      state.months.forEach(m => { if (m.id >= start) candidates.add(m.id); });
+                      // Add current month if not present
+                      candidates.add(todayMonth);
+                      // Sort descending
+                      const sorted = Array.from(candidates).sort().reverse();
+                      return sorted.map(id => `<option value="${id}"${id===todayMonth?' selected':''}>${monthLabel(id)}</option>`).join('');
+                    })()}
+                  </select>'s rent (utilities still owed separately).
+                </div>
+              </div>
+            </label>
+          </div>
+        ` : ''}
+
         ${(outstanding > 0.01 || dep > 0) ? `
           <div class="bg-surface-2 border border-line rounded-md p-3 text-xs space-y-1.5">
             ${outstanding > 0.01 ? `<div class="flex justify-between"><span class="text-ink-5">Outstanding balance</span><strong class="num" style="color:#DC2626">${fmtMoney(outstanding)}</strong></div>` : ''}
             ${dep > 0 ? `<div class="flex justify-between"><span class="text-ink-5">Security deposit on hand</span><strong class="num" style="color:#C9920C">${fmtMoney(dep)}</strong></div>` : ''}
-            <div class="text-ink-5 pt-1.5 border-t border-line"><strong class="text-ink">Tip:</strong> ${dep > 0 ? 'Use <strong>Deposit entry</strong> after this to record the deposit refund.' : ''}${outstanding > 0.01 ? ' Outstanding balance still applies — record any final payments separately.' : ''}</div>
+            <div class="text-ink-5 pt-1.5 border-t border-line"><strong class="text-ink">Tip:</strong> ${dep > 0 ? 'The deposit is for damages — use <strong>Deposit entry → Out (refund)</strong> after this to record any refund.' : ''}${outstanding > 0.01 ? ' Outstanding utility/rent charges still apply — record any final payments separately.' : ''}</div>
           </div>
         ` : ''}
+
         <div class="flex gap-2 justify-end pt-2">
           <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
           <button type="submit" class="btn btn-primary" style="background:#DC2626;border-color:#DC2626">${icons.check}Confirm move-out</button>
@@ -2445,9 +2464,14 @@ function openMoveOutModal(tenantId) {
     const date = $('#moveOutDate').value;
     if (!date) { toast('Pick a move-out date', 'warn'); return; }
     t.moveOutDate = date;
+    let appliedAdvance = false;
+    if (advance > 0 && t.unitId && $('#applyAdvance')?.checked) {
+      const finalMonthId = $('#finalMonthId')?.value || date.slice(0,7);
+      appliedAdvance = applyAdvanceForFinalMonth(t.id, finalMonthId);
+    }
     saveState();
     closeModal();
-    toast('Tenant marked as moved out', 'success');
+    toast(appliedAdvance ? 'Tenant moved out · advance applied to final month' : 'Tenant marked as moved out', 'success');
     render();
   });
 }
@@ -3224,19 +3248,19 @@ function openTenantModal(tenantId) {
             <div class="flex items-start gap-2 mb-3" style="color:#1E40AF">
               <span>${icons.info}</span>
               <div class="text-xs flex-1">
-                <strong>Move-in payment</strong> = security deposit + advance payment. The deposit is held as security; the advance payment auto-applies to the first month's rent once readings are entered.
+                <strong>Move-in payment</strong> = security deposit + advance payment. Both are held by the landlord. The advance is applied to the tenant's <strong>final month's rent</strong> at move-out; the deposit is held for damages.
               </div>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Security deposit</label>
                 <input type="number" step="0.01" id="deposit" class="input-base" value="0" />
-                <p class="text-[11px] text-ink-5 mt-1">Held as security</p>
+                <p class="text-[11px] text-ink-5 mt-1">Held for damages / refundable</p>
               </div>
               <div>
                 <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Advance payment</label>
                 <input type="number" step="0.01" id="advance" class="input-base" value="0" />
-                <p class="text-[11px] text-ink-5 mt-1">Upfront payment that covers the first month of rent</p>
+                <p class="text-[11px] text-ink-5 mt-1">Used to cover the final month's rent at move-out</p>
               </div>
             </div>
             <div class="mt-3 pt-3 border-t" style="border-color:#BFDBFE">
@@ -3256,7 +3280,7 @@ function openTenantModal(tenantId) {
             <div>
               <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Advance payment</label>
               <input type="number" step="0.01" id="advance" class="input-base" value="${t.advance || 0}" />
-              <p class="text-[11px] text-ink-5 mt-1">${(t.advance > 0) ? 'Upfront — auto-applies to first billed month.' : 'Already applied (or none recorded).'}</p>
+              <p class="text-[11px] text-ink-5 mt-1">${(t.advance > 0) ? 'Held until move-out — applied to final month rent.' : 'Already applied (or none recorded).'}</p>
             </div>
           </div>
         `}
