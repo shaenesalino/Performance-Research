@@ -4559,6 +4559,16 @@ function openDepositModal(tenantId) {
         toast(`This tenant moved out ${monthLabel(tenancyEnd)} — pick that month or earlier`, 'warn');
         return;
       }
+      // Refuse if a deposit-method payment already exists for this unit/month —
+      // prevents accidental duplicate clicks from draining the deposit and
+      // applying the same amount multiple times.
+      const existingDep = state.payments.find(p =>
+        p.unitId === u.id && p.monthId === monthId && p.method === 'Deposit'
+      );
+      if (existingDep) {
+        toast(`${monthLabel(monthId)} rent was already covered by deposit (${fmtMoney(existingDep.amount)} on ${fmtDate(existingDep.date)})`, 'warn');
+        return;
+      }
       const rent = rentForUnit(u.id, monthId);
       if (!(rent > 0)) { toast('No rent set for this month', 'warn'); return; }
       if (rent > heldBalance + 0.01) {
@@ -6083,6 +6093,65 @@ function renderTenant(code) {
           </div>
         `;
       })()}
+
+      ${isAdminView ? (() => {
+        // Admin-only payment history. Lists every payment recorded for this
+        // tenant (within their tenancy window) with a delete button per row.
+        // Useful for cleaning up duplicates or accidental entries. Hidden in
+        // the printable Statement of Account and the read-only tenant view.
+        const tenantPayments = state.payments.filter(p => {
+          if (p.unitId !== u.id) return false;
+          if (tenant.moveInDate && p.date < tenant.moveInDate) return false;
+          if (tenant.moveOutDate && p.date > tenant.moveOutDate) return false;
+          return true;
+        }).sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+
+        if (!tenantPayments.length) return `
+          <div class="card mb-6 p-4">
+            <div class="flex items-center gap-2 mb-1">
+              <div class="text-[11px] font-semibold uppercase tracking-wider" style="color:#92400E">Admin · Payment history</div>
+            </div>
+            <div class="text-sm text-ink-5 italic">No payments recorded for this tenant yet.</div>
+          </div>
+        `;
+
+        return `
+          <div class="card mb-6 overflow-hidden">
+            <div class="p-4 pb-2 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider" style="color:#92400E">Admin · Payment history</div>
+                <p class="text-xs text-ink-5 mt-0.5">${tenantPayments.length} payment${tenantPayments.length===1?'':'s'} · click × to remove a record</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Month</th>
+                    <th>Method</th>
+                    <th class="num-cell">Amount</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tenantPayments.map(p => `
+                    <tr>
+                      <td>${fmtDate(p.date)}</td>
+                      <td>${monthLabel(p.monthId)}</td>
+                      <td>${p.method ? h(p.method) : '<span class="text-ink-5">—</span>'}${p.notes ? `<div class="text-[11px] text-ink-5 mt-0.5">${h(p.notes)}</div>` : ''}</td>
+                      <td class="num-cell font-semibold">${fmtMoney(p.amount)}</td>
+                      <td style="text-align:right">
+                        <button onclick="deletePayment('${p.id}')" class="btn btn-icon btn-sm" title="Delete this payment" style="background:#FEF2F2;border-color:#FECACA;color:#991B1B">${icons.trash}</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      })() : ''}
 
       <div class="text-center text-sm text-ink-5 mb-4">
         Questions about your bill? Please contact your landlord.
