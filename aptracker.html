@@ -699,12 +699,12 @@ function rentForUnit(unitId, monthId) {
   return Number(u.rent) || 0;
 }
 
-// Effective other-charges for a unit in a given month. Honors snapshots inside
-// unit.rentHistory entries; falls back to unit.otherCharges (the current value)
-// if a history entry exists but has no otherCharges snapshot — this prevents
-// silently dropping Other charges for older rate-history entries created
-// before the per-entry otherCharges feature, or entries saved with an empty
-// snapshot.
+// Effective other-charges for a unit in a given month.
+// Snapshot semantics inside rentHistory entries:
+//   - undefined / null → "no snapshot stored" → fall back to unit.otherCharges
+//   - any array (including []) → "use this snapshot, even if empty"
+// This lets users explicitly remove charges going forward by saving a
+// rate-change with an empty Other Charges list.
 function otherChargesForUnit(unitId, monthId) {
   const u = unitById(unitId);
   if (!u) return [];
@@ -712,9 +712,9 @@ function otherChargesForUnit(unitId, monthId) {
   if (history.length) {
     history.sort((a,b) => b.from.localeCompare(a.from));
     const snapshot = history[0].otherCharges;
-    // Only use the historical snapshot if it actually has entries.
-    // An empty array or missing field means "no per-entry override" → use current.
-    if (Array.isArray(snapshot) && snapshot.length > 0) return snapshot;
+    // Array (including empty) is treated as authoritative.
+    if (Array.isArray(snapshot)) return snapshot;
+    // null/undefined → no snapshot, fall back below
   }
   return Array.isArray(u.otherCharges) ? u.otherCharges : [];
 }
