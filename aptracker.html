@@ -4286,7 +4286,11 @@ function openTenantModal(tenantId) {
           </div>
           <div>
             <label class="text-xs font-semibold uppercase tracking-wide text-ink-5 block mb-1.5">Move-out date (optional)</label>
-            <input type="date" id="moveOutDate" class="input-base" value="${t.moveOutDate || ''}" />
+            <div class="flex gap-2">
+              <input type="date" id="moveOutDate" class="input-base flex-1" value="${t.moveOutDate || ''}" />
+              <button type="button" onclick="document.getElementById('moveOutDate').value=''" class="btn btn-secondary btn-sm flex-shrink-0" title="Clear move-out date (undo move-out)">${icons.x}Clear</button>
+            </div>
+            <p class="text-[11px] text-ink-5 mt-1">Leave empty if tenant is still active. Clearing this restores them to active status.</p>
           </div>
         </div>
         <div>
