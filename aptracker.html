@@ -6319,16 +6319,48 @@ window.saveLedgerRow = saveLedgerRow;
 // ============================================================================
 function openStatement(unitId, monthId) {
   const u = unitById(unitId);
-  const ledger = computeLedger(unitId);
-  if (!ledger.length) { toast('No activity to print', 'warn'); return; }
+  const fullLedger = computeLedger(unitId);
+  if (!fullLedger.length) { toast('No activity to print', 'warn'); return; }
   let row;
   if (monthId) {
-    row = ledger.find(r => r.monthId === monthId);
+    row = fullLedger.find(r => r.monthId === monthId);
   } else {
-    row = ledger[ledger.length - 1];
+    row = fullLedger[fullLedger.length - 1];
     monthId = row.monthId;
   }
   if (!row) { toast('Statement not found', 'warn'); return; }
+
+  // Scope the running balance to the tenant occupying the unit for this
+  // month. Without this, prevBal carries over from PREVIOUS tenants of the
+  // same unit (or from gaps in the unit's history) and the statement shows
+  // a phantom "unpaid from before" amount that the current tenant never
+  // owed. The tenant ledger view already does this; the statement was the
+  // outlier producing inconsistent numbers.
+  const occupant = state.tenants.find(t =>
+    t.unitId === unitId &&
+    (!t.moveInDate || t.moveInDate.slice(0,7) <= monthId) &&
+    (!t.moveOutDate || t.moveOutDate.slice(0,7) >= monthId)
+  );
+  if (occupant) {
+    const tStart = occupant.moveInDate ? occupant.moveInDate.slice(0,7) : null;
+    const tEnd = occupant.moveOutDate ? occupant.moveOutDate.slice(0,7) : null;
+    const tenancyLedger = fullLedger.filter(r => {
+      if (tStart && r.monthId < tStart) return false;
+      if (tEnd && r.monthId > tEnd) return false;
+      return true;
+    });
+    let runBal = 0;
+    for (const r of tenancyLedger) {
+      const newPrevBal = runBal;
+      const newEndBal = runBal + r.charges - r.payments;
+      runBal = newEndBal;
+      if (r.monthId === monthId) {
+        row = { ...r, prevBal: newPrevBal, endBal: newEndBal };
+        break;
+      }
+    }
+  }
+
   const month = monthById(monthId);
   const cm = row.cm;
   const pays = paymentsForUnitMonth(unitId, monthId);
