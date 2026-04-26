@@ -4124,7 +4124,7 @@ function renderTenants() {
         const unit = t.unitId ? unitById(t.unitId) : null;
         const accent = unit ? unitAccent(unit.id) : { color: '#94A3B8' };
         const dep = depositBalance(t.id);
-        const tenantUrl = `${location.origin}${location.pathname}#/tenant?code=${t.tenantCode}`;
+        const tenantUrl = buildTenantUrl(t.tenantCode);
         const movedOut = !!t.moveOutDate;
         const outstanding = tenantOutstanding(t.id);
         const lastPaid = tenantLastPaidDate(t.id);
@@ -4203,8 +4203,26 @@ function renderTenants() {
   $('#app').innerHTML = layoutShell(body);
 }
 
+// Builds the shareable tenant URL. If cloud sync is connected on this
+// device, embeds the Supabase URL + anon key so the tenant's device can
+// auto-connect to the cloud and pull state without manual setup.
+//
+// Same security trade-off the app already accepted: the anon key is
+// public-by-design (RLS off; the password gates the app). Adding it to
+// each tenant link doesn't change the threat model — anyone with the link
+// could already extract it from the HTML source if you've connected sync.
+function buildTenantUrl(code) {
+  const base = `${location.origin}${location.pathname}#/tenant?code=${encodeURIComponent(code)}`;
+  const sb = (state.settings.supabaseUrl || '').trim();
+  const key = (state.settings.supabaseKey || '').trim();
+  if (sb && key) {
+    return `${base}&sb=${encodeURIComponent(sb)}&k=${encodeURIComponent(key)}`;
+  }
+  return base;
+}
+
 function copyTenantUrl(code) {
-  const url = `${location.origin}${location.pathname}#/tenant?code=${code}`;
+  const url = buildTenantUrl(code);
   navigator.clipboard.writeText(url).then(() => toast('Tenant link copied', 'success'));
 }
 window.copyTenantUrl = copyTenantUrl;
@@ -6648,6 +6666,17 @@ function render() {
 async function init() {
   session = loadSession();
 
+  // Detect tenant URL with embedded Supabase credentials so a fresh device
+  // (a tenant clicking a shared link) can auto-connect to cloud and pull
+  // state without any local setup. Also handles the case where the tenant
+  // URL carries different keys than locally stored ones (we trust the URL
+  // for tenant-mode navigation since it implies a fresh-share scenario).
+  const initialRoute = parseRoute();
+  const isTenantRoute = initialRoute.name === 'tenant';
+  const urlSb = initialRoute.query?.sb;
+  const urlKey = initialRoute.query?.k;
+  const tenantCodeFromUrl = initialRoute.query?.code;
+
   const local = loadState();
   if (local) {
     state = migrateState(local);
@@ -6670,12 +6699,49 @@ async function init() {
     if (!t.tenantCode) t.tenantCode = slugify(t.name) + '-' + Math.random().toString(36).slice(2,6);
   });
 
+  // Tenant-link bootstrapping path: if the URL has cloud creds AND the
+  // tenant code isn't found locally (or local state is fresh), use the URL
+  // creds to pull cloud data BEFORE first render. Otherwise tenant just
+  // sees "Tenant not found".
+  if (isTenantRoute && urlSb && urlKey) {
+    const tenantExistsLocally = tenantCodeFromUrl && state.tenants.some(t => t.tenantCode === tenantCodeFromUrl);
+    if (!tenantExistsLocally) {
+      // Adopt the URL credentials (overwrites any existing local sync config —
+      // acceptable because if you're opening a tenant link, you want the
+      // landlord's data, not whatever stale data this device had).
+      state.settings.supabaseUrl = urlSb;
+      state.settings.supabaseKey = urlKey;
+      saveStateLocal();
+      // Show a brief loading state so a slow network doesn't look broken
+      const appEl = document.getElementById('app');
+      if (appEl) {
+        appEl.innerHTML = `
+          <div style="min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:32px">
+            <div style="width:32px;height:32px;border:3px solid #E5E7EB;border-top-color:#3B82F6;border-radius:50%;animation:pulse 1s infinite"></div>
+            <div style="font-size:14px;color:#6B7280">Loading your bill…</div>
+          </div>
+        `;
+      }
+      try {
+        const ok = await initCloudSync();
+        if (ok) {
+          const cloudRow = await cloudPull();
+          if (cloudRow && cloudRow.state) {
+            applyCloudData(cloudRow);
+          }
+        }
+      } catch (err) {
+        console.error('Tenant cloud bootstrap failed:', err);
+      }
+    }
+  }
+
   saveStateLocal();
   render();
 
-  // Cloud sync: if configured, fetch the cloud row in the background.
-  // initialCloudSync() will reconcile and re-render if cloud is newer.
-  if (state.settings.supabaseUrl && state.settings.supabaseKey) {
+  // For admin sessions that already had cloud configured (or just got it
+  // from a tenant URL), kick off the initial reconciliation in background.
+  if (!isTenantRoute && state.settings.supabaseUrl && state.settings.supabaseKey) {
     initialCloudSync().catch(err => console.error('Cloud sync init failed:', err));
   }
 }
