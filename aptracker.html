@@ -600,6 +600,18 @@ function computeCharges(unitId, monthId) {
     return true;
   });
 
+  // Edge case: tenant moved out partway through the month and no readings
+  // were entered (typical when they leave on day N and you don't bill them
+  // for utilities). Treat as vacant rather than charging full rent for a
+  // partial month — otherwise the running balance gets a phantom rent
+  // charge with no offsetting payment.
+  if (tenantInMonth && tenantInMonth.moveOutDate && !cm.hasReadings) {
+    const moveOutDate = new Date(tenantInMonth.moveOutDate);
+    if (moveOutDate < monthEnd) {
+      return { vacant: true, rent: 0, otherCharge: 0, otherCharges: [], electricBill: 0, waterBill: 0, total: 0, hasReadings: false, cm };
+    }
+  }
+
   // If no tenant occupying, and no readings, we treat it as unoccupied.
   const occupied = !!tenantInMonth;
   const rent = occupied ? rentForUnit(unitId, monthId) : 0;
@@ -2831,6 +2843,29 @@ function wireMonthFormReactivity(monthId) {
 function applyAdvanceForFinalMonth(tenantId, monthId) {
   const t = tenantById(tenantId);
   if (!t || !(t.advance > 0) || !t.unitId) return false;
+  // Validate the chosen month is within the tenancy window. Without this,
+  // an out-of-range monthId silently creates a payment that floats outside
+  // the tenant's window and contaminates future tenants of the same unit
+  // (this was the cause of the Jumbo & Princess → Mac & Family orphan bug).
+  const tenancyStart = t.moveInDate ? t.moveInDate.slice(0,7) : null;
+  const tenancyEnd = t.moveOutDate ? t.moveOutDate.slice(0,7) : null;
+  if (tenancyStart && monthId < tenancyStart) {
+    toast(`Final month ${monthLabel(monthId)} is before tenant's move-in. Advance not applied.`, 'warn');
+    return false;
+  }
+  if (tenancyEnd && monthId > tenancyEnd) {
+    toast(`Final month ${monthLabel(monthId)} is after tenant's move-out. Advance not applied.`, 'warn');
+    return false;
+  }
+  // Refuse if an Advance payment already exists for this unit/month —
+  // prevents duplicate applications if the move-out flow is re-run.
+  const existing = state.payments.find(p =>
+    p.unitId === t.unitId && p.monthId === monthId && p.method === 'Advance'
+  );
+  if (existing) {
+    toast(`Advance already applied to ${monthLabel(monthId)} (${fmtMoney(existing.amount)})`, 'warn');
+    return false;
+  }
   // Make sure the target month exists so the payment has somewhere to land
   if (!monthById(monthId)) {
     state.months.push({
