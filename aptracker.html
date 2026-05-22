@@ -6156,10 +6156,18 @@ function renderTenant(code) {
         // tenant (within their tenancy window) with a delete button per row.
         // Useful for cleaning up duplicates or accidental entries. Hidden in
         // the printable Statement of Account and the read-only tenant view.
+        // Filter by the payment's monthId being within the tenant's tenancy
+        // window — NOT by payment date. This makes orphan/misattributed
+        // payments visible so they can be cleaned up (e.g., a previous
+        // tenant's advance that was incorrectly attached to a future month
+        // that now falls in a new tenant's window).
+        const tStart = tenant.moveInDate ? tenant.moveInDate.slice(0,7) : null;
+        const tEnd = tenant.moveOutDate ? tenant.moveOutDate.slice(0,7) : null;
         const tenantPayments = state.payments.filter(p => {
           if (p.unitId !== u.id) return false;
-          if (tenant.moveInDate && p.date < tenant.moveInDate) return false;
-          if (tenant.moveOutDate && p.date > tenant.moveOutDate) return false;
+          const mid = p.monthId || '';
+          if (tStart && mid < tStart) return false;
+          if (tEnd && mid > tEnd) return false;
           return true;
         }).sort((a,b) => (b.date || '').localeCompare(a.date || ''));
 
