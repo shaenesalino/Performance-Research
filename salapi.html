@@ -4163,6 +4163,16 @@
   const SUPABASE_URL      = 'https://tdzbuxgqmduastaxggac.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_YsdD0xesIl5AN9yAvJnE9w_B4i-tooz';
 
+  // -------------------------------------------------------------------------
+  // DEV AUTO-LOGIN — set to false before showing this to anyone else.
+  // Auto-signs in with these hardcoded creds on load. Creates the account
+  // on first run if it doesn't exist yet (requires email confirmation OFF
+  // in the Supabase dashboard).
+  // -------------------------------------------------------------------------
+  const DEV_AUTO_LOGIN = true;
+  const DEV_EMAIL      = 'shaene@silaksalapi.app';
+  const DEV_PASSWORD   = 'silaksalapi';
+
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
   // Guard against forgotten config — obvious message rather than silent failure
@@ -9086,9 +9096,35 @@
 
       if (data.session) {
         routeToNextStep(data.session.user);
-      } else {
-        goto('welcome');
+        return;
       }
+
+      // DEV auto-login — try to sign in with hardcoded creds; if account doesn't
+      // exist yet, create it on the fly. Runs only when no session is active.
+      if (DEV_AUTO_LOGIN) {
+        console.log('[Silak] DEV_AUTO_LOGIN: attempting sign-in for', DEV_EMAIL);
+        let attempt = await auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
+        if (attempt.error) {
+          console.log('[Silak] DEV sign-in failed:', attempt.error.message, '— trying signUp');
+          const signup = await auth.signUp({ email: DEV_EMAIL, password: DEV_PASSWORD });
+          if (signup.error) {
+            console.error('[Silak] DEV signUp failed:', signup.error.message);
+            toast(`Dev auto-login failed: ${signup.error.message}`, 'error');
+            goto('welcome');
+            return;
+          }
+          // Signup succeeded and returned a session — we're in
+          toast('Dev auto-login ✦', 'success');
+          routeToNextStep(signup.data.user);
+          return;
+        }
+        // Sign-in succeeded
+        toast('Dev auto-login ✦', 'success');
+        routeToNextStep(attempt.data.user);
+        return;
+      }
+
+      goto('welcome');
     } catch (err) {
       console.error('[Silak] Init failed:', err);
       goto('welcome');
