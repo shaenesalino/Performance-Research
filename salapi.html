@@ -3272,6 +3272,10 @@
     </div>
 
     <div class="welcome-cta">
+      <!-- Dev-only shortcut. Hidden at runtime when DEV_AUTO_LOGIN is false. -->
+      <button class="btn btn-primary" id="devQuickLoginBtn" type="button" style="display:none; background: var(--teal);">
+        ✦ Quick log in (dev)
+      </button>
       <button class="btn btn-primary" data-goto="register">Get started</button>
       <button class="btn btn-outline" data-goto="login">I already have an account</button>
     </div>
@@ -4173,6 +4177,14 @@
   const DEV_EMAIL      = 'shaene@silaksalapi.app';
   const DEV_PASSWORD   = 'silaksalapi';
 
+  // -------------------------------------------------------------------------
+  // DEV OFFLINE MODE — when true, Supabase is bypassed entirely. All data
+  // lives in localStorage on this device. Use this for fast iteration without
+  // any network dependency. Flip to false to switch back to real Supabase.
+  // -------------------------------------------------------------------------
+  const DEV_OFFLINE_MODE = true;
+  const DEV_LOCAL_KEY    = 'silak-salapi-local-user';
+
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
   // Guard against forgotten config — obvious message rather than silent failure
@@ -4227,9 +4239,34 @@
     };
   }
 
-  // Public API — mirrors @supabase/supabase-js so the rest of the app didn't need to change
+  // ==== Offline mode helpers (localStorage only, no network) ====
+  function loadLocalUser() {
+    try { return JSON.parse(localStorage.getItem(DEV_LOCAL_KEY) || 'null'); }
+    catch { return null; }
+  }
+  function saveLocalUser(u) {
+    localStorage.setItem(DEV_LOCAL_KEY, JSON.stringify(u));
+  }
+  function newLocalUser() {
+    return {
+      id: 'local_shaene',
+      email: DEV_EMAIL,
+      provider: 'offline',
+      created_at: new Date().toISOString(),
+      name: null,           // triggers setup flow on first launch
+      // incomes/expenses/goals/wallets/transactions stay undefined until user sets them
+    };
+  }
+
+  // Public API — mirrors @supabase/supabase-js so the rest of the app didn't need to change.
+  // When DEV_OFFLINE_MODE is on, every method resolves against localStorage instead of Supabase.
   const auth = {
     async signUp({ email, password }) {
+      if (DEV_OFFLINE_MODE) {
+        let u = loadLocalUser();
+        if (!u) { u = newLocalUser(); u.email = email; saveLocalUser(u); }
+        return { data: { user: u, session: { user: u, access_token: 'offline' } }, error: null };
+      }
       if (!sb) return { data: null, error: { message: 'Supabase is not configured.' } };
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) return { data: null, error };
@@ -4245,6 +4282,11 @@
     },
 
     async signInWithPassword({ email, password }) {
+      if (DEV_OFFLINE_MODE) {
+        let u = loadLocalUser();
+        if (!u) { u = newLocalUser(); u.email = email; saveLocalUser(u); }
+        return { data: { user: u, session: { user: u, access_token: 'offline' } }, error: null };
+      }
       if (!sb) return { data: null, error: { message: 'Supabase is not configured.' } };
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) return { data: null, error };
@@ -4256,6 +4298,7 @@
     },
 
     async signInWithOAuth({ provider }) {
+      if (DEV_OFFLINE_MODE) return { data: null, error: { message: 'OAuth is disabled in offline mode.' } };
       if (!sb) return { data: null, error: { message: 'Supabase is not configured.' } };
       // Triggers a redirect. After the provider redirects back, Supabase's onAuthStateChange picks it up.
       const { data, error } = await sb.auth.signInWithOAuth({
@@ -4266,27 +4309,34 @@
     },
 
     async signOut() {
+      if (DEV_OFFLINE_MODE) {
+        localStorage.removeItem(DEV_LOCAL_KEY);
+        return { error: null };
+      }
       if (!sb) return { error: { message: 'Supabase is not configured.' } };
       const { error } = await sb.auth.signOut();
       return { error };
     },
 
-    // Send a password-reset email. Supabase will send a link that, when tapped,
-    // brings the user back here in a PASSWORD_RECOVERY session.
     async resetPasswordForEmail(email) {
+      if (DEV_OFFLINE_MODE) return { data: null, error: { message: 'Password reset is disabled in offline mode.' } };
       if (!sb) return { data: null, error: { message: 'Supabase is not configured.' } };
-      // Strip any hash/query from the current URL so Supabase appends its own recovery params cleanly
       const redirectTo = window.location.href.split('#')[0].split('?')[0];
       return await sb.auth.resetPasswordForEmail(email, { redirectTo });
     },
 
-    // Called after the user is in a PASSWORD_RECOVERY session to actually change the password
     async updatePassword(newPassword) {
+      if (DEV_OFFLINE_MODE) return { data: null, error: { message: 'Password change is disabled in offline mode.' } };
       if (!sb) return { data: null, error: { message: 'Supabase is not configured.' } };
       return await sb.auth.updateUser({ password: newPassword });
     },
 
     async getSession() {
+      if (DEV_OFFLINE_MODE) {
+        const u = loadLocalUser();
+        if (!u) return { data: { session: null }, error: null };
+        return { data: { session: { user: u, access_token: 'offline' } }, error: null };
+      }
       if (!sb) return { data: { session: null }, error: null };
       const { data, error } = await sb.auth.getSession();
       if (error || !data.session) return { data: { session: null }, error: error || null };
@@ -4296,12 +4346,17 @@
     },
 
     async updateUser({ data: updates }) {
+      if (DEV_OFFLINE_MODE) {
+        const u = loadLocalUser() || newLocalUser();
+        Object.assign(u, updates);
+        saveLocalUser(u);
+        return { data: { user: u }, error: null };
+      }
       if (!sb) return { data: null, error: { message: 'Supabase is not configured.' } };
       const { data: sess } = await sb.auth.getSession();
       if (!sess.session) return { data: null, error: { message: 'Not signed in.' } };
       const authUser = sess.session.user;
 
-      // Fetch current, merge in new fields, upsert
       const current = await loadUserData(authUser);
       const next = { ...current, ...updates };
 
@@ -4312,7 +4367,6 @@
         return { data: null, error: { message: 'Could not save your changes. Please try again.' } };
       }
 
-      // Also mirror `name` into Supabase user_metadata so it shows up in the auth admin panel
       if (updates.name != null) {
         await sb.auth.updateUser({ data: { name: updates.name } });
       }
@@ -9061,69 +9115,64 @@
   // =========================================================================
   (async function init() {
     try {
-      if (!sb) {
-        toast('Supabase is not configured — set SUPABASE_URL and SUPABASE_ANON_KEY in the script.', 'error');
-        console.error('[Silak] Cannot boot without Supabase config.');
-        goto('welcome');
-        return;
-      }
-
-      // When Supabase's auth state changes (login, logout, OAuth callback), route the UI accordingly.
-      // This catches the redirect-back from Google/Apple OAuth automatically.
-      sb.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          // User clicked the "reset password" link from their email
-          goto('reset');
+      // Offline mode: skip Supabase health checks and onAuthStateChange
+      if (!DEV_OFFLINE_MODE) {
+        if (!sb) {
+          toast('Supabase is not configured — set SUPABASE_URL and SUPABASE_ANON_KEY in the script.', 'error');
+          console.error('[Silak] Cannot boot without Supabase config.');
+          goto('welcome');
           return;
         }
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-          if (!session) return;
-          const appData = await loadUserData(session.user);
-          const merged = mergeUser(session.user, appData);
-          const active = document.querySelector('.screen.active');
-          // If we're currently on welcome/login/register, jump into the app.
-          // If we're already inside the app, don't yank the user around.
-          if (!active || ['screen-welcome','screen-login','screen-register','screen-forgot'].includes(active.id)) {
-            routeToNextStep(merged);
+
+        sb.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'PASSWORD_RECOVERY') { goto('reset'); return; }
+          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+            if (!session) return;
+            const appData = await loadUserData(session.user);
+            const merged = mergeUser(session.user, appData);
+            const active = document.querySelector('.screen.active');
+            if (!active || ['screen-welcome','screen-login','screen-register','screen-forgot'].includes(active.id)) {
+              routeToNextStep(merged);
+            }
+          } else if (event === 'SIGNED_OUT') {
+            goto('welcome');
           }
-        } else if (event === 'SIGNED_OUT') {
-          goto('welcome');
-        }
-      });
+        });
+      } else {
+        console.log('[Silak] DEV_OFFLINE_MODE is ON — Supabase is bypassed, all data lives in localStorage.');
+      }
+
+      // Pre-fill the login and register forms with the dev credentials so that
+      // even after signing out, you're one tap away from either flow.
+      if (DEV_AUTO_LOGIN || DEV_OFFLINE_MODE) {
+        const preFillIfEmpty = (id, val) => {
+          const el = document.getElementById(id);
+          if (el && !el.value) el.value = val;
+        };
+        preFillIfEmpty('log-email',    DEV_EMAIL);
+        preFillIfEmpty('log-password', DEV_PASSWORD);
+        preFillIfEmpty('reg-email',    DEV_EMAIL);
+        preFillIfEmpty('reg-password', DEV_PASSWORD);
+        const devBtn = document.getElementById('devQuickLoginBtn');
+        if (devBtn) devBtn.style.display = '';
+      }
 
       const { data } = await auth.getSession();
-      console.log(`[Silak] Init: session ${data.session ? 'active' : 'none'}`);
+      console.log(`[Silak] Init: session ${data.session ? 'active' : 'none'}${DEV_OFFLINE_MODE ? ' (offline)' : ''}`);
+
+      // Offline mode: auto-log-in immediately with no button tap needed
+      if (DEV_OFFLINE_MODE && !data.session) {
+        const { data: signup } = await auth.signUp({ email: DEV_EMAIL, password: DEV_PASSWORD });
+        routeToNextStep(signup.user);
+        return;
+      }
 
       if (data.session) {
         routeToNextStep(data.session.user);
         return;
       }
 
-      // DEV auto-login — try to sign in with hardcoded creds; if account doesn't
-      // exist yet, create it on the fly. Runs only when no session is active.
-      if (DEV_AUTO_LOGIN) {
-        console.log('[Silak] DEV_AUTO_LOGIN: attempting sign-in for', DEV_EMAIL);
-        let attempt = await auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
-        if (attempt.error) {
-          console.log('[Silak] DEV sign-in failed:', attempt.error.message, '— trying signUp');
-          const signup = await auth.signUp({ email: DEV_EMAIL, password: DEV_PASSWORD });
-          if (signup.error) {
-            console.error('[Silak] DEV signUp failed:', signup.error.message);
-            toast(`Dev auto-login failed: ${signup.error.message}`, 'error');
-            goto('welcome');
-            return;
-          }
-          // Signup succeeded and returned a session — we're in
-          toast('Dev auto-login ✦', 'success');
-          routeToNextStep(signup.data.user);
-          return;
-        }
-        // Sign-in succeeded
-        toast('Dev auto-login ✦', 'success');
-        routeToNextStep(attempt.data.user);
-        return;
-      }
-
+      // No session — land on welcome. The dev button (if enabled) handles quick-login on tap.
       goto('welcome');
     } catch (err) {
       console.error('[Silak] Init failed:', err);
@@ -9139,6 +9188,35 @@
     else if (!u.goals) openSavingsScreen(u);
     else if (typeof u.wallets === 'undefined') openWalletsSetup(u);
     else showHome(u);
+  }
+
+  // Dev quick-login button — signs in with hardcoded creds. If the account doesn't
+  // exist yet, tries a one-time signUp. Never re-runs on its own, so no rate-limit
+  // spam even after failed attempts.
+  const devBtn = document.getElementById('devQuickLoginBtn');
+  if (devBtn) {
+    devBtn.addEventListener('click', async () => {
+      setLoading(devBtn, true, 'Signing in…');
+      let attempt = await auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
+      if (attempt.error && /invalid/i.test(attempt.error.message)) {
+        // Account might not exist — try creating it
+        console.log('[Silak] Dev sign-in failed, attempting signUp:', attempt.error.message);
+        const signup = await auth.signUp({ email: DEV_EMAIL, password: DEV_PASSWORD });
+        if (signup.error) {
+          setLoading(devBtn, false);
+          toast(signup.error.message, 'error');
+          return;
+        }
+        setLoading(devBtn, false);
+        toast('Account created ✦', 'success');
+        routeToNextStep(signup.data.user);
+        return;
+      }
+      setLoading(devBtn, false);
+      if (attempt.error) { toast(attempt.error.message, 'error'); return; }
+      toast('Welcome back ✦', 'success');
+      routeToNextStep(attempt.data.user);
+    });
   }
 </script>
 </body>
