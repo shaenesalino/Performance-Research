@@ -2038,6 +2038,173 @@
   .txh-add-btn:hover { background: #1339B8; }
   .txh-add-btn:active { transform: scale(0.95); }
 
+  /* Select mode toggle in the header */
+  .txh-select-btn {
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    color: var(--navy);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .txh-select-btn:hover  { background: var(--cream-2); }
+  .txh-select-btn:active { transform: scale(0.96); }
+  .txh-select-btn.active {
+    background: var(--navy);
+    color: var(--cream);
+    border-color: var(--navy);
+  }
+
+  /* Search bar */
+  .txh-search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+  .txh-search-wrap input {
+    width: 100%;
+    padding: 12px 40px 12px 40px;
+    border: 1.5px solid var(--sand);
+    border-radius: 14px;
+    background: var(--white);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--navy);
+    -webkit-appearance: none;
+    appearance: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+  }
+  .txh-search-wrap input:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+  .txh-search-wrap input::placeholder { color: var(--muted); }
+  .txh-search-icon {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .txh-search-clear {
+    position: absolute;
+    right: 8px; top: 50%;
+    transform: translateY(-50%);
+    background: var(--sand);
+    border: 0;
+    color: var(--navy);
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+  .txh-search-clear:hover { background: var(--muted); color: var(--white); }
+
+  /* Selection mode: row shows a checkbox on the left */
+  .txh-row .txh-check {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    border: 2px solid var(--sand);
+    background: var(--white);
+    display: none;
+    place-items: center;
+    flex-shrink: 0;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .txh-row .txh-check svg { opacity: 0; transition: opacity 0.12s; }
+  .txh-row.selected .txh-check {
+    background: var(--blue);
+    border-color: var(--blue);
+  }
+  .txh-row.selected .txh-check svg { opacity: 1; }
+  #screen-transactions.selecting .txh-row {
+    grid-template-columns: auto auto 1fr auto;
+  }
+  #screen-transactions.selecting .txh-row .txh-check {
+    display: grid;
+  }
+  #screen-transactions.selecting .txh-row.selected {
+    border-color: var(--blue);
+    background: rgba(26, 71, 214, 0.04);
+  }
+  /* Hide the "+" while selecting — it'd be a nasty misclick */
+  #screen-transactions.selecting #txhAddBtn { display: none; }
+
+  /* Floating action bar for bulk delete */
+  .txh-selection-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 440px;
+    width: calc(100% - 40px);
+    background: var(--navy);
+    color: var(--cream);
+    border-radius: 999px;
+    padding: 10px 8px 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 10px 30px rgba(10, 37, 64, 0.35);
+    z-index: 60;
+    animation: sel-bar-in 0.2s ease;
+  }
+  @keyframes sel-bar-in {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+  .txh-selection-bar .txh-sel-count {
+    flex: 1;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--cream);
+  }
+  .txh-selection-bar .txh-sel-cancel,
+  .txh-selection-bar .txh-sel-delete {
+    background: rgba(255, 255, 255, 0.15);
+    border: 0;
+    color: var(--cream);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .txh-selection-bar .txh-sel-cancel:hover  { background: rgba(255, 255, 255, 0.25); }
+  .txh-selection-bar .txh-sel-delete {
+    background: var(--error);
+  }
+  .txh-selection-bar .txh-sel-delete:hover { background: #B03535; }
+  .txh-selection-bar .txh-sel-delete:disabled {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 247, 236, 0.5);
+    cursor: not-allowed;
+  }
+
+  /* Empty search state */
+  .txh-empty-search {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+  }
+  .txh-empty-search .ico { font-size: 40px; margin-bottom: 8px; }
+
   /* Filter tabs — like tx-tabs but smaller */
   .txh-filter {
     display: grid;
@@ -3082,6 +3249,322 @@
   }
 
   /* Wallets screen */
+  /* Net Worth screen */
+  .nw-hero {
+    background: linear-gradient(135deg, var(--navy), #14345a);
+    color: var(--cream);
+    border-radius: 20px;
+    padding: 22px 22px 20px;
+    margin-bottom: 16px;
+  }
+  .nw-hero-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255, 247, 236, 0.7);
+    margin-bottom: 6px;
+  }
+  .nw-hero-val {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 40px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+  }
+  .nw-hero-val.negative { color: #FFB4A0; }
+  .nw-hero-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: rgba(255, 247, 236, 0.65);
+    margin-top: 6px;
+  }
+
+  .nw-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .nw-split-side {
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 16px;
+    padding: 14px;
+  }
+  .nw-split-side .lbl {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .nw-split-side .val {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 20px;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+  }
+  .nw-split-side .val.positive { color: var(--teal); }
+  .nw-split-side .val.negative { color: var(--error); }
+  .nw-split-side .sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .nw-section-head {
+    display: flex;
+    flex-direction: column;
+    margin: 4px 4px 10px;
+  }
+  .nw-section-head > span:first-child {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .nw-section-head .hint {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    margin-top: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .nw-breakdown-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .nw-breakdown-row .icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: var(--cream-2);
+    display: grid; place-items: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .nw-breakdown-row .name {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--navy);
+    font-weight: 600;
+  }
+  .nw-breakdown-row .sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .nw-breakdown-row .amt {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nw-manual-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nw-manual-row:hover  { border-color: var(--muted); }
+  .nw-manual-row:active { transform: scale(0.99); }
+
+  .nw-link-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 16px;
+    padding: 14px 18px;
+    margin-top: 20px;
+    cursor: pointer;
+    width: 100%;
+    font-family: inherit;
+    text-align: left;
+    transition: transform 0.12s, border-color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nw-link-card:hover  { border-color: var(--muted); }
+  .nw-link-card:active { transform: scale(0.99); }
+  .nw-link-card .lbl {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .nw-link-card .val {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 18px;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Loans screen */
+  .loans-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .lsum-card {
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 16px;
+    padding: 14px;
+  }
+  .lsum-card .lbl {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .lsum-card .val {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 20px;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+  }
+  .loan-card {
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .loan-card:hover  { border-color: var(--muted); }
+  .loan-card:active { transform: scale(0.99); }
+  .loan-card.paid   { opacity: 0.55; }
+  .loan-card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .loan-card-head .icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: rgba(214, 69, 69, 0.08);
+    color: var(--error);
+    display: grid; place-items: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .loan-card.paid .loan-card-head .icon {
+    background: rgba(44, 188, 177, 0.12);
+    color: var(--teal);
+  }
+  .loan-card-head .name {
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0;
+    line-height: 1.2;
+  }
+  .loan-card-head .lender {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .loan-card-body {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: flex-end;
+    margin-bottom: 10px;
+  }
+  .loan-card-body .remaining {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 20px;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .loan-card-body .of {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .loan-card-body .payment {
+    text-align: right;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .loan-card-body .payment strong {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+  }
+  .loan-progress {
+    height: 6px;
+    background: var(--sand);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .loan-progress > div {
+    height: 100%;
+    background: linear-gradient(90deg, var(--teal), var(--blue));
+    border-radius: 999px;
+    transition: width 0.4s ease;
+  }
+  .loan-card.paid .loan-progress > div { background: var(--teal); }
+
+  /* Two-column form fields */
+  .two-col-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .two-col-fields .field { margin-bottom: 14px; }
+
+  /* Wallets screen — end marker */
   .wallets-intro {
     color: var(--muted);
     font-size: 13px;
@@ -3257,6 +3740,12 @@
       </button>
       <button class="drawer-item" type="button" data-nav="wallets">
         <span class="icon">🪙</span> Wallets
+      </button>
+      <button class="drawer-item" type="button" data-nav="networth">
+        <span class="icon">💎</span> Net worth
+      </button>
+      <button class="drawer-item" type="button" data-nav="loans">
+        <span class="icon">💳</span> Utang / Loans
       </button>
       <button class="drawer-item" type="button" data-nav="profile">
         <span class="icon">👤</span> Profile
@@ -3983,6 +4472,239 @@
     </div>
   </section>
 
+  <!-- ============ NET WORTH ============ -->
+  <section class="screen" id="screen-networth" style="padding: 24px;">
+    <div class="view-header">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>Net worth</h1>
+    </div>
+
+    <!-- The big number -->
+    <div class="nw-hero" id="nwHero">
+      <div class="nw-hero-label">Your net worth</div>
+      <div class="nw-hero-val" id="nwHeroVal">₱0</div>
+      <div class="nw-hero-sub" id="nwHeroSub">Assets minus what you owe</div>
+    </div>
+
+    <!-- Assets vs Liabilities breakdown -->
+    <div class="nw-split">
+      <div class="nw-split-side">
+        <div class="lbl">Assets</div>
+        <div class="val positive" id="nwAssetsTotal">₱0</div>
+        <div class="sub" id="nwAssetsSub">Wallets + manual</div>
+      </div>
+      <div class="nw-split-side">
+        <div class="lbl">Liabilities</div>
+        <div class="val negative" id="nwLiabTotal">₱0</div>
+        <div class="sub" id="nwLiabSub">From loans</div>
+      </div>
+    </div>
+
+    <!-- Asset composition -->
+    <div class="nw-section-head">
+      <span>Assets breakdown</span>
+    </div>
+    <div id="nwAssetBreakdown"></div>
+
+    <!-- Manual assets management -->
+    <div class="nw-section-head" style="margin-top: 24px;">
+      <span>Other things you own</span>
+      <span class="hint">Wallet balances count automatically. Add anything else here.</span>
+    </div>
+    <div id="nwManualAssets"></div>
+    <div class="expenses-empty" id="nwManualEmpty" style="display:none;">
+      <div class="ico">💎</div>
+      No manual assets yet. Add house, land, vehicles, jewelry, or anything valuable you own.
+    </div>
+    <button class="add-expense-btn" id="addAssetBtn" type="button" style="margin-top: 12px;">+ Add asset</button>
+
+    <!-- Link to loans -->
+    <button class="nw-link-card" type="button" data-nav="loans">
+      <div>
+        <div class="lbl">Loans / Utang</div>
+        <div class="val" id="nwLoansPreview">₱0 owed</div>
+      </div>
+      <span style="color: var(--muted); font-size: 18px;">→</span>
+    </button>
+  </section>
+
+  <!-- ============ ASSET EDIT ============ -->
+  <section class="screen" id="screen-asset-edit" style="padding: 24px;">
+    <div class="view-header">
+      <button class="hamburger" data-nav="networth" type="button" aria-label="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h1 id="assetEditTitle">Add asset</h1>
+    </div>
+
+    <div class="field">
+      <label>Type</label>
+      <div class="select-wrap">
+        <select class="input select" id="assetTypeSelect"></select>
+        <span class="select-caret">▾</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Name</label>
+      <input class="input" type="text" id="assetNameInput" placeholder="e.g. Family home, Toyota Vios, Rolex" maxlength="60" />
+    </div>
+
+    <div class="field">
+      <label>Current value</label>
+      <div style="position:relative;">
+        <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
+        <input class="input" type="number" min="0" step="0.01" id="assetValueInput" placeholder="0" style="padding-left:32px;" />
+      </div>
+      <div class="payday-hint">Estimated market value in pesos.</div>
+    </div>
+
+    <div class="field">
+      <label>Note <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+      <input class="input" type="text" id="assetNoteInput" placeholder="e.g. 2018 model, financed via BPI" maxlength="120" />
+    </div>
+
+    <div class="income-actions" style="margin-top: 20px;">
+      <button class="btn btn-primary" id="saveAssetBtn" type="button">Save asset</button>
+      <button class="btn btn-ghost" type="button" data-nav="networth">Cancel</button>
+      <button class="single-delete-btn" id="deleteAssetBtn" type="button">Delete this asset</button>
+    </div>
+  </section>
+
+  <!-- ============ LOANS ============ -->
+  <section class="screen" id="screen-loans" style="padding: 24px;">
+    <div class="view-header">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>Utang / Loans</h1>
+    </div>
+
+    <div class="loans-summary" id="loansSummary" style="display:none;">
+      <div class="lsum-card">
+        <div class="lbl">Total debt</div>
+        <div class="val" id="loansTotalDebt">₱0</div>
+      </div>
+      <div class="lsum-card">
+        <div class="lbl">Monthly payments</div>
+        <div class="val" id="loansMonthlyDue">₱0</div>
+      </div>
+    </div>
+
+    <div class="expenses-empty" id="loansEmpty">
+      <div class="ico">💳</div>
+      No loans tracked. Add credit cards, housing loans, family utang, or any BNPL to keep tabs on what you owe.
+    </div>
+
+    <div id="loansList"></div>
+
+    <button class="add-expense-btn" id="addLoanBtn" type="button" style="margin-top: 12px;">+ Add loan</button>
+  </section>
+
+  <!-- ============ LOAN EDIT ============ -->
+  <section class="screen" id="screen-loan-edit" style="padding: 24px;">
+    <div class="view-header">
+      <button class="hamburger" data-nav="loans" type="button" aria-label="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h1 id="loanEditTitle">Add loan</h1>
+    </div>
+
+    <div class="field">
+      <label>Loan type</label>
+      <div class="select-wrap">
+        <select class="input select" id="loanTypeSelect"></select>
+        <span class="select-caret">▾</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Name</label>
+      <input class="input" type="text" id="loanNameInput" placeholder="e.g. BPI Home Loan, Bea's utang" maxlength="60" />
+    </div>
+
+    <div class="field">
+      <label>Lender <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+      <input class="input" type="text" id="loanLenderInput" placeholder="e.g. BPI, PayLater, Mom" maxlength="60" />
+    </div>
+
+    <div class="two-col-fields">
+      <div class="field">
+        <label>Original amount</label>
+        <div style="position:relative;">
+          <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
+          <input class="input" type="number" min="0" step="0.01" id="loanOriginalInput" placeholder="0" style="padding-left:32px;" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Remaining</label>
+        <div style="position:relative;">
+          <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
+          <input class="input" type="number" min="0" step="0.01" id="loanBalanceInput" placeholder="0" style="padding-left:32px;" />
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col-fields">
+      <div class="field">
+        <label>Interest rate (%/yr) <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+        <input class="input" type="number" min="0" step="0.01" id="loanRateInput" placeholder="e.g. 6.5" />
+      </div>
+      <div class="field">
+        <label>Monthly payment</label>
+        <div style="position:relative;">
+          <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
+          <input class="input" type="number" min="0" step="0.01" id="loanPaymentInput" placeholder="0" style="padding-left:32px;" />
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col-fields">
+      <div class="field">
+        <label>Frequency</label>
+        <div class="select-wrap">
+          <select class="input select" id="loanFreqSelect">
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="semi-monthly">Semi-monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="annually">Annually</option>
+          </select>
+          <span class="select-caret">▾</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Due day</label>
+        <input class="input" type="number" min="1" max="31" id="loanDueDayInput" placeholder="e.g. 15" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Status</label>
+      <div class="select-wrap">
+        <select class="input select" id="loanStatusSelect">
+          <option value="active">Active</option>
+          <option value="paid">Paid off</option>
+          <option value="defaulted">In default</option>
+        </select>
+        <span class="select-caret">▾</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Note <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+      <input class="input" type="text" id="loanNoteInput" placeholder="Anything worth remembering" maxlength="120" />
+    </div>
+
+    <div class="income-actions" style="margin-top: 20px;">
+      <button class="btn btn-primary" id="saveLoanBtn" type="button">Save loan</button>
+      <button class="btn btn-ghost" type="button" data-nav="loans">Cancel</button>
+      <button class="single-delete-btn" id="deleteLoanBtn" type="button">Delete this loan</button>
+    </div>
+  </section>
+
   <!-- ============ PROFILE ============ -->
   <section class="screen" id="screen-profile" style="padding: 24px;">
     <div class="view-header">
@@ -4128,11 +4850,19 @@
   <!-- ============ TRANSACTIONS HISTORY ============ -->
   <section class="screen" id="screen-transactions">
     <div class="txh-header">
-      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu" id="txhMenuBtn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>Transactions</h1>
-      <button class="txh-add-btn" type="button" data-nav="transaction" aria-label="Add transaction">+</button>
+      <h1 id="txhTitle">Transactions</h1>
+      <button class="txh-select-btn" type="button" id="txhSelectBtn" aria-label="Select transactions">Select</button>
+      <button class="txh-add-btn" type="button" data-nav="transaction" aria-label="Add transaction" id="txhAddBtn">+</button>
+    </div>
+
+    <!-- Search — live-filters the list as you type -->
+    <div class="txh-search-wrap" id="txhSearchWrap">
+      <span class="txh-search-icon" aria-hidden="true">🔍</span>
+      <input type="search" id="txhSearch" placeholder="Search by name, note, or amount…" autocomplete="off" spellcheck="false" />
+      <button type="button" class="txh-search-clear" id="txhSearchClear" aria-label="Clear search" style="display:none;">×</button>
     </div>
 
     <div class="txh-filter" id="txhFilter">
@@ -4144,6 +4874,13 @@
     </div>
 
     <div id="txhContent"></div>
+
+    <!-- Floating action bar for bulk actions (shown only in selection mode) -->
+    <div class="txh-selection-bar" id="txhSelectionBar" style="display:none;">
+      <button type="button" class="txh-sel-cancel" id="txhSelCancel">Cancel</button>
+      <span class="txh-sel-count" id="txhSelCount">0 selected</span>
+      <button type="button" class="txh-sel-delete" id="txhSelDelete">Delete</button>
+    </div>
   </section>
 
 </div>
@@ -6746,6 +7483,8 @@
     else if (nav === 'budget-view')   showBudgetView(u);
     else if (nav === 'savings-view')  showSavingsView(u);
     else if (nav === 'wallets')       showWalletsScreen(u);
+    else if (nav === 'networth')      showNetWorth(u);
+    else if (nav === 'loans')         showLoansScreen(u);
     else if (nav === 'profile')       showProfile(u);
     else if (nav === 'logout') {
       await auth.signOut();
@@ -8394,6 +9133,23 @@
   function showTransactionsHistory(user) {
     userCache = user;
     refreshDrawerUser(user);
+    // Reset search + selection state for a clean entry
+    txhSearchQuery = '';
+    const _si = document.getElementById('txhSearch');
+    const _sc = document.getElementById('txhSearchClear');
+    if (_si) _si.value = '';
+    if (_sc) _sc.style.display = 'none';
+    if (txhSelectMode) {
+      // Inline exit — the handler function is defined further down, but the effect is the same
+      txhSelectMode = false;
+      txhSelected.clear();
+      const _ts = document.getElementById('screen-transactions');
+      const _sb = document.getElementById('txhSelectBtn');
+      const _bar = document.getElementById('txhSelectionBar');
+      if (_ts) _ts.classList.remove('selecting');
+      if (_sb) { _sb.classList.remove('active'); _sb.textContent = 'Select'; }
+      if (_bar) _bar.style.display = 'none';
+    }
     renderTxhContent();
     goto('transactions');
   }
@@ -8410,25 +9166,132 @@
     });
   });
 
+  // Search input — live-filter as you type, with a clear button
+  const searchInput = document.getElementById('txhSearch');
+  const searchClear = document.getElementById('txhSearchClear');
+  searchInput.addEventListener('input', () => {
+    txhSearchQuery = searchInput.value;
+    searchClear.style.display = txhSearchQuery ? 'grid' : 'none';
+    renderTxhContent();
+  });
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    txhSearchQuery = '';
+    searchClear.style.display = 'none';
+    renderTxhContent();
+    searchInput.focus();
+  });
+
+  // Selection mode — tap "Select" to enter; row taps then toggle selection instead of opening edit
+  const selectBtn      = document.getElementById('txhSelectBtn');
+  const selectionBar   = document.getElementById('txhSelectionBar');
+  const selCountEl     = document.getElementById('txhSelCount');
+  const selCancelBtn   = document.getElementById('txhSelCancel');
+  const selDeleteBtn   = document.getElementById('txhSelDelete');
+  const txScreen       = document.getElementById('screen-transactions');
+
+  function enterSelectMode() {
+    txhSelectMode = true;
+    txhSelected.clear();
+    txScreen.classList.add('selecting');
+    selectBtn.classList.add('active');
+    selectBtn.textContent = 'Done';
+    renderTxhContent();
+    updateSelectionBar();
+  }
+  function exitSelectMode() {
+    txhSelectMode = false;
+    txhSelected.clear();
+    txScreen.classList.remove('selecting');
+    selectBtn.classList.remove('active');
+    selectBtn.textContent = 'Select';
+    renderTxhContent();
+    updateSelectionBar();
+  }
+  function updateSelectionBar() {
+    if (!txhSelectMode) {
+      selectionBar.style.display = 'none';
+      return;
+    }
+    selectionBar.style.display = 'flex';
+    const n = txhSelected.size;
+    selCountEl.textContent = n === 0 ? 'Tap rows to select' : `${n} selected`;
+    selDeleteBtn.disabled = n === 0;
+  }
+
+  selectBtn.addEventListener('click', () => {
+    txhSelectMode ? exitSelectMode() : enterSelectMode();
+  });
+  selCancelBtn.addEventListener('click', exitSelectMode);
+
+  selDeleteBtn.addEventListener('click', async () => {
+    if (txhSelected.size === 0) return;
+    const n = txhSelected.size;
+    if (!confirm(`Delete ${n} ${n === 1 ? 'transaction' : 'transactions'}? This can't be undone.`)) return;
+
+    const { data: sess } = await auth.getSession();
+    if (!sess.session) { toast('Not signed in.', 'error'); return; }
+    const remaining = (sess.session.user.transactions || []).filter(t => !txhSelected.has(t.id));
+
+    setLoading(selDeleteBtn, true, 'Deleting…');
+    const { data, error } = await auth.updateUser({ data: { transactions: remaining } });
+    setLoading(selDeleteBtn, false);
+    if (error) { toast(error.message, 'error'); return; }
+
+    toast(`Deleted ${n} ${n === 1 ? 'transaction' : 'transactions'}`, 'success');
+    exitSelectMode();
+    showTransactionsHistory(data.user);
+  });
+
+  // Reset search + selection whenever the screen (re)opens — handled inside showTransactionsHistory
+
+  // Selection + search state
+  let txhSelectMode = false;
+  const txhSelected = new Set();
+  let txhSearchQuery = '';
+
   function renderTxhContent() {
     const wrap = document.getElementById('txhContent');
     const user = userCache || {};
     const all = Array.isArray(user.transactions) ? user.transactions : [];
 
-    // Filter
-    const filtered = txhFilter === 'all' ? all : all.filter(t => t.type === txhFilter);
+    // Filter by type
+    let filtered = txhFilter === 'all' ? all : all.filter(t => t.type === txhFilter);
+
+    // Filter by search query (name/note/amount/wallet/payment method)
+    const q = txhSearchQuery.trim().toLowerCase();
+    if (q) {
+      const walletById = Object.fromEntries((user.wallets || []).map(w => [w.id, w]));
+      filtered = filtered.filter(t => {
+        const name = resolveTxName(t, user).toLowerCase();
+        const note = (t.note || '').toLowerCase();
+        const amt  = String(t.amount || '');
+        const pm   = (PAYMENT_NAME[t.paymentMethod] || t.paymentMethod || '').toLowerCase();
+        const walletLabel = (walletById[t.wallet]?.label || '').toLowerCase();
+        return name.includes(q) || note.includes(q) || amt.includes(q) || pm.includes(q) || walletLabel.includes(q);
+      });
+    }
 
     if (filtered.length === 0) {
-      const msg = all.length === 0
-        ? 'No transactions yet. Tap + to add one.'
-        : `No ${txhFilter} transactions yet.`;
+      let msg, emptyIcon;
+      if (all.length === 0) {
+        msg = 'No transactions yet. Tap + to add one.';
+        emptyIcon = '🧾';
+      } else if (q) {
+        msg = `No matches for "${escapeAttr(txhSearchQuery)}".`;
+        emptyIcon = '🔍';
+      } else {
+        msg = `No ${txhFilter} transactions yet.`;
+        emptyIcon = '🧾';
+      }
       wrap.innerHTML = `
         <div class="txh-empty">
-          <div class="ico">🧾</div>
+          <div class="ico">${emptyIcon}</div>
           <p>${msg}</p>
           ${all.length === 0 ? '<button class="btn btn-primary" type="button" data-nav="transaction" style="max-width:220px; margin:0 auto;">Add transaction</button>' : ''}
         </div>
       `;
+      updateSelectionBar();
       return;
     }
 
@@ -8476,10 +9339,14 @@
         const amt = `${sign}${peso(tx.amount)}`;
 
         const row = document.createElement('div');
-        row.className = 'txh-row';
+        row.className = 'txh-row' + (txhSelected.has(tx.id) ? ' selected' : '');
         row.dataset.txId = tx.id;
         row.style.cursor = 'pointer';
+        // Checkbox (visible only when #screen-transactions has .selecting class)
         row.innerHTML = `
+          <div class="txh-check" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
           <div class="txh-icon ${tx.type}">${icon}</div>
           <div class="txh-info">
             <p class="name">${escapeAttr(name)}</p>
@@ -8491,7 +9358,19 @@
           <div class="txh-amt ${tx.type}">${amt}</div>
         `;
         row.addEventListener('click', () => {
-          openTransactionScreen(user, { txId: tx.id });
+          if (txhSelectMode) {
+            // Toggle selection instead of opening edit
+            if (txhSelected.has(tx.id)) {
+              txhSelected.delete(tx.id);
+              row.classList.remove('selected');
+            } else {
+              txhSelected.add(tx.id);
+              row.classList.add('selected');
+            }
+            updateSelectionBar();
+          } else {
+            openTransactionScreen(user, { txId: tx.id });
+          }
         });
         group.appendChild(row);
       });
@@ -9122,6 +10001,423 @@
     editingWalletId = null;
     toast('Wallet deleted', 'success');
     showWalletsScreen(data.user);
+  });
+
+  // =========================================================================
+  // NET WORTH + MANUAL ASSETS
+  // =========================================================================
+  const ASSET_TYPES = [
+    { v: 'cash',        icon: '💵', label: 'Cash on hand'   },
+    { v: 'bank',        icon: '🏦', label: 'Bank account'   },
+    { v: 'ewallet',     icon: '📱', label: 'E-wallet'       },
+    { v: 'savings',     icon: '🌱', label: 'Savings'        },
+    { v: 'investment',  icon: '📈', label: 'Investment'     },
+    { v: 'house',       icon: '🏠', label: 'House'          },
+    { v: 'land',        icon: '🌍', label: 'Land'           },
+    { v: 'vehicle',     icon: '🚗', label: 'Vehicle'        },
+    { v: 'jewelry',     icon: '💍', label: 'Jewelry'        },
+    { v: 'business',    icon: '🏢', label: 'Business'       },
+    { v: 'other',       icon: '💎', label: 'Other'          },
+  ];
+  const ASSET_ICON  = Object.fromEntries(ASSET_TYPES.map(a => [a.v, a.icon]));
+  const ASSET_LABEL = Object.fromEntries(ASSET_TYPES.map(a => [a.v, a.label]));
+
+  // Central net-worth calculation. Deliberately modular — all callers use this
+  // so any tweak to what counts (e.g. excluding certain wallet types) lands
+  // consistently across the app.
+  function computeNetWorth(user) {
+    const txs = Array.isArray(user.transactions) ? user.transactions : [];
+    const wallets = Array.isArray(user.wallets) ? user.wallets : [];
+    const walletTotal = wallets.reduce((s, w) => s + computeWalletBalance(w, txs), 0);
+
+    const assets = Array.isArray(user.assets) ? user.assets : [];
+    const manualTotal = assets.reduce((s, a) => s + (Number(a.value) || 0), 0);
+
+    const loans = Array.isArray(user.loans) ? user.loans : [];
+    // Paid-off loans don't count toward current liabilities
+    const totalLiabilities = loans
+      .filter(l => l.status !== 'paid')
+      .reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+
+    const totalAssets = walletTotal + manualTotal;
+    return {
+      walletTotal, manualTotal, totalAssets,
+      totalLiabilities,
+      netWorth: totalAssets - totalLiabilities,
+      assetsCount: assets.length,
+      loansCount: loans.filter(l => l.status !== 'paid').length,
+    };
+  }
+
+  function showNetWorth(user) {
+    userCache = user;
+    refreshDrawerUser(user);
+    const nw = computeNetWorth(user);
+
+    // Hero
+    const heroVal = document.getElementById('nwHeroVal');
+    heroVal.textContent = peso(nw.netWorth);
+    heroVal.classList.toggle('negative', nw.netWorth < 0);
+    document.getElementById('nwHeroSub').textContent = nw.netWorth < 0
+      ? "Debts exceed assets — let's chip away at it."
+      : 'Assets minus what you owe.';
+
+    // Split cards
+    document.getElementById('nwAssetsTotal').textContent = peso(nw.totalAssets);
+    document.getElementById('nwLiabTotal').textContent   = peso(nw.totalLiabilities);
+    document.getElementById('nwAssetsSub').textContent   = `Wallets ${peso(nw.walletTotal)} · Manual ${peso(nw.manualTotal)}`;
+    document.getElementById('nwLiabSub').textContent     = nw.loansCount === 0
+      ? 'No active loans'
+      : `${nw.loansCount} active ${nw.loansCount === 1 ? 'loan' : 'loans'}`;
+
+    // Assets breakdown (wallets first, then manual grouped by type)
+    renderNwAssetBreakdown(user);
+    renderNwManualAssets(user);
+
+    // Loans preview
+    document.getElementById('nwLoansPreview').textContent = nw.totalLiabilities > 0
+      ? `${peso(nw.totalLiabilities)} owed across ${nw.loansCount} ${nw.loansCount === 1 ? 'loan' : 'loans'}`
+      : 'None tracked yet';
+
+    goto('networth');
+  }
+
+  function renderNwAssetBreakdown(user) {
+    const wrap = document.getElementById('nwAssetBreakdown');
+    const txs = user.transactions || [];
+    const wallets = user.wallets || [];
+    const assets  = user.assets  || [];
+
+    const rows = [];
+    wallets.forEach(w => {
+      const bal = computeWalletBalance(w, txs);
+      const name = (w.label && w.label.trim()) || PAYMENT_NAME[w.method] || 'Wallet';
+      rows.push({ icon: PAYMENT_ICON[w.method] || '💰', name, sub: 'Wallet', amt: bal });
+    });
+    // Group manual assets by type for a cleaner breakdown view
+    const byType = {};
+    assets.forEach(a => {
+      const type = a.type || 'other';
+      if (!byType[type]) byType[type] = { total: 0, count: 0 };
+      byType[type].total += Number(a.value) || 0;
+      byType[type].count += 1;
+    });
+    Object.entries(byType).forEach(([type, agg]) => {
+      rows.push({
+        icon: ASSET_ICON[type] || '💎',
+        name: ASSET_LABEL[type] || type,
+        sub: `${agg.count} ${agg.count === 1 ? 'item' : 'items'}`,
+        amt: agg.total,
+      });
+    });
+
+    if (rows.length === 0) {
+      wrap.innerHTML = `<div class="expenses-empty"><div class="ico">🪙</div>Add wallets and manual assets to see your breakdown.</div>`;
+      return;
+    }
+    // Sort largest first
+    rows.sort((a, b) => b.amt - a.amt);
+    wrap.innerHTML = rows.map(r => `
+      <div class="nw-breakdown-row">
+        <div class="icon">${r.icon}</div>
+        <div>
+          <div class="name">${escapeAttr(r.name)}</div>
+          <div class="sub">${escapeAttr(r.sub)}</div>
+        </div>
+        <div class="amt">${peso(r.amt)}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderNwManualAssets(user) {
+    const wrap  = document.getElementById('nwManualAssets');
+    const empty = document.getElementById('nwManualEmpty');
+    const assets = user.assets || [];
+    if (assets.length === 0) {
+      wrap.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    wrap.innerHTML = '';
+    // Newest first — most recently added is probably the top of mind
+    const sorted = [...assets].sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || ''));
+    sorted.forEach(a => {
+      const row = document.createElement('div');
+      row.className = 'nw-manual-row';
+      row.innerHTML = `
+        <div class="icon" style="background: var(--cream-2); font-size: 16px;">${ASSET_ICON[a.type] || '💎'}</div>
+        <div>
+          <div style="font-family:'Inter', sans-serif; font-size:13px; color:var(--navy); font-weight:600;">${escapeAttr(a.name || ASSET_LABEL[a.type] || 'Asset')}</div>
+          <div style="font-family:'Inter', sans-serif; font-size:11px; color:var(--muted); margin-top:1px;">${ASSET_LABEL[a.type] || a.type}${a.note ? ' · ' + escapeAttr(a.note) : ''}</div>
+        </div>
+        <div style="font-family:'Fraunces', serif; font-weight:500; font-size:15px; color:var(--navy); font-variant-numeric: tabular-nums;">${peso(a.value)}</div>
+      `;
+      row.addEventListener('click', () => openAssetEdit(userCache, a.id));
+      wrap.appendChild(row);
+    });
+  }
+
+  // -------- Asset add / edit / delete --------
+  let editingAssetId = null;
+
+  function openAssetEdit(user, assetId) {
+    userCache = user;
+    editingAssetId = assetId || null;
+    const isEditing = !!assetId;
+    const existing = isEditing ? (user.assets || []).find(a => a.id === assetId) : null;
+
+    const typeSel = document.getElementById('assetTypeSelect');
+    typeSel.innerHTML = ASSET_TYPES.map(t => `<option value="${t.v}">${t.icon} ${t.label}</option>`).join('');
+    typeSel.value = existing ? existing.type : 'house';
+
+    document.getElementById('assetNameInput').value  = existing?.name  || '';
+    document.getElementById('assetValueInput').value = existing?.value || '';
+    document.getElementById('assetNoteInput').value  = existing?.note  || '';
+
+    document.getElementById('assetEditTitle').textContent = isEditing ? 'Edit asset' : 'Add asset';
+    document.getElementById('saveAssetBtn').textContent   = isEditing ? 'Save changes' : 'Save asset';
+    document.getElementById('deleteAssetBtn').style.display = isEditing ? 'block' : 'none';
+
+    goto('asset-edit');
+  }
+
+  document.getElementById('addAssetBtn').addEventListener('click', () => openAssetEdit(userCache, null));
+
+  document.getElementById('saveAssetBtn').addEventListener('click', async () => {
+    const type  = document.getElementById('assetTypeSelect').value;
+    const name  = document.getElementById('assetNameInput').value.trim();
+    const value = Number(document.getElementById('assetValueInput').value) || 0;
+    const note  = document.getElementById('assetNoteInput').value.trim();
+    if (!name) { toast('Please give this asset a name.', 'error'); return; }
+    if (value <= 0) { toast('Please enter a value greater than zero.', 'error'); return; }
+
+    const { data: sess } = await auth.getSession();
+    const user = sess.session.user;
+    const assets = Array.isArray(user.assets) ? [...user.assets] : [];
+    const now = new Date().toISOString();
+
+    if (editingAssetId) {
+      const idx = assets.findIndex(a => a.id === editingAssetId);
+      if (idx >= 0) assets[idx] = { ...assets[idx], type, name, value, note, updatedAt: now };
+    } else {
+      assets.push({
+        id: 'a_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        type, name, value, note,
+        addedAt: now, updatedAt: now,
+      });
+    }
+
+    const btn = document.getElementById('saveAssetBtn');
+    setLoading(btn, true, 'Saving…');
+    const { data, error } = await auth.updateUser({ data: { assets } });
+    setLoading(btn, false);
+    if (error) { toast(error.message, 'error'); return; }
+    editingAssetId = null;
+    toast('Asset saved ✦', 'success');
+    showNetWorth(data.user);
+  });
+
+  document.getElementById('deleteAssetBtn').addEventListener('click', async () => {
+    if (!editingAssetId) return;
+    if (!confirm('Delete this asset? This can\'t be undone.')) return;
+    const { data: sess } = await auth.getSession();
+    const assets = (sess.session.user.assets || []).filter(a => a.id !== editingAssetId);
+    const { data, error } = await auth.updateUser({ data: { assets } });
+    if (error) { toast(error.message, 'error'); return; }
+    editingAssetId = null;
+    toast('Asset deleted', 'success');
+    showNetWorth(data.user);
+  });
+
+  // =========================================================================
+  // LOANS / UTANG
+  // =========================================================================
+  const LOAN_TYPES = [
+    { v: 'personal',    icon: '💵', label: 'Personal loan'  },
+    { v: 'credit_card', icon: '💳', label: 'Credit card'    },
+    { v: 'housing',     icon: '🏠', label: 'Housing loan'   },
+    { v: 'car',         icon: '🚗', label: 'Car loan'       },
+    { v: 'student',     icon: '🎓', label: 'Student loan'   },
+    { v: 'family',      icon: '❤️', label: 'Family / friends' },
+    { v: 'bnpl',        icon: '🛍️', label: 'Buy now, pay later' },
+    { v: 'other',       icon: '📄', label: 'Other'          },
+  ];
+  const LOAN_ICON  = Object.fromEntries(LOAN_TYPES.map(l => [l.v, l.icon]));
+  const LOAN_LABEL = Object.fromEntries(LOAN_TYPES.map(l => [l.v, l.label]));
+
+  // Convert a loan's regular payment into its monthly equivalent, so all loans
+  // can be summed on a consistent monthly basis on the Loans summary tile.
+  function loanMonthlyEquivalent(loan) {
+    const amt = Number(loan.monthlyPayment) || 0;
+    const f = loan.frequency || 'monthly';
+    return amt * (BUDGET_TO_MONTHLY[f] || 1);
+  }
+
+  function showLoansScreen(user) {
+    userCache = user;
+    refreshDrawerUser(user);
+    const loans = Array.isArray(user.loans) ? user.loans : [];
+    const summary = document.getElementById('loansSummary');
+    const empty   = document.getElementById('loansEmpty');
+    const list    = document.getElementById('loansList');
+
+    if (loans.length === 0) {
+      empty.style.display = 'block';
+      summary.style.display = 'none';
+      list.innerHTML = '';
+    } else {
+      empty.style.display = 'none';
+      summary.style.display = 'grid';
+
+      const active = loans.filter(l => l.status !== 'paid');
+      const totalDebt   = active.reduce((s, l) => s + (Number(l.currentBalance)   || 0), 0);
+      const monthlyDue  = active.reduce((s, l) => s + loanMonthlyEquivalent(l), 0);
+      document.getElementById('loansTotalDebt').textContent = peso(totalDebt);
+      document.getElementById('loansMonthlyDue').textContent = peso(monthlyDue);
+
+      // Active first (largest balance first), then paid at the bottom
+      const sorted = [...loans].sort((a, b) => {
+        const aPaid = a.status === 'paid' ? 1 : 0;
+        const bPaid = b.status === 'paid' ? 1 : 0;
+        if (aPaid !== bPaid) return aPaid - bPaid;
+        return (Number(b.currentBalance) || 0) - (Number(a.currentBalance) || 0);
+      });
+
+      list.innerHTML = '';
+      sorted.forEach(l => {
+        const original = Number(l.originalAmount) || 0;
+        const remaining = Number(l.currentBalance) || 0;
+        const paid = Math.max(original - remaining, 0);
+        const pct = original > 0 ? Math.min(Math.round((paid / original) * 100), 100) : 0;
+        const isPaid = l.status === 'paid' || (original > 0 && remaining === 0);
+        const card = document.createElement('div');
+        card.className = 'loan-card' + (isPaid ? ' paid' : '');
+        card.innerHTML = `
+          <div class="loan-card-head">
+            <div class="icon">${LOAN_ICON[l.type] || '💳'}</div>
+            <div style="flex:1; min-width:0;">
+              <p class="name">${escapeAttr(l.name || LOAN_LABEL[l.type] || 'Loan')}</p>
+              <p class="lender">${LOAN_LABEL[l.type] || l.type}${l.lender ? ' · ' + escapeAttr(l.lender) : ''}</p>
+            </div>
+          </div>
+          <div class="loan-card-body">
+            <div>
+              <div class="remaining">${peso(remaining)}</div>
+              <div class="of">of ${peso(original)} · ${pct}% paid</div>
+            </div>
+            <div class="payment">
+              ${l.monthlyPayment ? `<strong>${peso(l.monthlyPayment)}</strong><br>${FREQ_LABEL[l.frequency || 'monthly'] || 'monthly'}${l.dueDay ? ' · ' + ordinal(l.dueDay) : ''}` : (isPaid ? '<strong>Paid off ✦</strong>' : '—')}
+            </div>
+          </div>
+          <div class="loan-progress"><div style="width:${pct}%"></div></div>
+        `;
+        card.addEventListener('click', () => openLoanEdit(userCache, l.id));
+        list.appendChild(card);
+      });
+    }
+
+    goto('loans');
+  }
+
+  // -------- Loan add / edit / delete --------
+  let editingLoanId = null;
+
+  function openLoanEdit(user, loanId) {
+    userCache = user;
+    editingLoanId = loanId || null;
+    const isEditing = !!loanId;
+    const existing = isEditing ? (user.loans || []).find(l => l.id === loanId) : null;
+
+    const typeSel = document.getElementById('loanTypeSelect');
+    typeSel.innerHTML = LOAN_TYPES.map(t => `<option value="${t.v}">${t.icon} ${t.label}</option>`).join('');
+    typeSel.value = existing ? existing.type : 'credit_card';
+
+    document.getElementById('loanNameInput').value    = existing?.name    || '';
+    document.getElementById('loanLenderInput').value  = existing?.lender  || '';
+    document.getElementById('loanOriginalInput').value= existing?.originalAmount || '';
+    document.getElementById('loanBalanceInput').value = existing?.currentBalance || '';
+    document.getElementById('loanRateInput').value    = existing?.interestRate   || '';
+    document.getElementById('loanPaymentInput').value = existing?.monthlyPayment || '';
+    document.getElementById('loanFreqSelect').value   = existing?.frequency || 'monthly';
+    document.getElementById('loanDueDayInput').value  = existing?.dueDay   || '';
+    document.getElementById('loanStatusSelect').value = existing?.status   || 'active';
+    document.getElementById('loanNoteInput').value    = existing?.note     || '';
+
+    document.getElementById('loanEditTitle').textContent = isEditing ? 'Edit loan' : 'Add loan';
+    document.getElementById('saveLoanBtn').textContent   = isEditing ? 'Save changes' : 'Save loan';
+    document.getElementById('deleteLoanBtn').style.display = isEditing ? 'block' : 'none';
+
+    goto('loan-edit');
+  }
+
+  document.getElementById('addLoanBtn').addEventListener('click', () => openLoanEdit(userCache, null));
+
+  document.getElementById('saveLoanBtn').addEventListener('click', async () => {
+    const type    = document.getElementById('loanTypeSelect').value;
+    const name    = document.getElementById('loanNameInput').value.trim();
+    const lender  = document.getElementById('loanLenderInput').value.trim();
+    const original= Number(document.getElementById('loanOriginalInput').value) || 0;
+    const balance = Number(document.getElementById('loanBalanceInput').value) || 0;
+    const rate    = Number(document.getElementById('loanRateInput').value)    || 0;
+    const payment = Number(document.getElementById('loanPaymentInput').value) || 0;
+    const freq    = document.getElementById('loanFreqSelect').value;
+    const dueDay  = parseInt(document.getElementById('loanDueDayInput').value, 10) || null;
+    const status  = document.getElementById('loanStatusSelect').value;
+    const note    = document.getElementById('loanNoteInput').value.trim();
+
+    if (!name) { toast('Please name this loan.', 'error'); return; }
+    if (original <= 0) { toast('Enter the original loan amount.', 'error'); return; }
+
+    const { data: sess } = await auth.getSession();
+    const user = sess.session.user;
+    const loans = Array.isArray(user.loans) ? [...user.loans] : [];
+    const now = new Date().toISOString();
+
+    if (editingLoanId) {
+      const idx = loans.findIndex(l => l.id === editingLoanId);
+      if (idx >= 0) {
+        loans[idx] = {
+          ...loans[idx],
+          type, name, lender,
+          originalAmount: original, currentBalance: balance,
+          interestRate: rate, monthlyPayment: payment,
+          frequency: freq, dueDay, status, note,
+          updatedAt: now,
+        };
+      }
+    } else {
+      loans.push({
+        id: 'ln_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        type, name, lender,
+        originalAmount: original, currentBalance: balance,
+        interestRate: rate, monthlyPayment: payment,
+        frequency: freq, dueDay, status, note,
+        payments: [],   // reserved for Phase 1c (payment history)
+        addedAt: now, updatedAt: now,
+      });
+    }
+
+    const btn = document.getElementById('saveLoanBtn');
+    setLoading(btn, true, 'Saving…');
+    const { data, error } = await auth.updateUser({ data: { loans } });
+    setLoading(btn, false);
+    if (error) { toast(error.message, 'error'); return; }
+    editingLoanId = null;
+    toast('Loan saved ✦', 'success');
+    showLoansScreen(data.user);
+  });
+
+  document.getElementById('deleteLoanBtn').addEventListener('click', async () => {
+    if (!editingLoanId) return;
+    if (!confirm('Delete this loan? Its payment history will be lost.')) return;
+    const { data: sess } = await auth.getSession();
+    const loans = (sess.session.user.loans || []).filter(l => l.id !== editingLoanId);
+    const { data, error } = await auth.updateUser({ data: { loans } });
+    if (error) { toast(error.message, 'error'); return; }
+    editingLoanId = null;
+    toast('Loan deleted', 'success');
+    showLoansScreen(data.user);
   });
 
   // =========================================================================
