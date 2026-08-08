@@ -5220,8 +5220,8 @@
   }
   .cal-dot.income { background: var(--teal); }
   .cal-dot.due    { background: var(--orange); }
+  .cal-dot.ipon   { background: var(--yellow); }
   .cal-dot.loan   { background: var(--error); }
-  .cal-dot.logged { background: var(--blue); }
 
   /* Week view — vertical list */
   .cal-week {
@@ -5289,8 +5289,8 @@
   }
   .cal-event-chip .chip-icon.income { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
   .cal-event-chip .chip-icon.due    { background: rgba(242, 101, 34, 0.15); color: var(--orange); }
+  .cal-event-chip .chip-icon.ipon   { background: rgba(245, 166, 35, 0.18); color: var(--yellow); }
   .cal-event-chip .chip-icon.loan   { background: rgba(214, 69, 69, 0.15); color: var(--error); }
-  .cal-event-chip .chip-icon.logged { background: rgba(26, 71, 214, 0.12); color: var(--blue); }
   .cal-event-chip .chip-label {
     flex: 1;
     min-width: 0;
@@ -5327,8 +5327,8 @@
   }
   .cal-legend-item .dot.income { background: var(--teal); }
   .cal-legend-item .dot.due    { background: var(--orange); }
+  .cal-legend-item .dot.ipon   { background: var(--yellow); }
   .cal-legend-item .dot.loan   { background: var(--error); }
-  .cal-legend-item .dot.logged { background: var(--blue); }
 
   /* Selected day detail — appears below month view when a day is tapped */
   .cal-day-detail {
@@ -5560,6 +5560,9 @@
       <button class="drawer-item" type="button" data-nav="home">
         <span class="icon">☀️</span> Home
       </button>
+      <button class="drawer-item" type="button" data-nav="wallets">
+        <span class="icon">🪙</span> Pitaka
+      </button>
       <button class="drawer-item" type="button" data-nav="transactions">
         <span class="icon">🧾</span> Transactions
       </button>
@@ -5572,20 +5575,14 @@
       <button class="drawer-item" type="button" data-nav="savings-view">
         <span class="icon">🌱</span> Ipon
       </button>
-      <button class="drawer-item" type="button" data-nav="wallets">
-        <span class="icon">🪙</span> Pitaka
-      </button>
-      <button class="drawer-item" type="button" data-nav="networth">
-        <span class="icon">💎</span> Net worth
-      </button>
       <button class="drawer-item" type="button" data-nav="loans">
         <span class="icon">💳</span> Utang at Pautang
       </button>
-      <button class="drawer-item" type="button" data-nav="review">
-        <span class="icon">📅</span> Monthly recap
-      </button>
       <button class="drawer-item" type="button" data-nav="calendar">
         <span class="icon">📆</span> Calendar
+      </button>
+      <button class="drawer-item" type="button" data-nav="review">
+        <span class="icon">📊</span> Reports
       </button>
     </nav>
     <div class="drawer-brand">
@@ -6731,7 +6728,7 @@
       <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1 id="reviewTitle">Monthly recap</h1>
+      <h1 id="reviewTitle">Reports</h1>
     </div>
 
     <!-- Prev / next month navigation -->
@@ -6813,9 +6810,9 @@
     <!-- Legend -->
     <div class="cal-legend">
       <span class="cal-legend-item"><span class="dot income"></span>Income</span>
-      <span class="cal-legend-item"><span class="dot due"></span>Budget due</span>
-      <span class="cal-legend-item"><span class="dot loan"></span>Loan due</span>
-      <span class="cal-legend-item"><span class="dot logged"></span>Logged</span>
+      <span class="cal-legend-item"><span class="dot due"></span>Budget</span>
+      <span class="cal-legend-item"><span class="dot ipon"></span>Ipon</span>
+      <span class="cal-legend-item"><span class="dot loan"></span>Utang / Pautang</span>
     </div>
 
     <!-- Selected day detail — renders when a day is tapped in month view -->
@@ -13020,8 +13017,8 @@
   }
 
   // Return all events for a specific date.
+  // Four types: income paydays, budget dues, utang/pautang dues, ipon contributions.
   function computeEventsForDate(user, dateObj) {
-    const ymd = ymdOf(dateObj);
     const events = [];
 
     // Expected income
@@ -13046,6 +13043,17 @@
       }
     });
 
+    // Ipon — scheduled savings contributions
+    (user.goals || []).forEach(g => {
+      if (scheduleMatchesDate(g, dateObj, 'contribDay', 'contribDay2', 'contribMonth')) {
+        events.push({
+          type: 'ipon',
+          label: g.name || 'Ipon',
+          amount: Number(g.contribution) || 0,
+        });
+      }
+    });
+
     // Loan dues (skip paid-off loans)
     (user.loans || []).forEach(loan => {
       if (loan.status === 'paid') return;
@@ -13057,18 +13065,6 @@
           amount: Number(loan.monthlyPayment) || 0,
         });
       }
-    });
-
-    // Actual transactions logged on this date
-    (user.transactions || []).forEach(t => {
-      if (!t.date || t.date !== ymd) return;
-      const sign = t.type === 'expense' ? '−' : t.type === 'income' ? '+' : '';
-      events.push({
-        type: 'logged',
-        label: resolveTxName(t, user),
-        amount: Number(t.amount) || 0,
-        sign,
-      });
     });
 
     return events;
@@ -13121,7 +13117,7 @@
 
       const events = inMonth ? computeEventsForDate(user, cellDate) : [];
       const types = eventTypeSet(events);
-      const dots = ['income', 'due', 'loan', 'logged']
+      const dots = ['income', 'due', 'ipon', 'loan']
         .filter(t => types.has(t))
         .map(t => `<span class="cal-dot ${t}"></span>`)
         .join('');
@@ -13176,8 +13172,9 @@
         : events.map(e => {
             const iconChar = e.type === 'income' ? '↑'
                           : e.type === 'due'    ? '📅'
+                          : e.type === 'ipon'   ? '🌱'
                           : e.type === 'loan'   ? '💳'
-                          : '✓';
+                          : '•';
             const amtStr = (e.sign || '') + peso(e.amount);
             return `
               <div class="cal-event-chip">
@@ -13218,8 +13215,9 @@
       list.innerHTML = events.map(e => {
         const iconChar = e.type === 'income' ? '↑'
                       : e.type === 'due'    ? '📅'
+                      : e.type === 'ipon'   ? '🌱'
                       : e.type === 'loan'   ? '💳'
-                      : '✓';
+                      : '•';
         const amtStr = (e.sign || '') + peso(e.amount);
         return `
           <div class="cal-event-chip" style="padding: 8px 0; border-bottom: 1px solid var(--sand);">
