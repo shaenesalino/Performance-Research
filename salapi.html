@@ -3948,8 +3948,12 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
+    align-items: end;   /* bottom-align inputs when one label wraps to 2 lines */
   }
   .two-col-fields .field { margin-bottom: 14px; }
+  /* When .two-col-fields is inside a .form container, the form's own gap handles
+     vertical spacing — kill the child bottom margin so gaps don't stack. */
+  .form .two-col-fields .field { margin-bottom: 0; }
 
   /* Loan balance banner + payment context */
   .loan-balance-banner {
