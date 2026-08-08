@@ -6219,20 +6219,20 @@
     </div>
 
     <div class="field">
-      <label>Lender <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+      <label id="loanLenderLbl">Lender <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
       <input class="input" type="text" id="loanLenderInput" placeholder="e.g. BPI, PayLater, Mom" maxlength="60" />
     </div>
 
     <div class="two-col-fields">
       <div class="field">
-        <label>Original amount</label>
+        <label id="loanOriginalLbl">Original amount</label>
         <div style="position:relative;">
           <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
           <input class="input" type="number" min="0" step="0.01" id="loanOriginalInput" placeholder="0" style="padding-left:32px;" />
         </div>
       </div>
       <div class="field">
-        <label>Remaining</label>
+        <label id="loanBalanceLbl">Remaining</label>
         <div style="position:relative;">
           <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
           <input class="input" type="number" min="0" step="0.01" id="loanBalanceInput" placeholder="0" style="padding-left:32px;" />
@@ -6246,7 +6246,7 @@
         <input class="input" type="number" min="0" step="0.01" id="loanRateInput" placeholder="e.g. 6.5" />
       </div>
       <div class="field">
-        <label>Monthly payment</label>
+        <label id="loanPaymentLbl">Monthly payment</label>
         <div style="position:relative;">
           <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
           <input class="input" type="number" min="0" step="0.01" id="loanPaymentInput" placeholder="0" style="padding-left:32px;" />
@@ -6269,13 +6269,13 @@
         </div>
       </div>
       <div class="field">
-        <label>Due day</label>
+        <label id="loanDueDayLbl">Due day</label>
         <input class="input" type="number" min="1" max="31" id="loanDueDayInput" placeholder="e.g. 15" />
       </div>
     </div>
 
     <div class="field">
-      <label>Status</label>
+      <label id="loanStatusLbl">Status</label>
       <div class="select-wrap">
         <select class="input select" id="loanStatusSelect">
           <option value="active">Active</option>
@@ -13107,8 +13107,8 @@
 
     // Loans preview
     document.getElementById('nwLoansPreview').textContent = nw.totalLiabilities > 0
-      ? `${peso(nw.totalLiabilities)} owed across ${nw.loansCount} ${nw.loansCount === 1 ? 'loan' : 'loans'}`
-      : 'None tracked yet';
+      ? `${peso(nw.totalLiabilities)} owed across ${nw.loansCount} ${nw.loansCount === 1 ? 'utang' : 'utangs'}`
+      : (nw.totalReceivables > 0 ? `${peso(nw.totalReceivables)} pautang (asset side)` : 'None tracked yet');
 
     goto('networth');
   }
@@ -13468,12 +13468,44 @@
 
     // Title reflects the entry's direction (Edit utang / Edit pautang) so users
     // know which bucket they're modifying.
-    const editingDir = existing?.direction || 'payable';
+    const editingDir = existing?.direction || (isEditing ? 'payable' : pendingLoanDirection);
+    const isReceivable = editingDir === 'receivable';
     document.getElementById('loanEditTitle').textContent = isEditing
-      ? (editingDir === 'receivable' ? 'Edit pautang' : 'Edit utang')
-      : 'Add loan';
-    document.getElementById('saveLoanBtn').textContent   = isEditing ? 'Save changes' : 'Save loan';
+      ? (isReceivable ? 'Edit pautang' : 'Edit utang')
+      : (isReceivable ? 'Add pautang' : 'Add utang');
+    document.getElementById('saveLoanBtn').textContent   = isEditing
+      ? 'Save changes'
+      : (isReceivable ? 'Save pautang' : 'Save utang');
     document.getElementById('deleteLoanBtn').style.display = isEditing ? 'block' : 'none';
+
+    // Flip labels + placeholders + status options so the form reads correctly
+    // from the lender's perspective (pautang) vs the borrower's (utang).
+    const setOptional = (base) => `${base} <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span>`;
+    if (isReceivable) {
+      document.getElementById('loanLenderLbl').innerHTML   = setOptional('Borrower');
+      document.getElementById('loanLenderInput').placeholder = 'e.g. Kuya Ben, Ate Rose, JC';
+      document.getElementById('loanOriginalLbl').textContent  = 'Amount lent';
+      document.getElementById('loanBalanceLbl').textContent   = 'Still owed to you';
+      document.getElementById('loanPaymentLbl').textContent   = 'Expected repayment';
+      document.getElementById('loanDueDayLbl').textContent    = 'Expected due day';
+      document.getElementById('loanStatusLbl').textContent    = 'Status';
+      const statusSel = document.getElementById('loanStatusSelect');
+      statusSel.options[0].textContent = 'Outstanding';
+      statusSel.options[1].textContent = 'Fully collected';
+      statusSel.options[2].textContent = 'Overdue';
+    } else {
+      document.getElementById('loanLenderLbl').innerHTML   = setOptional('Lender');
+      document.getElementById('loanLenderInput').placeholder = 'e.g. BPI, PayLater, Mom';
+      document.getElementById('loanOriginalLbl').textContent  = 'Original amount';
+      document.getElementById('loanBalanceLbl').textContent   = 'Remaining';
+      document.getElementById('loanPaymentLbl').textContent   = 'Monthly payment';
+      document.getElementById('loanDueDayLbl').textContent    = 'Due day';
+      document.getElementById('loanStatusLbl').textContent    = 'Status';
+      const statusSel = document.getElementById('loanStatusSelect');
+      statusSel.options[0].textContent = 'Active';
+      statusSel.options[1].textContent = 'Paid off';
+      statusSel.options[2].textContent = 'In default';
+    }
 
     // Balance banner + payment history are now on the loan DETAIL view.
     // The edit screen focuses on the form only, to avoid duplication.
@@ -13521,13 +13553,10 @@
   document.getElementById('addUtangBtn').addEventListener('click', () => {
     pendingLoanDirection = 'payable';
     openLoanEdit(userCache, null);
-    // Retitle the edit screen so it's obvious which bucket we're adding to
-    document.getElementById('loanEditTitle').textContent = 'Add utang';
   });
   document.getElementById('addPautangBtn').addEventListener('click', () => {
     pendingLoanDirection = 'receivable';
     openLoanEdit(userCache, null);
-    document.getElementById('loanEditTitle').textContent = 'Add pautang';
   });
 
   document.getElementById('saveLoanBtn').addEventListener('click', async () => {
