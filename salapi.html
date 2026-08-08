@@ -2198,6 +2198,7 @@
     flex: 1;
     letter-spacing: -0.3px;
   }
+  .header-add-btn,
   .txh-add-btn {
     background: var(--blue);
     border: none;
@@ -2209,9 +2210,13 @@
     font-size: 20px;
     line-height: 1;
     box-shadow: 0 4px 12px rgba(26, 71, 214, 0.28);
-    transition: transform 0.15s;
+    transition: transform 0.15s, background 0.15s;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
   }
+  .header-add-btn:hover,
   .txh-add-btn:hover { background: #1339B8; }
+  .header-add-btn:active,
   .txh-add-btn:active { transform: scale(0.95); }
 
   /* Select mode toggle in the header */
@@ -3212,6 +3217,55 @@
     box-shadow: 0 3px 12px rgba(214, 69, 69, 0.35);
   }
   .confirm-modal-actions .btn-primary.danger:hover { background: #c33a3a; }
+
+  /* Picker options — big tile buttons inside the confirm modal body */
+  .picker-option {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: transform 0.12s, border-color 0.12s, background 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .picker-option:last-child { margin-bottom: 0; }
+  .picker-option:hover  { border-color: var(--blue); background: var(--cream-2); }
+  .picker-option:active { transform: scale(0.98); }
+  .picker-option .picker-icon {
+    font-size: 22px;
+    line-height: 1;
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    background: var(--cream-2);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .picker-option .picker-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .picker-option .picker-label {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    color: var(--navy);
+    font-size: 15px;
+    line-height: 1.2;
+  }
+  .picker-option .picker-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
 
   /* Quick log strip on transaction screen */
   .quick-log-strip {
@@ -5845,7 +5899,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>Sahod at Kita</h1>
-      
+      <button class="header-add-btn" type="button" data-add-new="income" aria-label="Add income">+</button>
     </div>
 
     <div class="total-banner" id="incomeViewBanner" style="display:none;">
@@ -5871,7 +5925,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>Budget</h1>
-      
+      <button class="header-add-btn" type="button" data-add-new="budget" aria-label="Add expense">+</button>
     </div>
 
     <div class="budget-banner" id="budgetViewBanner" style="display:none;">
@@ -5901,7 +5955,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>Ipon</h1>
-      
+      <button class="header-add-btn" type="button" data-add-new="savings" aria-label="Add savings goal">+</button>
     </div>
 
     <div class="savings-banner" id="savingsViewBanner" style="display:none;">
@@ -5961,7 +6015,7 @@
       <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>Pitaka</h1>
+      <h1>Pitaka</h1><button class="header-add-btn" type="button" id="walletsHeaderAddBtn" aria-label="Add wallet">+</button>
     </div>
 
     <div class="wallets-intro">
@@ -6147,6 +6201,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1>Utang at Pautang</h1>
+      <button class="header-add-btn" type="button" id="loansHeaderAddBtn" aria-label="Add">+</button>
     </div>
 
     <p class="loans-intro" id="loansIntro">Track what you owe (utang) and what others owe you (pautang) — all in one place.</p>
@@ -6177,11 +6232,7 @@
 
     <div id="loansList"></div>
 
-    <!-- Two side-by-side add buttons -->
-    <div class="loans-add-row" style="margin-top: 12px;">
-      <button class="btn btn-outline" id="addUtangBtn" type="button">+ Utang</button>
-      <button class="btn btn-outline" id="addPautangBtn" type="button">+ Pautang</button>
-    </div>
+    <!-- Add is on the header button; bottom row removed to avoid duplication -->
   </section>
 
   <!-- ============ LOAN EDIT ============ -->
@@ -6205,93 +6256,95 @@
       <button type="button" class="btn btn-primary" id="recordPaymentBtn" style="margin: 0; max-width: 160px; padding: 10px 16px; font-size: 13px;">+ Record payment</button>
     </div>
 
-    <div class="field">
-      <label>Loan type</label>
-      <div class="select-wrap">
-        <select class="input select" id="loanTypeSelect"></select>
-        <span class="select-caret">▾</span>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Name</label>
-      <input class="input" type="text" id="loanNameInput" placeholder="e.g. BPI Home Loan, Bea's utang" maxlength="60" />
-    </div>
-
-    <div class="field">
-      <label id="loanLenderLbl">Lender <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
-      <input class="input" type="text" id="loanLenderInput" placeholder="e.g. BPI, PayLater, Mom" maxlength="60" />
-    </div>
-
-    <div class="two-col-fields">
+    <div class="form">
       <div class="field">
-        <label id="loanOriginalLbl">Original amount</label>
-        <div style="position:relative;">
-          <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
-          <input class="input" type="number" min="0" step="0.01" id="loanOriginalInput" placeholder="0" style="padding-left:32px;" />
-        </div>
-      </div>
-      <div class="field">
-        <label id="loanBalanceLbl">Remaining</label>
-        <div style="position:relative;">
-          <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
-          <input class="input" type="number" min="0" step="0.01" id="loanBalanceInput" placeholder="0" style="padding-left:32px;" />
-        </div>
-      </div>
-    </div>
-
-    <div class="two-col-fields">
-      <div class="field">
-        <label>Interest rate (%/yr) <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
-        <input class="input" type="number" min="0" step="0.01" id="loanRateInput" placeholder="e.g. 6.5" />
-      </div>
-      <div class="field">
-        <label id="loanPaymentLbl">Monthly payment</label>
-        <div style="position:relative;">
-          <span style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:600;">₱</span>
-          <input class="input" type="number" min="0" step="0.01" id="loanPaymentInput" placeholder="0" style="padding-left:32px;" />
-        </div>
-      </div>
-    </div>
-
-    <div class="two-col-fields">
-      <div class="field">
-        <label>Frequency</label>
+        <label>Loan type</label>
         <div class="select-wrap">
-          <select class="input select" id="loanFreqSelect">
-            <option value="monthly">Monthly</option>
-            <option value="weekly">Weekly</option>
-            <option value="semi-monthly">Semi-monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="annually">Annually</option>
+          <select class="input select" id="loanTypeSelect"></select>
+          <span class="select-caret">▾</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Name</label>
+        <input class="input" type="text" id="loanNameInput" placeholder="e.g. BPI Home Loan, Bea's utang" maxlength="60" />
+      </div>
+
+      <div class="field">
+        <label id="loanLenderLbl">Lender <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+        <input class="input" type="text" id="loanLenderInput" placeholder="e.g. BPI, PayLater, Mom" maxlength="60" />
+      </div>
+
+      <div class="two-col-fields">
+        <div class="field">
+          <label id="loanOriginalLbl">Original amount</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanOriginalInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+        <div class="field">
+          <label id="loanBalanceLbl">Remaining</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanBalanceInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col-fields">
+        <div class="field">
+          <label>Interest rate (%/yr) <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+          <input class="input" type="number" min="0" step="0.01" id="loanRateInput" placeholder="e.g. 6.5" />
+        </div>
+        <div class="field">
+          <label id="loanPaymentLbl">Monthly payment</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanPaymentInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col-fields">
+        <div class="field">
+          <label>Frequency</label>
+          <div class="select-wrap">
+            <select class="input select" id="loanFreqSelect">
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="semi-monthly">Semi-monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annually">Annually</option>
+            </select>
+            <span class="select-caret">▾</span>
+          </div>
+        </div>
+        <div class="field">
+          <label id="loanDueDayLbl">Due day</label>
+          <input class="input" type="number" min="1" max="31" id="loanDueDayInput" placeholder="e.g. 15" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label id="loanStatusLbl">Status</label>
+        <div class="select-wrap">
+          <select class="input select" id="loanStatusSelect">
+            <option value="active">Active</option>
+            <option value="paid">Paid off</option>
+            <option value="defaulted">In default</option>
           </select>
           <span class="select-caret">▾</span>
         </div>
       </div>
+
       <div class="field">
-        <label id="loanDueDayLbl">Due day</label>
-        <input class="input" type="number" min="1" max="31" id="loanDueDayInput" placeholder="e.g. 15" />
+        <label>Note <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+        <input class="input" type="text" id="loanNoteInput" placeholder="Anything worth remembering" maxlength="120" />
       </div>
     </div>
 
-    <div class="field">
-      <label id="loanStatusLbl">Status</label>
-      <div class="select-wrap">
-        <select class="input select" id="loanStatusSelect">
-          <option value="active">Active</option>
-          <option value="paid">Paid off</option>
-          <option value="defaulted">In default</option>
-        </select>
-        <span class="select-caret">▾</span>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Note <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
-      <input class="input" type="text" id="loanNoteInput" placeholder="Anything worth remembering" maxlength="120" />
-    </div>
-
-    <div class="income-actions" style="margin-top: 20px;">
+    <div class="income-actions" style="margin-top: 24px;">
       <button class="btn btn-primary" id="saveLoanBtn" type="button">Save loan</button>
       <button class="btn btn-ghost" type="button" data-nav="loans">Cancel</button>
       <button class="single-delete-btn" id="deleteLoanBtn" type="button">Delete this loan</button>
@@ -9853,6 +9906,56 @@
     });
   }
 
+  // showPicker({ icon, title, options: [{ key, label, sub, icon }] }) → Promise<key|null>
+  // A modal with N large tap-friendly option cards. Returns the picked key,
+  // or null if the user dismissed via backdrop / Esc.
+  function showPicker(opts = {}) {
+    const modal   = document.getElementById('confirmModal');
+    const iconEl  = document.getElementById('confirmModalIcon');
+    const titleEl = document.getElementById('confirmModalTitle');
+    const bodyEl  = document.getElementById('confirmModalBody');
+    const actions = modal.querySelector('.confirm-modal-actions');
+    const cancels = modal.querySelectorAll('[data-confirm-cancel]');
+
+    iconEl.textContent  = opts.icon  || '';
+    titleEl.textContent = opts.title || 'Choose one';
+
+    // Options render as full-width tile-like buttons inside the body area.
+    // The action bar (Cancel / Confirm) is hidden here — each option IS a confirm.
+    bodyEl.innerHTML = (opts.options || []).map(o => `
+      <button type="button" class="picker-option" data-picker-key="${escapeAttr(o.key)}">
+        ${o.icon ? `<span class="picker-icon">${o.icon}</span>` : ''}
+        <span class="picker-text">
+          <span class="picker-label">${escapeAttr(o.label)}</span>
+          ${o.sub ? `<span class="picker-sub">${escapeAttr(o.sub)}</span>` : ''}
+        </span>
+      </button>
+    `).join('');
+    actions.style.display = 'none';
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+
+    return new Promise(resolve => {
+      const cleanup = (result) => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        actions.style.display = '';   // restore for future showConfirm callers
+        cancels.forEach(el => el.removeEventListener('click', onCancel));
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      const onCancel = () => cleanup(null);
+      const onKey    = (e) => { if (e.key === 'Escape') cleanup(null); };
+      cancels.forEach(el => el.addEventListener('click', onCancel));
+      document.addEventListener('keydown', onKey);
+      // Delegate option clicks
+      bodyEl.querySelectorAll('[data-picker-key]').forEach(btn => {
+        btn.addEventListener('click', () => cleanup(btn.dataset.pickerKey), { once: true });
+      });
+    });
+  }
+
   document.getElementById('profileLogoutBtn').addEventListener('click', async () => {
     if (DEV_OFFLINE_MODE) {
       toast("Offline mode — you're always signed in on this device.", 'success');
@@ -12564,6 +12667,9 @@
   document.getElementById('addWalletBtn').addEventListener('click', () => {
     openWalletEdit(userCache, null);
   });
+  document.getElementById('walletsHeaderAddBtn').addEventListener('click', () => {
+    openWalletEdit(userCache, null);
+  });
 
   document.getElementById('saveWalletBtn').addEventListener('click', async () => {
     const method = document.getElementById('walletMethodSelect').value;
@@ -13550,12 +13656,32 @@
   // 'payable' = utang (I owe), 'receivable' = pautang (they owe me)
   let pendingLoanDirection = 'payable';
 
-  document.getElementById('addUtangBtn').addEventListener('click', () => {
-    pendingLoanDirection = 'payable';
-    openLoanEdit(userCache, null);
-  });
-  document.getElementById('addPautangBtn').addEventListener('click', () => {
-    pendingLoanDirection = 'receivable';
+  // Header + on Utang at Pautang — context-aware:
+  //   - Active tab is Utang    → straight into "Add utang"
+  //   - Active tab is Pautang  → straight into "Add pautang"
+  //   - Active tab is All      → picker modal (Utang or Pautang)
+  document.getElementById('loansHeaderAddBtn').addEventListener('click', async () => {
+    if (loansFilter === 'payable') {
+      pendingLoanDirection = 'payable';
+      openLoanEdit(userCache, null);
+      return;
+    }
+    if (loansFilter === 'receivable') {
+      pendingLoanDirection = 'receivable';
+      openLoanEdit(userCache, null);
+      return;
+    }
+    // "All" tab — show picker
+    const pick = await showPicker({
+      icon: '💳',
+      title: 'What are you adding?',
+      options: [
+        { key: 'payable',    label: 'Utang',    sub: 'Money you owe someone', icon: '💸' },
+        { key: 'receivable', label: 'Pautang',  sub: 'Money someone owes you', icon: '💛' },
+      ],
+    });
+    if (!pick) return;
+    pendingLoanDirection = pick;
     openLoanEdit(userCache, null);
   });
 
