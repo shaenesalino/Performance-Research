@@ -5062,6 +5062,316 @@
   .nwf-item .val.positive { color: var(--teal); }
   .nwf-item .val.negative { color: var(--error); }
 
+  /* ===== CALENDAR SCREEN ================================================== */
+  .cal-view-tabs {
+    display: flex;
+    background: var(--cream-2);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .cal-view-btn {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 8px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cal-view-btn.active {
+    background: var(--white);
+    color: var(--navy);
+    box-shadow: 0 1px 3px rgba(10, 37, 64, 0.08);
+  }
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 14px;
+    padding: 6px;
+    margin-bottom: 8px;
+  }
+  .cal-nav-btn {
+    background: var(--cream-2);
+    border: 0;
+    color: var(--navy);
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cal-nav-btn:hover  { background: var(--sand); }
+  .cal-nav-label {
+    flex: 1;
+    text-align: center;
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 18px;
+    color: var(--navy);
+    letter-spacing: -0.2px;
+  }
+  .cal-today-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+  .cal-today-btn {
+    background: transparent;
+    border: 0;
+    color: var(--blue);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cal-today-btn:hover { background: rgba(26, 71, 214, 0.06); }
+
+  /* Month view */
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .cal-weekdays span {
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-cell {
+    aspect-ratio: 1;
+    background: var(--white);
+    border: 1.5px solid transparent;
+    border-radius: 10px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cal-cell:hover  { background: var(--cream-2); }
+  .cal-cell:active { transform: scale(0.96); }
+  .cal-cell.other-month {
+    color: var(--muted);
+    opacity: 0.4;
+    cursor: default;
+    background: transparent;
+  }
+  .cal-cell.other-month:hover { background: transparent; }
+  .cal-cell.today {
+    border-color: var(--blue);
+    background: rgba(26, 71, 214, 0.05);
+  }
+  .cal-cell.selected {
+    background: var(--navy);
+    color: var(--cream);
+  }
+  .cal-cell.selected .cal-cell-num { color: var(--cream); }
+  .cal-cell-num {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--navy);
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .cal-cell-dots {
+    display: flex;
+    gap: 2px;
+    margin-top: 4px;
+    height: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .cal-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+  }
+  .cal-dot.income { background: var(--teal); }
+  .cal-dot.due    { background: var(--orange); }
+  .cal-dot.loan   { background: var(--error); }
+  .cal-dot.logged { background: var(--blue); }
+
+  /* Week view — vertical list */
+  .cal-week {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .cal-week-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 12px;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 14px;
+    padding: 12px 14px;
+    align-items: flex-start;
+  }
+  .cal-week-row.today { border-color: var(--blue); background: rgba(26, 71, 214, 0.04); }
+  .cal-week-row.empty { opacity: 0.7; }
+  .cal-week-date {
+    text-align: center;
+  }
+  .cal-week-date .dow {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .cal-week-date .day {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--navy);
+    line-height: 1.1;
+    margin-top: 2px;
+  }
+  .cal-week-events {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .cal-week-events .empty-note {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 4px 0;
+  }
+  .cal-event-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--navy);
+  }
+  .cal-event-chip .chip-icon {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    display: grid; place-items: center;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .cal-event-chip .chip-icon.income { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
+  .cal-event-chip .chip-icon.due    { background: rgba(242, 101, 34, 0.15); color: var(--orange); }
+  .cal-event-chip .chip-icon.loan   { background: rgba(214, 69, 69, 0.15); color: var(--error); }
+  .cal-event-chip .chip-icon.logged { background: rgba(26, 71, 214, 0.12); color: var(--blue); }
+  .cal-event-chip .chip-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cal-event-chip .chip-amt {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  /* Legend */
+  .cal-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 4px;
+    margin-top: 4px;
+  }
+  .cal-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .cal-legend-item .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .cal-legend-item .dot.income { background: var(--teal); }
+  .cal-legend-item .dot.due    { background: var(--orange); }
+  .cal-legend-item .dot.loan   { background: var(--error); }
+  .cal-legend-item .dot.logged { background: var(--blue); }
+
+  /* Selected day detail — appears below month view when a day is tapped */
+  .cal-day-detail {
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-top: 6px;
+  }
+  .cal-day-detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .cal-day-detail-lbl {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 17px;
+    color: var(--navy);
+    line-height: 1.15;
+  }
+  .cal-day-detail-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .cal-day-close {
+    background: var(--cream-2);
+    border: 0;
+    color: var(--navy);
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cal-day-close:hover { background: var(--sand); }
+
   /* Wallets screen — end marker */
   .wallets-intro {
     color: var(--muted);
@@ -5273,6 +5583,9 @@
       </button>
       <button class="drawer-item" type="button" data-nav="review">
         <span class="icon">📅</span> Monthly recap
+      </button>
+      <button class="drawer-item" type="button" data-nav="calendar">
+        <span class="icon">📆</span> Calendar
       </button>
     </nav>
     <div class="drawer-brand">
@@ -6458,6 +6771,63 @@
     <div class="review-empty" id="reviewEmpty" style="display:none;">
       <div class="ico">📅</div>
       <p>No activity logged this month yet.</p>
+    </div>
+  </section>
+
+  <!-- ============ CALENDAR ============ -->
+  <section class="screen" id="screen-calendar" style="padding: 24px;">
+    <div class="view-header">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1>Calendar</h1>
+    </div>
+
+    <!-- View toggle: Month / Week -->
+    <div class="cal-view-tabs" id="calViewTabs">
+      <button type="button" class="cal-view-btn active" data-cal-view="month">Month</button>
+      <button type="button" class="cal-view-btn" data-cal-view="week">Week</button>
+    </div>
+
+    <!-- Nav: prev / label / next + Today -->
+    <div class="cal-nav">
+      <button type="button" class="cal-nav-btn" id="calPrevBtn" aria-label="Previous">←</button>
+      <div class="cal-nav-label" id="calNavLabel">—</div>
+      <button type="button" class="cal-nav-btn" id="calNextBtn" aria-label="Next">→</button>
+    </div>
+    <div class="cal-today-row">
+      <button type="button" class="cal-today-btn" id="calTodayBtn">Today</button>
+    </div>
+
+    <!-- Month view: 7-col grid -->
+    <div class="cal-month" id="calMonthView">
+      <div class="cal-weekdays">
+        <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <!-- Week view: vertical list of 7 days -->
+    <div class="cal-week" id="calWeekView" style="display:none;"></div>
+
+    <!-- Legend -->
+    <div class="cal-legend">
+      <span class="cal-legend-item"><span class="dot income"></span>Income</span>
+      <span class="cal-legend-item"><span class="dot due"></span>Budget due</span>
+      <span class="cal-legend-item"><span class="dot loan"></span>Loan due</span>
+      <span class="cal-legend-item"><span class="dot logged"></span>Logged</span>
+    </div>
+
+    <!-- Selected day detail — renders when a day is tapped in month view -->
+    <div class="cal-day-detail" id="calDayDetail" style="display:none;">
+      <div class="cal-day-detail-head">
+        <div>
+          <div class="cal-day-detail-lbl" id="calDayDetailDate">—</div>
+          <div class="cal-day-detail-sub" id="calDayDetailSub">—</div>
+        </div>
+        <button type="button" class="cal-day-close" id="calDayDetailClose" aria-label="Close">×</button>
+      </div>
+      <div id="calDayDetailList"></div>
     </div>
   </section>
 
@@ -9441,6 +9811,7 @@
     else if (nav === 'networth')      showNetWorth(u);
     else if (nav === 'loans')         showLoansScreen(u);
     else if (nav === 'review')        showMonthlyReview(u);
+    else if (nav === 'calendar')      showCalendarScreen(u);
     else if (nav === 'profile')       showProfile(u);
     else if (nav === 'logout') {
       await auth.signOut();
@@ -12584,6 +12955,328 @@
     // Sort by priority desc, cap at 4 (bumped from 3 now that we have more variety)
     return insights.sort((a, b) => b.priority - a.priority).slice(0, 4);
   }
+
+  // =========================================================================
+  // CALENDAR
+  // =========================================================================
+  //
+  // Shows expected income paydays, budget dues, and loan due dates for a
+  // whole month or week, alongside any actual transactions logged on those
+  // dates. Two views (month grid, week list), navigable via arrows.
+  // =========================================================================
+
+  // Current calendar state
+  let calView = 'month';                            // 'month' | 'week'
+  let calDate = new Date();                         // anchor date (first of month, or any day in the week)
+  let calSelectedDate = null;                       // 'YYYY-MM-DD' when a day is tapped in month view
+
+  // Helpers
+  function ymdOf(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function parseYmd(s) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  function isSameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  // Given an income/expense/loan and a Date, decide if the entry is "due" that day.
+  // Handles the frequencies the app supports: monthly, semi-monthly, quarterly,
+  // annually, and (best-effort) weekly.
+  function scheduleMatchesDate(entry, dateObj, dayFieldA, dayFieldB, monthField) {
+    const dom = dateObj.getDate();
+    const mo  = dateObj.getMonth() + 1;   // 1-12
+    const dayA = Number(entry[dayFieldA]) || null;
+    const dayB = Number(entry[dayFieldB]) || null;
+    const setMo = Number(entry[monthField]) || null;
+    const freq  = entry.frequency || 'monthly';
+
+    switch (freq) {
+      case 'monthly':
+        return dayA !== null && dom === dayA;
+      case 'semi-monthly':
+        return (dayA !== null && dom === dayA) || (dayB !== null && dom === dayB);
+      case 'quarterly': {
+        // Fires on setMo (default 1) and every 3rd month after, on dayA
+        if (dayA === null || dom !== dayA) return false;
+        const startMo = setMo || 1;
+        return ((mo - startMo) % 3 + 3) % 3 === 0;
+      }
+      case 'annually':
+        return dayA !== null && setMo !== null && dom === dayA && mo === setMo;
+      case 'weekly':
+        // Weekly semantics in this app are loose. Best-effort: if dayA is 1-7,
+        // treat it as a weekday (Sun=1..Sat=7). Otherwise fall back to
+        // treating dayA as day-of-month and showing weekly.
+        if (dayA !== null && dayA >= 1 && dayA <= 7) {
+          return dateObj.getDay() + 1 === dayA;   // JS Sun=0..Sat=6 → +1
+        }
+        return dayA !== null && dom === dayA;
+      default:
+        return false;
+    }
+  }
+
+  // Return all events for a specific date.
+  function computeEventsForDate(user, dateObj) {
+    const ymd = ymdOf(dateObj);
+    const events = [];
+
+    // Expected income
+    (user.incomes || []).forEach(inc => {
+      if (scheduleMatchesDate(inc, dateObj, 'payday', 'payday2', 'payMonth')) {
+        events.push({
+          type: 'income',
+          label: inc.label || 'Income',
+          amount: Number(inc.amount) || 0,
+        });
+      }
+    });
+
+    // Expected budget dues
+    (user.expenses || []).forEach(exp => {
+      if (scheduleMatchesDate(exp, dateObj, 'dueDay', 'dueDay2', 'dueMonth')) {
+        events.push({
+          type: 'due',
+          label: exp.name || 'Expense',
+          amount: Number(exp.amount) || 0,
+        });
+      }
+    });
+
+    // Loan dues (skip paid-off loans)
+    (user.loans || []).forEach(loan => {
+      if (loan.status === 'paid') return;
+      if (scheduleMatchesDate(loan, dateObj, 'dueDay', null, null)) {
+        const isReceivable = (loan.direction || 'payable') === 'receivable';
+        events.push({
+          type: 'loan',
+          label: (isReceivable ? 'Collect: ' : 'Pay: ') + (loan.name || 'Loan'),
+          amount: Number(loan.monthlyPayment) || 0,
+        });
+      }
+    });
+
+    // Actual transactions logged on this date
+    (user.transactions || []).forEach(t => {
+      if (!t.date || t.date !== ymd) return;
+      const sign = t.type === 'expense' ? '−' : t.type === 'income' ? '+' : '';
+      events.push({
+        type: 'logged',
+        label: resolveTxName(t, user),
+        amount: Number(t.amount) || 0,
+        sign,
+      });
+    });
+
+    return events;
+  }
+
+  // Group events by simple type totals for a compact indicator (used by month cells).
+  function eventTypeSet(events) {
+    const set = new Set();
+    events.forEach(e => set.add(e.type));
+    return set;
+  }
+
+  function renderCalendar(user) {
+    document.getElementById('calMonthView').style.display = calView === 'month' ? '' : 'none';
+    document.getElementById('calWeekView').style.display  = calView === 'week'  ? '' : 'none';
+    document.querySelectorAll('[data-cal-view]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.calView === calView);
+    });
+
+    if (calView === 'month') renderCalendarMonth(user);
+    else                     renderCalendarWeek(user);
+  }
+
+  function renderCalendarMonth(user) {
+    const y = calDate.getFullYear();
+    const m = calDate.getMonth();
+    const first = new Date(y, m, 1);
+    const monthName = first.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+    document.getElementById('calNavLabel').textContent = monthName;
+
+    // Determine grid start (Sunday of the week the 1st sits in) and total 42 cells
+    const startWeekday = first.getDay();   // 0=Sun
+    const gridStart = new Date(y, m, 1 - startWeekday);
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    const today = new Date();
+    for (let i = 0; i < 42; i++) {
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(gridStart.getDate() + i);
+      const inMonth = cellDate.getMonth() === m;
+      const ymd = ymdOf(cellDate);
+      const isToday = isSameDay(cellDate, today);
+      const isSelected = calSelectedDate === ymd;
+
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'cal-cell' + (inMonth ? '' : ' other-month') + (isToday ? ' today' : '') + (isSelected ? ' selected' : '');
+      cell.dataset.date = ymd;
+
+      const events = inMonth ? computeEventsForDate(user, cellDate) : [];
+      const types = eventTypeSet(events);
+      const dots = ['income', 'due', 'loan', 'logged']
+        .filter(t => types.has(t))
+        .map(t => `<span class="cal-dot ${t}"></span>`)
+        .join('');
+
+      cell.innerHTML = `
+        <span class="cal-cell-num">${cellDate.getDate()}</span>
+        <span class="cal-cell-dots">${dots}</span>
+      `;
+      if (inMonth) {
+        cell.addEventListener('click', () => {
+          calSelectedDate = ymd;
+          renderCalendarMonth(userCache);
+          renderCalendarDayDetail(userCache, cellDate);
+        });
+      }
+      grid.appendChild(cell);
+    }
+
+    // Render selected-day detail if one is set
+    if (calSelectedDate) {
+      renderCalendarDayDetail(user, parseYmd(calSelectedDate));
+    } else {
+      document.getElementById('calDayDetail').style.display = 'none';
+    }
+  }
+
+  function renderCalendarWeek(user) {
+    // Anchor week to the Sunday of the week containing calDate
+    const anchor = new Date(calDate);
+    anchor.setDate(anchor.getDate() - anchor.getDay());   // back to Sunday
+    const weekEnd = new Date(anchor);
+    weekEnd.setDate(anchor.getDate() + 6);
+    const sameMonth = anchor.getMonth() === weekEnd.getMonth();
+    const label = sameMonth
+      ? `${anchor.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
+      : `${anchor.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} – ${weekEnd.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}, ${weekEnd.getFullYear()}`;
+    document.getElementById('calNavLabel').textContent = label;
+
+    const wrap = document.getElementById('calWeekView');
+    wrap.innerHTML = '';
+    const today = new Date();
+    const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(anchor);
+      d.setDate(anchor.getDate() + i);
+      const events = computeEventsForDate(user, d);
+      const isToday = isSameDay(d, today);
+      const row = document.createElement('div');
+      row.className = 'cal-week-row' + (isToday ? ' today' : '') + (events.length === 0 ? ' empty' : '');
+      const eventsHtml = events.length === 0
+        ? '<div class="empty-note">Nothing scheduled</div>'
+        : events.map(e => {
+            const iconChar = e.type === 'income' ? '↑'
+                          : e.type === 'due'    ? '📅'
+                          : e.type === 'loan'   ? '💳'
+                          : '✓';
+            const amtStr = (e.sign || '') + peso(e.amount);
+            return `
+              <div class="cal-event-chip">
+                <span class="chip-icon ${e.type}">${iconChar}</span>
+                <span class="chip-label">${escapeAttr(e.label)}</span>
+                <span class="chip-amt">${amtStr}</span>
+              </div>
+            `;
+          }).join('');
+      row.innerHTML = `
+        <div class="cal-week-date">
+          <div class="dow">${DOW[d.getDay()]}</div>
+          <div class="day">${d.getDate()}</div>
+        </div>
+        <div class="cal-week-events">${eventsHtml}</div>
+      `;
+      wrap.appendChild(row);
+    }
+
+    // Selected-day detail is month-view only; hide in week view
+    document.getElementById('calDayDetail').style.display = 'none';
+  }
+
+  function renderCalendarDayDetail(user, dateObj) {
+    const detail = document.getElementById('calDayDetail');
+    const events = computeEventsForDate(user, dateObj);
+    document.getElementById('calDayDetailDate').textContent = dateObj.toLocaleDateString('en-PH', {
+      weekday: 'long', month: 'long', day: 'numeric',
+    });
+    document.getElementById('calDayDetailSub').textContent = events.length === 0
+      ? 'Nothing scheduled or logged.'
+      : `${events.length} ${events.length === 1 ? 'item' : 'items'}`;
+
+    const list = document.getElementById('calDayDetailList');
+    if (events.length === 0) {
+      list.innerHTML = '';
+    } else {
+      list.innerHTML = events.map(e => {
+        const iconChar = e.type === 'income' ? '↑'
+                      : e.type === 'due'    ? '📅'
+                      : e.type === 'loan'   ? '💳'
+                      : '✓';
+        const amtStr = (e.sign || '') + peso(e.amount);
+        return `
+          <div class="cal-event-chip" style="padding: 8px 0; border-bottom: 1px solid var(--sand);">
+            <span class="chip-icon ${e.type}">${iconChar}</span>
+            <span class="chip-label">${escapeAttr(e.label)}</span>
+            <span class="chip-amt">${amtStr}</span>
+          </div>
+        `;
+      }).join('');
+    }
+    detail.style.display = 'block';
+  }
+
+  function showCalendarScreen(user) {
+    userCache = user;
+    refreshDrawerUser(user);
+    if (!(calDate instanceof Date)) calDate = new Date();
+    renderCalendar(user);
+    goto('calendar');
+  }
+
+  // Wire up view tabs, nav arrows, today button, close button
+  document.querySelectorAll('[data-cal-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      calView = btn.dataset.calView;
+      calSelectedDate = null;
+      renderCalendar(userCache);
+    });
+  });
+  document.getElementById('calPrevBtn').addEventListener('click', () => {
+    if (calView === 'month') {
+      calDate = new Date(calDate.getFullYear(), calDate.getMonth() - 1, 1);
+    } else {
+      calDate = new Date(calDate); calDate.setDate(calDate.getDate() - 7);
+    }
+    calSelectedDate = null;
+    renderCalendar(userCache);
+  });
+  document.getElementById('calNextBtn').addEventListener('click', () => {
+    if (calView === 'month') {
+      calDate = new Date(calDate.getFullYear(), calDate.getMonth() + 1, 1);
+    } else {
+      calDate = new Date(calDate); calDate.setDate(calDate.getDate() + 7);
+    }
+    calSelectedDate = null;
+    renderCalendar(userCache);
+  });
+  document.getElementById('calTodayBtn').addEventListener('click', () => {
+    calDate = new Date();
+    calSelectedDate = ymdOf(new Date());
+    renderCalendar(userCache);
+  });
+  document.getElementById('calDayDetailClose').addEventListener('click', () => {
+    calSelectedDate = null;
+    document.getElementById('calDayDetail').style.display = 'none';
+    renderCalendar(userCache);
+  });
 
   function showWalletsScreen(user) {
     userCache = user;
