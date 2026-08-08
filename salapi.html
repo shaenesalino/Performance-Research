@@ -988,6 +988,12 @@
     border-color: var(--teal);
   }
   .starter-chip.added::after { content: " ✓"; opacity: 0.85; }
+  .starter-chip-icon {
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
+  }
+  .starter-chip-icon .svg-inline-icon { width: 14px; height: 14px; }
 
   /* Expense card */
   .expense-card {
@@ -1491,11 +1497,34 @@
     color: var(--cream);
   }
   .drawer-item .icon {
-    font-size: 18px;
     width: 24px;
+    height: 24px;
     display: inline-grid;
     place-items: center;
+    color: var(--navy);
+    flex-shrink: 0;
   }
+  .drawer-item .icon svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+    pointer-events: none;
+  }
+  .drawer-item.active .icon { color: var(--cream); }
+
+  /* Base for reusable SVG icons rendered inside category chips, wallet cards,
+     loan tiles, and other contexts. Sizes and color inherit; override with
+     .svg-inline-icon.lg etc. as needed. */
+  .svg-inline-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    vertical-align: middle;
+    color: inherit;
+    flex-shrink: 0;
+  }
+  .svg-inline-icon.sm { width: 16px; height: 16px; }
+  .svg-inline-icon.lg { width: 24px; height: 24px; }
   .drawer-item.logout {
     color: var(--error);
     margin-top: 8px;
@@ -1620,9 +1649,9 @@
     width: 36px; height: 36px;
     border-radius: 12px;
     display: grid; place-items: center;
-    font-size: 16px;
     flex-shrink: 0;
   }
+  .view-item-icon .svg-inline-icon { width: 18px; height: 18px; }
   .view-item-icon.income   { background: linear-gradient(135deg, var(--yellow), var(--orange)); color: var(--white); }
   .view-item-icon.expense  { background: rgba(26, 71, 214, 0.1); color: var(--blue); }
   .view-item-icon.saving   { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
@@ -2713,9 +2742,10 @@
     background: var(--white);
     border: 1px solid var(--sand);
     display: grid; place-items: center;
-    font-size: 15px;
+    color: var(--navy);
     flex-shrink: 0;
   }
+  .reminder-icon .svg-inline-icon { width: 16px; height: 16px; }
   .reminder-info { min-width: 0; }
   .reminder-info .name {
     font-weight: 600;
@@ -3340,9 +3370,9 @@
     width: 48px; height: 48px;
     border-radius: 14px;
     display: grid; place-items: center;
-    font-size: 24px;
     flex-shrink: 0;
   }
+  .entry-summary-card .icon .svg-inline-icon { width: 24px; height: 24px; }
   .entry-summary-card .icon.income  { background: linear-gradient(135deg, var(--yellow), var(--orange)); color: var(--white); }
   .entry-summary-card .icon.expense { background: rgba(26, 71, 214, 0.1); color: var(--blue); }
   .entry-summary-card .icon.saving  { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
@@ -3548,13 +3578,14 @@
     width: 32px; height: 32px;
     border-radius: 10px;
     display: grid; place-items: center;
-    font-size: 15px;
+    color: var(--navy);
     flex-shrink: 0;
   }
-  .insight-icon.warn    { background: rgba(214, 69, 69, 0.10); }
-  .insight-icon.caution { background: rgba(245, 166, 35, 0.15); }
-  .insight-icon.good    { background: rgba(44, 188, 177, 0.15); }
-  .insight-icon.info    { background: var(--cream-2); }
+  .insight-icon .svg-inline-icon { width: 16px; height: 16px; }
+  .insight-icon.warn    { background: rgba(214, 69, 69, 0.10); color: var(--error); }
+  .insight-icon.caution { background: rgba(245, 166, 35, 0.15); color: var(--orange); }
+  .insight-icon.good    { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
+  .insight-icon.info    { background: var(--cream-2); color: var(--navy); }
   .insight-body { flex: 1; min-width: 0; }
   .insight-title {
     font-family: 'Inter', sans-serif;
@@ -3874,9 +3905,9 @@
     background: rgba(214, 69, 69, 0.08);
     color: var(--error);
     display: grid; place-items: center;
-    font-size: 18px;
     flex-shrink: 0;
   }
+  .loan-card-head .icon .svg-inline-icon { width: 20px; height: 20px; }
   .loan-card.paid .loan-card-head .icon {
     background: rgba(44, 188, 177, 0.12);
     color: var(--teal);
@@ -4336,11 +4367,12 @@
     width: 32px; height: 32px;
     border-radius: 10px;
     display: grid; place-items: center;
-    font-size: 15px;
+    color: var(--navy);
   }
-  .hs-metric.good .icon { background: rgba(44, 188, 177, 0.15); }
-  .hs-metric.ok   .icon { background: rgba(245, 166, 35, 0.18); }
-  .hs-metric.poor .icon { background: rgba(214, 69, 69, 0.12); }
+  .hs-metric .icon .svg-inline-icon { width: 16px; height: 16px; }
+  .hs-metric.good .icon { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
+  .hs-metric.ok   .icon { background: rgba(245, 166, 35, 0.18); color: var(--orange); }
+  .hs-metric.poor .icon { background: rgba(214, 69, 69, 0.12); color: var(--error); }
   .hs-metric .label {
     font-family: 'Inter', sans-serif;
     font-size: 10px;
@@ -4820,9 +4852,10 @@
     border-radius: 10px;
     background: var(--cream-2);
     display: grid; place-items: center;
-    font-size: 16px;
+    color: var(--navy);
     flex-shrink: 0;
   }
+  .goal-card-head .icon .svg-inline-icon { width: 18px; height: 18px; }
   .goal-card-head .name {
     font-family: 'Inter', sans-serif;
     font-size: 13px;
@@ -4897,11 +4930,12 @@
     width: 36px; height: 36px;
     border-radius: 10px;
     display: grid; place-items: center;
-    font-size: 15px;
+    color: var(--navy);
     flex-shrink: 0;
   }
+  .recent-tx-row .rt-icon .svg-inline-icon { width: 18px; height: 18px; }
   .recent-tx-row .rt-icon.expense  { background: var(--cream-2); }
-  .recent-tx-row .rt-icon.income   { background: rgba(245, 166, 35, 0.18); }
+  .recent-tx-row .rt-icon.income   { background: rgba(245, 166, 35, 0.18); color: var(--orange); }
   .recent-tx-row .rt-icon.saving   { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
   .recent-tx-row .rt-icon.transfer { background: rgba(10, 37, 64, 0.08); color: var(--navy); }
   .recent-tx-row .rt-info .name {
@@ -5281,12 +5315,12 @@
     color: var(--navy);
   }
   .cal-event-chip .chip-icon {
-    width: 20px; height: 20px;
+    width: 24px; height: 24px;
     border-radius: 6px;
     display: grid; place-items: center;
-    font-size: 10px;
     flex-shrink: 0;
   }
+  .cal-event-chip .chip-icon .svg-inline-icon { width: 14px; height: 14px; }
   .cal-event-chip .chip-icon.income { background: rgba(44, 188, 177, 0.15); color: var(--teal); }
   .cal-event-chip .chip-icon.due    { background: rgba(242, 101, 34, 0.15); color: var(--orange); }
   .cal-event-chip .chip-icon.ipon   { background: rgba(245, 166, 35, 0.18); color: var(--yellow); }
@@ -5421,9 +5455,10 @@
     border-radius: 12px;
     background: var(--cream-2);
     display: grid; place-items: center;
-    font-size: 22px;
+    color: var(--navy);
     flex-shrink: 0;
   }
+  .wallet-icon .svg-inline-icon { width: 22px; height: 22px; }
   .wallet-info h3 {
     font-family: 'Inter', sans-serif;
     font-size: 15px;
@@ -5558,34 +5593,34 @@
     </button>
     <nav class="drawer-nav">
       <button class="drawer-item" type="button" data-nav="home">
-        <span class="icon">☀️</span> Home
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg></span> Home
       </button>
       <button class="drawer-item" type="button" data-nav="wallets">
-        <span class="icon">👛</span> Pitaka
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h14"/><path d="M3 4v15a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-5"/><circle cx="17" cy="13" r="1.2" fill="currentColor" stroke="none"/></svg></span> Pitaka
       </button>
       <button class="drawer-item" type="button" data-nav="transactions">
-        <span class="icon">🧾</span> Transactions
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18l2-1.5L10 21l2-1.5L14 21l2-1.5L18 21V3z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg></span> Transactions
       </button>
       <button class="drawer-item" type="button" data-nav="income-view">
-        <span class="icon">💵</span> Sahod at Kita
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12 12 8 16 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg></span> Sahod at Kita
       </button>
       <button class="drawer-item" type="button" data-nav="budget-view">
-        <span class="icon">🎯</span> Budget
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span> Budget
       </button>
       <button class="drawer-item" type="button" data-nav="savings-view">
-        <span class="icon">🐷</span> Ipon
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12c0 3-2.5 6-7 6-1 0-2-.1-3-.4L7 19v-2.5C4.5 15.5 3 13.9 3 12c0-3 3-6 8-6 1.3 0 2.6.3 3.7.7L18 5v3.3c1.2 1 2 2.3 2 3.7z"/><circle cx="15" cy="11" r=".8" fill="currentColor" stroke="none"/><path d="M9 10h3"/></svg></span> Ipon
       </button>
       <button class="drawer-item" type="button" data-nav="loans">
-        <span class="icon">💳</span> Utang at Pautang
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><line x1="2" y1="11" x2="22" y2="11"/><line x1="6" y1="15.5" x2="10" y2="15.5"/></svg></span> Utang at Pautang
       </button>
       <button class="drawer-item" type="button" data-nav="networth">
-        <span class="icon">💎</span> Net worth
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><polyline points="4 17 9 12 13 15 20 8"/><polyline points="15 8 20 8 20 13"/></svg></span> Net worth
       </button>
       <button class="drawer-item" type="button" data-nav="calendar">
-        <span class="icon">📆</span> Calendar
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg></span> Calendar
       </button>
       <button class="drawer-item" type="button" data-nav="review">
-        <span class="icon">📊</span> Reports
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="11"/><line x1="3" y1="20" x2="21" y2="20"/></svg></span> Reports
       </button>
     </nav>
     <div class="drawer-brand">
@@ -7545,6 +7580,145 @@
   //   monthly × 1
   const TO_MONTHLY = { weekly: 4.345, 'semi-monthly': 2, monthly: 1, quarterly: 1/3, annually: 1/12 };
 
+  // =========================================================================
+  // SVG ICON LIBRARY
+  // =========================================================================
+  //
+  // Single-source of truth for line-based icons used throughout the app.
+  // Each entry is just the inner SVG path markup — svgIcon() wraps it in a
+  // properly-sized <svg> element that inherits color from the parent.
+  //
+  // Style contract for all icons:
+  //   - 24×24 viewBox
+  //   - 2px stroke, currentColor
+  //   - Round caps + joins
+  //   - Minimal fills (only for tiny accent dots)
+  //
+  // Feather / Lucide-inspired so they share visual weight with the drawer icons.
+  // =========================================================================
+  const ICON_PATHS = {
+    // Payment methods
+    cash:     '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    card:     '<rect x="2" y="6" width="20" height="13" rx="2"/><line x1="2" y1="11" x2="22" y2="11"/><line x1="6" y1="15.5" x2="10" y2="15.5"/>',
+    bank:     '<line x1="3" y1="21" x2="21" y2="21"/><path d="M4 10l8-6 8 6"/><line x1="6" y1="10" x2="6" y2="18"/><line x1="10" y1="10" x2="10" y2="18"/><line x1="14" y1="10" x2="14" y2="18"/><line x1="18" y1="10" x2="18" y2="18"/>',
+    ewallet:  '<rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none"/><line x1="10" y1="6" x2="14" y2="6"/>',
+    wallet:   '<path d="M21 12V7a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h14"/><path d="M3 4v15a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-5"/><circle cx="17" cy="13" r="1.2" fill="currentColor" stroke="none"/>',
+    plus:     '<circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>',
+
+    // Categories
+    house:    '<path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/>',
+    bulb:     '<path d="M9 21h6"/><path d="M12 3a6 6 0 0 0-4 10.5V17h8v-3.5A6 6 0 0 0 12 3z"/>',
+    cart:     '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.5 12h11l2-8H6.5"/>',
+    bus:      '<path d="M5 17h14V6a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1z"/><path d="M5 11h14"/><circle cx="8" cy="15" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="15" r=".8" fill="currentColor" stroke="none"/><path d="M6 17v2M18 17v2"/>',
+    pill:     '<path d="M10.5 20.5a5 5 0 1 1-7-7l7-7a5 5 0 0 1 7 7z"/><line x1="7" y1="14" x2="14" y2="7"/>',
+    phone:    '<rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/>',
+    heart:    '<path d="M12 21s-7-5-9-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 5-9 10-9 10z"/>',
+    palette:  '<circle cx="12" cy="12" r="10"/><circle cx="8" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="10" r="1" fill="currentColor" stroke="none"/><path d="M12 22a2 2 0 0 0 2-2c0-1-1-2-1-3s1-1 2-1c2 0 3-1 3-3"/>',
+    box:      '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+
+    // Assets + loans specific
+    savings:  '<path d="M20 12c0 3-2.5 6-7 6-1 0-2-.1-3-.4L7 19v-2.5C4.5 15.5 3 13.9 3 12c0-3 3-6 8-6 1.3 0 2.6.3 3.7.7L18 5v3.3c1.2 1 2 2.3 2 3.7z"/><circle cx="15" cy="11" r=".8" fill="currentColor" stroke="none"/><path d="M9 10h3"/>',
+    chartUp:  '<path d="M3 20h18"/><polyline points="4 17 9 12 13 15 20 8"/><polyline points="15 8 20 8 20 13"/>',
+    globe:    '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2c3 3 4.5 6 4.5 10s-1.5 7-4.5 10c-3-3-4.5-6-4.5-10s1.5-7 4.5-10z"/>',
+    car:      '<path d="M5 12l1.5-4c.2-.6.8-1 1.4-1h8.2c.6 0 1.2.4 1.4 1L19 12v6h-2v-2H7v2H5z"/><line x1="5" y1="12" x2="19" y2="12"/><circle cx="8" cy="15" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="15" r=".8" fill="currentColor" stroke="none"/>',
+    gem:      '<polygon points="6 3 18 3 22 9 12 21 2 9"/><line x1="6" y1="3" x2="10" y2="9"/><line x1="18" y1="3" x2="14" y2="9"/><line x1="2" y1="9" x2="22" y2="9"/>',
+    building: '<rect x="4" y="3" width="16" height="18" rx="1"/><line x1="9" y1="8" x2="9" y2="8.01"/><line x1="15" y1="8" x2="15" y2="8.01"/><line x1="9" y1="12" x2="9" y2="12.01"/><line x1="15" y1="12" x2="15" y2="12.01"/><path d="M10 21v-4h4v4"/>',
+    cap:      '<path d="M2 10l10-4 10 4-10 4z"/><path d="M6 12v5c2 2 10 2 12 0v-5"/>',
+    bag:      '<path d="M6 8h12l-1 12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+    document: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/>',
+
+    // Health / status
+    target:   '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    shield:   '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/>',
+    scales:   '<line x1="12" y1="4" x2="12" y2="21"/><line x1="6" y1="21" x2="18" y2="21"/><path d="M5 8h14"/><path d="M2 12l3-4 3 4a3 3 0 0 1-6 0z"/><path d="M16 12l3-4 3 4a3 3 0 0 1-6 0z"/>',
+    drop:     '<path d="M12 3s-6 7-6 12a6 6 0 0 0 12 0c0-5-6-12-6-12z"/>',
+    trophy:   '<path d="M6 4h12v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4z"/><path d="M6 6H4a2 2 0 0 0 0 4h2M18 6h2a2 2 0 0 1 0 4h-2"/><line x1="10" y1="14" x2="14" y2="14"/><line x1="12" y1="12" x2="12" y2="18"/><path d="M9 20h6"/>',
+    hourglass:'<path d="M6 3h12M6 21h12"/><path d="M6 3v3c0 3 3 5 6 6 3-1 6-3 6-6V3M6 21v-3c0-3 3-5 6-6 3 1 6 3 6 6v3"/>',
+    warning:  '<path d="M12 3l10 18H2z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18.01"/>',
+    spark:    '<path d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5z"/><path d="M5 18l.5 2 2 .5-2 .5-.5 2-.5-2-2-.5 2-.5z"/>',
+    clock:    '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 14"/>',
+
+    // Goal-specific icons — the palette Ipon starter chips + goal cards pick from
+    plane:    '<path d="M2 12l6-2 4-8 2 2v6l7 2v3l-7-1v6l3 2v2l-5-1-5 1v-2l3-2v-6l-8 1z"/>',
+    palm:     '<path d="M12 22V10"/><path d="M12 10c-3-1-6 0-7 3M12 10c3-1 6 0 7 3M12 10c-1-3-4-4-7-3M12 10c1-3 4-4 7-3M12 10c-1-3 1-6 4-6M12 10c1-3-1-6-4-6"/>',
+    ring:     '<circle cx="12" cy="15" r="6"/><path d="M8 4l4 5 4-5"/><line x1="8" y1="4" x2="16" y2="4"/>',
+    gift:     '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M4 12v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9"/><line x1="12" y1="8" x2="12" y2="22"/><path d="M12 8c-2 0-3.5-1.5-3.5-3.5S10 1 12 4c2-3 3.5-1.5 3.5.5S14 8 12 8z"/>',
+    star:     '<polygon points="12 2 15 9 22 9 17 14 19 21 12 17 5 21 7 14 2 9 9 9"/>',
+    graduation: '<path d="M2 10l10-4 10 4-10 4z"/><path d="M6 12v5c2 2 10 2 12 0v-5"/><line x1="18" y1="10" x2="18" y2="16"/>',
+    coin:     '<circle cx="12" cy="12" r="10"/><path d="M14.5 9c-.5-1-1.5-1.5-2.5-1.5S9.5 8 9.5 9.5 10.5 11 12 11.5s2.5 1 2.5 2.5-1 2-2.5 2-2-.5-2.5-1.5"/><line x1="12" y1="6.5" x2="12" y2="17.5"/>',
+  };
+
+  // Return SVG markup for a given icon key (falls back to a plus circle if unknown).
+  // Extra classes can be appended for size overrides.
+  function svgIcon(key, extraClass) {
+    const paths = ICON_PATHS[key] || ICON_PATHS.plus;
+    const cls = 'svg-inline-icon' + (extraClass ? ' ' + extraClass : '');
+    return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+  }
+
+  // Maps: type-key → svgIcon markup — used everywhere an icon renders standalone
+  // (wallet cards, category chips, loan tiles, etc.). Emoji-prefixed labels are
+  // preserved separately for use in <select> options where native controls can't
+  // render inline SVG.
+  const PAYMENT_SVG = {
+    cash: svgIcon('cash'), card: svgIcon('card'), gcash: svgIcon('phone'),
+    maya: svgIcon('phone'), bank: svgIcon('bank'), other: svgIcon('plus'),
+  };
+  const CATEGORY_SVG = {
+    housing: svgIcon('house'), bills: svgIcon('bulb'), food: svgIcon('cart'),
+    transport: svgIcon('bus'), health: svgIcon('pill'), subscriptions: svgIcon('phone'),
+    family: svgIcon('heart'), personal: svgIcon('palette'), other: svgIcon('box'),
+  };
+  const ASSET_SVG = {
+    cash: svgIcon('cash'), bank: svgIcon('bank'), ewallet: svgIcon('phone'),
+    savings: svgIcon('savings'), investment: svgIcon('chartUp'), house: svgIcon('house'),
+    land: svgIcon('globe'), vehicle: svgIcon('car'), jewelry: svgIcon('gem'),
+    business: svgIcon('building'), other: svgIcon('gem'),
+  };
+  const LOAN_SVG = {
+    personal: svgIcon('cash'), credit_card: svgIcon('card'), housing: svgIcon('house'),
+    car: svgIcon('car'), student: svgIcon('cap'), family: svgIcon('heart'),
+    bnpl: svgIcon('bag'), other: svgIcon('document'),
+  };
+
+  // Ipon (savings goal) icons — user picks one when creating a goal.
+  // Stored on the goal as a key string (e.g. 'plane'), rendered via svgIcon().
+  // Legacy goals stored the emoji directly; renderGoalIcon() handles both.
+  const GOAL_ICONS = [
+    { key: 'savings', label: 'Emergency' },
+    { key: 'palm',    label: 'Vacation'  },
+    { key: 'plane',   label: 'Travel'    },
+    { key: 'house',   label: 'House'     },
+    { key: 'car',     label: 'Car'       },
+    { key: 'graduation', label: 'Education' },
+    { key: 'ring',    label: 'Wedding'   },
+    { key: 'gift',    label: 'Gift'      },
+    { key: 'coin',    label: 'Retirement'},
+    { key: 'heart',   label: 'Family'    },
+    { key: 'star',    label: 'Dream'     },
+    { key: 'spark',   label: 'Other'     },
+  ];
+  // Emoji → key migration map. Any goal whose icon is a stored emoji from the
+  // old system gets remapped to the matching new SVG key at render time.
+  const LEGACY_GOAL_EMOJI_TO_KEY = {
+    '🌱': 'savings', '🌴': 'palm', '✈️': 'plane', '🏡': 'house', '🏠': 'house',
+    '🚗': 'car', '🎓': 'graduation', '💍': 'ring', '🎁': 'gift', '💰': 'coin',
+    '❤️': 'heart', '⭐': 'star', '✨': 'spark', '🎯': 'target',
+  };
+  // Render a goal's icon as SVG regardless of whether it's stored as emoji or key.
+  function renderGoalIcon(iconVal) {
+    if (!iconVal) return svgIcon('spark');
+    // Already an SVG string? Return as-is.
+    if (typeof iconVal === 'string' && iconVal.startsWith('<svg')) return iconVal;
+    // Known SVG key
+    if (ICON_PATHS[iconVal]) return svgIcon(iconVal);
+    // Legacy emoji → map to key
+    const mapped = LEGACY_GOAL_EMOJI_TO_KEY[iconVal];
+    if (mapped) return svgIcon(mapped);
+    // Unknown value — fall back to a neutral spark
+    return svgIcon('spark');
+  }
+
   // Safely escape user text for HTML attribute values
   function escapeAttr(s) {
     return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({
@@ -8303,14 +8477,14 @@
   // =========================================================================
   // Reuse BUDGET_TO_MONTHLY conversion — same frequencies apply
   const GOAL_STARTERS = [
-    { key: 'emergency',   icon: '🌱', name: 'Emergency fund',  frequency: 'monthly' },
-    { key: 'vacation',    icon: '🌴', name: 'Vacation',        frequency: 'monthly' },
-    { key: 'house',       icon: '🏡', name: 'House',           frequency: 'monthly' },
-    { key: 'car',         icon: '🚗', name: 'Car',             frequency: 'monthly' },
-    { key: 'education',   icon: '🎓', name: 'Education',       frequency: 'monthly' },
-    { key: 'wedding',     icon: '💍', name: 'Wedding',         frequency: 'monthly' },
-    { key: 'holidays',    icon: '🎁', name: 'Holidays',        frequency: 'monthly' },
-    { key: 'retirement',  icon: '💰', name: 'Retirement',      frequency: 'monthly' },
+    { key: 'emergency',   icon: 'savings',    name: 'Emergency fund',  frequency: 'monthly' },
+    { key: 'vacation',    icon: 'palm',       name: 'Vacation',        frequency: 'monthly' },
+    { key: 'house',       icon: 'house',      name: 'House',           frequency: 'monthly' },
+    { key: 'car',         icon: 'car',        name: 'Car',             frequency: 'monthly' },
+    { key: 'education',   icon: 'graduation', name: 'Education',       frequency: 'monthly' },
+    { key: 'wedding',     icon: 'ring',       name: 'Wedding',         frequency: 'monthly' },
+    { key: 'holidays',    icon: 'gift',       name: 'Holidays',        frequency: 'monthly' },
+    { key: 'retirement',  icon: 'coin',       name: 'Retirement',      frequency: 'monthly' },
   ];
 
   let goalDraft = [];
@@ -8382,7 +8556,7 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'starter-chip' + (alreadyAdded ? ' added' : '');
-      btn.innerHTML = `<span>${s.icon}</span> ${s.name}`;
+      btn.innerHTML = `<span class="starter-chip-icon">${svgIcon(s.icon)}</span> ${s.name}`;
       btn.disabled = alreadyAdded;
       btn.addEventListener('click', () => {
         goalDraft.push(newGoal({
@@ -8765,7 +8939,7 @@
       .filter(g => (g.name || '').trim() !== '' && (g.target || 0) > 0)
       .map(g => ({
         id: g.id,
-        icon: g.icon || '✨',
+        icon: g.icon || 'spark',
         name: g.name.trim(),
         target: Number(g.target) || 0,
         contribution: Number(g.contribution) || 0,
@@ -8801,10 +8975,7 @@
   // =========================================================================
   // HOME
   // =========================================================================
-  const CATEGORY_ICONS = {
-    housing: '🏠', bills: '💡', food: '🛒', transport: '🚌',
-    health: '💊', subscriptions: '📱', family: '❤️', personal: '🎨', other: '📦'
-  };
+  const CATEGORY_ICONS = CATEGORY_SVG;   // SVG markup for tile/chip rendering
 
   // -------------------------------------------------------------------------
   // Period helpers — compute the current window for a given frequency
@@ -8994,7 +9165,7 @@
       else if (daysDiff <= 1) cls = 'today';
       else if (daysDiff <= 6) cls = 'soon';
 
-      const catIcon = CATEGORY_ICONS[exp.category] || '📦';
+      const catIcon = CATEGORY_ICONS[exp.category] || svgIcon('box');
       const dateStr = dueDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
       const rel = relativeDueLabel(daysDiff);
 
@@ -9161,7 +9332,7 @@
       const target = Number(g.target) || 0;
       const saved  = totalSavedFor(g, txs);
       const pct    = target > 0 ? Math.min(100, (saved / target) * 100) : 0;
-      const icon   = g.icon || '🌱';
+      const icon   = renderGoalIcon(g.icon);
       const deadline = g.deadline
         ? `Target ${new Date(g.deadline).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}`
         : '';
@@ -9204,10 +9375,10 @@
 
     wrap.innerHTML = sorted.map(t => {
       const name = resolveTxName(t, user);
-      const icon = t.type === 'transfer' ? '🔄'
-                 : t.type === 'income'   ? '☀️'
-                 : t.type === 'saving'   ? '🌱'
-                 : (CATEGORY_ICONS[t.category] || '🍃');
+      const icon = t.type === 'transfer' ? svgIcon('wallet')
+                 : t.type === 'income'   ? svgIcon('chartUp')
+                 : t.type === 'saving'   ? svgIcon('savings')
+                 : (CATEGORY_ICONS[t.category] || svgIcon('box'));
       const dateStr = formatTxDate(t.date);
       const sign = t.type === 'expense' ? '−' : t.type === 'income' ? '+' : '';
       const amt = `${sign}${peso(t.amount)}`;
@@ -9749,11 +9920,11 @@
         const catObj = CATEGORIES.find(c => c.v === seg.cat);
         // catObj.label is like "🏠 Housing" — strip the leading emoji + space for the legend text
         const cleanName = catObj ? catObj.label.replace(/^\S+\s/, '') : seg.cat;
-        const emoji = catObj ? catObj.label.split(' ')[0] : (CATEGORY_ICONS[seg.cat] || '');
+        const iconSvg = CATEGORY_ICONS[seg.cat] || svgIcon('box');
         return `
           <div class="chart-legend-item">
             <span class="dot" style="background:${seg.color};"></span>
-            ${emoji} ${escapeAttr(cleanName)} <span class="amt">${peso(seg.value)}</span>
+            ${iconSvg} ${escapeAttr(cleanName)} <span class="amt">${peso(seg.value)}</span>
           </div>
         `;
       }).join('');
@@ -10019,7 +10190,7 @@
         item.dataset.tapDetail = 'expense';
         item.dataset.entryId = exp.id;
         const due = dueText(exp);
-        const catIcon = CATEGORY_ICONS[exp.category] || '📦';
+        const catIcon = CATEGORY_ICONS[exp.category] || svgIcon('box');
         const spent = spentThisPeriod(exp, user.transactions);
         const planned = Number(exp.amount) || 0;
         const pctRaw = planned > 0 ? (spent / planned) * 100 : 0;
@@ -10155,7 +10326,7 @@
         card.dataset.entryId = g.id;
         card.innerHTML = `
           <div class="view-goal-head">
-            <div class="view-item-icon saving">${g.icon || '✨'}</div>
+            <div class="view-item-icon saving">${renderGoalIcon(g.icon)}</div>
             <div class="view-item-info">
               <p class="name">${escapeAttr(g.name || 'Goal')}</p>
               <p class="meta">${peso(monthlyContrib)}/mo${cdt ? ' · ' + cdt : ''} · target ${peso(target)}</p>
@@ -10879,7 +11050,7 @@
     const cleaned = goalDraft
       .filter(g => (g.name || '').trim() !== '' && (g.target || 0) > 0)
       .map(g => ({
-        id: g.id, icon: g.icon || '✨', name: g.name.trim(),
+        id: g.id, icon: g.icon || 'spark', name: g.name.trim(),
         target: Number(g.target) || 0, contribution: Number(g.contribution) || 0,
         frequency: g.frequency, deadline: g.deadline || '', saved: Number(g.saved) || 0,
         contribDay: g.contribDay, contribDay2: g.contribDay2, contribMonth: g.contribMonth,
@@ -11311,7 +11482,7 @@
                     const saved = totalSavedFor(g, u.transactions);
                     const target = Number(g.target) || 0;
                     const remaining = Math.max(target - saved, 0);
-                    return `<option value="${g.id}" ${txDraft.linkedId === g.id ? 'selected' : ''}>${g.icon || '✨'} ${escapeAttr(g.name)} · ${peso(remaining)} to go</option>`;
+                    return `<option value="${g.id}" ${txDraft.linkedId === g.id ? 'selected' : ''}>${escapeAttr(g.name)} · ${peso(remaining)} to go</option>`;
                   }).join('')}
                 </select>
                 <span class="select-caret">▾</span>
@@ -12109,7 +12280,7 @@
       if (!exp) { toast('Expense not found.', 'error'); showBudgetView(user); return; }
       titleEl.textContent = exp.name || 'Expense';
       const cat = CATEGORIES.find(c => c.v === exp.category);
-      const catIcon = cat ? cat.label.split(' ')[0] : '📦';
+      const catIcon = CATEGORY_ICONS[exp.category] || svgIcon('box');
       const period = getCurrentPeriod(exp.frequency || 'monthly');
       const spent = spentThisPeriod(exp, txs);
       const planned = Number(exp.amount) || 0;
@@ -12159,7 +12330,7 @@
       summaryEl.innerHTML = `
         <div class="entry-summary-card">
           <div class="head">
-            <div class="icon saving">${g.icon || '✨'}</div>
+            <div class="icon saving">${renderGoalIcon(g.icon)}</div>
             <div style="min-width:0; flex:1;">
               <div class="title">${escapeAttr(g.name || 'Goal')}</div>
               <div class="subtitle">${peso(g.contribution || 0)}/${FREQ_LABEL[g.frequency] || 'mo'}${g.deadline ? ' · by ' + g.deadline : ''}</div>
@@ -12345,7 +12516,7 @@
   // =========================================================================
   // WALLETS
   // =========================================================================
-  const PAYMENT_ICON = Object.fromEntries(PAYMENT_METHODS.map(p => [p.v, p.icon]));
+  const PAYMENT_ICON = PAYMENT_SVG;   // Now returns SVG markup for standalone rendering
   const PAYMENT_NAME = Object.fromEntries(PAYMENT_METHODS.map(p => [p.v, p.label]));
 
   let editingWalletId = null; // when set, save updates existing; null means adding new
@@ -12624,7 +12795,7 @@
         insights.push({
           priority: 10,
           tone: 'warn',
-          icon: '📈',
+          icon: svgIcon('chartUp'),
           title: `Your ${catName} spending is up ${pct}% this month`,
           sub: `${peso(now)} so far vs ${peso(prev)} last month.`,
         });
@@ -12639,7 +12810,7 @@
         insights.push({
           priority: 9,
           tone: 'warn',
-          icon: '⚠️',
+          icon: svgIcon('warning'),
           title: `${name} is running low`,
           sub: `Balance is down to ${peso(bal)}.`,
         });
@@ -12648,7 +12819,7 @@
         insights.push({
           priority: 11,
           tone: 'warn',
-          icon: '🚨',
+          icon: svgIcon('warning'),
           title: `${name} is negative`,
           sub: `Balance shows ${peso(bal)} — double-check recent transactions.`,
         });
@@ -12669,7 +12840,7 @@
         insights.push({
           priority: 8,
           tone: 'warn',
-          icon: '⏳',
+          icon: svgIcon('hourglass'),
           title: `You've used ${Math.round(budgetPct)}% of your budget`,
           sub: `Only ${Math.round(monthPct)}% of the month has passed. Pace is tight.`,
         });
@@ -12677,7 +12848,7 @@
         insights.push({
           priority: 4,
           tone: 'good',
-          icon: '🌱',
+          icon: svgIcon('savings'),
           title: `You're well under budget this month`,
           sub: `Only ${Math.round(budgetPct)}% spent, ${Math.round(monthPct)}% into the month.`,
         });
@@ -12697,7 +12868,7 @@
         insights.push({
           priority: 5,
           tone: 'good',
-          icon: '✨',
+          icon: svgIcon('spark'),
           title: `You've saved ${Math.round(rate)}% of your income this month`,
           sub: `That's a healthy pace — keep it up.`,
         });
@@ -12705,7 +12876,7 @@
         insights.push({
           priority: 6,
           tone: 'caution',
-          icon: '🎯',
+          icon: svgIcon('target'),
           title: `No savings logged this month yet`,
           sub: `Even ₱100 toward a goal keeps the habit alive.`,
         });
@@ -12727,7 +12898,7 @@
         insights.push({
           priority: 5,
           tone: 'good',
-          icon: g.icon || '🎯',
+          icon: renderGoalIcon(g.icon),
           title: `${monthsLeft} ${monthsLeft === 1 ? 'month' : 'months'} to reach ${g.name || 'your goal'}`,
           sub: `${peso(remaining)} to go at ${peso(monthlyContrib)}/month.`,
         });
@@ -12742,7 +12913,7 @@
       insights.push({
         priority: 3,
         tone: 'info',
-        icon: catObj ? catObj.label.split(' ')[0] : '📦',
+        icon: CATEGORY_ICONS[topCat] || svgIcon('box'),
         title: `Biggest spend this month: ${catName}`,
         sub: `${peso(topAmt)} across ${catThis[topCat] > 0 ? 'this category' : '—'}.`,
       });
@@ -12759,7 +12930,7 @@
         insights.push({
           priority: 6,
           tone: 'good',
-          icon: catObj ? catObj.label.split(' ')[0] : '📦',
+          icon: CATEGORY_ICONS[cat] || svgIcon('box'),
           title: `${catName.charAt(0).toUpperCase() + catName.slice(1)} spending dropped ${peso(drop)}`,
           sub: `Nice — down from ${peso(prev)} last month.`,
         });
@@ -12777,7 +12948,7 @@
         insights.push({
           priority: 7,
           tone: 'good',
-          icon: '💳',
+          icon: svgIcon('card'),
           title: `${monthsLeft} ${monthsLeft === 1 ? 'month' : 'months'} to pay off ${l.name || 'this loan'}`,
           sub: `At ${peso(monthly)}/month, ${peso(balance)} left.`,
         });
@@ -12786,7 +12957,7 @@
         insights.push({
           priority: 3,
           tone: 'info',
-          icon: '💳',
+          icon: svgIcon('card'),
           title: `${l.name || 'Loan'} — ~${monthsLeft} months at current pace`,
           sub: `${peso(balance)} remaining.`,
         });
@@ -12805,7 +12976,7 @@
         insights.push({
           priority: 9,
           tone: daysToDue <= 1 ? 'warn' : 'caution',
-          icon: '⏰',
+          icon: svgIcon('clock'),
           title: `${l.name || 'Loan'} payment due ${daysToDue === 0 ? 'today' : daysToDue === 1 ? 'tomorrow' : 'in ' + daysToDue + ' days'}`,
           sub: `${peso(l.monthlyPayment || 0)} to ${l.lender || 'lender'}.`,
         });
@@ -12823,7 +12994,7 @@
       insights.push({
         priority: 8,
         tone: 'good',
-        icon: '🎉',
+        icon: svgIcon('trophy'),
         title: `You paid off ${l.name || 'a loan'}!`,
         sub: `That's ${peso(l.originalAmount || 0)} of debt cleared.`,
       });
@@ -12840,7 +13011,7 @@
         insights.push({
           priority: 6,
           tone: 'good',
-          icon: '🛡️',
+          icon: svgIcon('shield'),
           title: `Your emergency fund now covers ${monthsCovered.toFixed(1)} months`,
           sub: `Aim for 6 months for full peace of mind.`,
         });
@@ -12848,7 +13019,7 @@
         insights.push({
           priority: 5,
           tone: 'good',
-          icon: '🛡️',
+          icon: svgIcon('shield'),
           title: `Emergency fund fully stocked ✦`,
           sub: `${monthsCovered.toFixed(1)} months of expenses covered.`,
         });
@@ -12856,7 +13027,7 @@
         insights.push({
           priority: 7,
           tone: 'caution',
-          icon: '🛡️',
+          icon: svgIcon('shield'),
           title: `Emergency fund is thin`,
           sub: `Currently covers ${(monthsCovered * 30).toFixed(0)} days. Aim for 3 months.`,
         });
@@ -12876,7 +13047,7 @@
         insights.push({
           priority: 8,
           tone: 'good',
-          icon: '💎',
+          icon: svgIcon('gem'),
           title: `You crossed ${peso(crossed)} in net worth ✦`,
           sub: `Currently at ${peso(after)}.`,
         });
@@ -12903,7 +13074,7 @@
         insights.push({
           priority: 5,
           tone: 'good',
-          icon: '🌱',
+          icon: svgIcon('savings'),
           title: `${streak} months of consistent saving`,
           sub: `Habit is sticking. Keep the streak alive.`,
         });
@@ -12923,7 +13094,7 @@
       insights.push({
         priority: 7,
         tone: 'info',
-        icon: '💛',
+        icon: svgIcon('savings'),
         title: `${peso(totalOwed)} in outstanding pautang`,
         sub: peopleTxt,
       });
@@ -12946,7 +13117,7 @@
       insights.push({
         priority: 6,
         tone: 'caution',
-        icon: '⏳',
+        icon: svgIcon('hourglass'),
         title: `${who}'s pautang hasn't moved in ${daysSince} days`,
         sub: `${peso(l.currentBalance || 0)} still outstanding.`,
       });
@@ -13173,11 +13344,11 @@
       const eventsHtml = events.length === 0
         ? '<div class="empty-note">Nothing scheduled</div>'
         : events.map(e => {
-            const iconChar = e.type === 'income' ? '↑'
-                          : e.type === 'due'    ? '📅'
-                          : e.type === 'ipon'   ? '🌱'
-                          : e.type === 'loan'   ? '💳'
-                          : '•';
+            const iconChar = e.type === 'income' ? svgIcon('chartUp')
+                          : e.type === 'due'    ? svgIcon('bulb')
+                          : e.type === 'ipon'   ? svgIcon('savings')
+                          : e.type === 'loan'   ? svgIcon('card')
+                          : svgIcon('plus');
             const amtStr = (e.sign || '') + peso(e.amount);
             return `
               <div class="cal-event-chip">
@@ -13216,11 +13387,11 @@
       list.innerHTML = '';
     } else {
       list.innerHTML = events.map(e => {
-        const iconChar = e.type === 'income' ? '↑'
-                      : e.type === 'due'    ? '📅'
-                      : e.type === 'ipon'   ? '🌱'
-                      : e.type === 'loan'   ? '💳'
-                      : '•';
+        const iconChar = e.type === 'income' ? svgIcon('chartUp')
+                      : e.type === 'due'    ? svgIcon('bulb')
+                      : e.type === 'ipon'   ? svgIcon('savings')
+                      : e.type === 'loan'   ? svgIcon('card')
+                      : svgIcon('plus');
         const amtStr = (e.sign || '') + peso(e.amount);
         return `
           <div class="cal-event-chip" style="padding: 8px 0; border-bottom: 1px solid var(--sand);">
@@ -13443,7 +13614,7 @@
     { v: 'business',    icon: '🏢', label: 'Business'       },
     { v: 'other',       icon: '💎', label: 'Other'          },
   ];
-  const ASSET_ICON  = Object.fromEntries(ASSET_TYPES.map(a => [a.v, a.icon]));
+  const ASSET_ICON  = ASSET_SVG;      // SVG markup for card/tile rendering
   const ASSET_LABEL = Object.fromEntries(ASSET_TYPES.map(a => [a.v, a.label]));
 
   // Central net-worth calculation. Deliberately modular — all callers use this
@@ -13470,12 +13641,12 @@
     cashFlowStability: 0.10,
   };
   const HEALTH_METRIC_META = {
-    savingsRate:       { icon: '🐷', label: 'Savings Rate'      },
-    budgetAdherence:   { icon: '🎯', label: 'Budget Adherence'  },
-    emergencyFund:     { icon: '🛡️', label: 'Emergency Fund'    },
-    debtToIncome:      { icon: '⚖️', label: 'Debt to Income'    },
-    netWorthTrend:     { icon: '📈', label: 'Net Worth Trend'   },
-    cashFlowStability: { icon: '💧', label: 'Cash Flow'         },
+    savingsRate:       { icon: svgIcon('savings'),  label: 'Savings Rate'      },
+    budgetAdherence:   { icon: svgIcon('target'),   label: 'Budget Adherence'  },
+    emergencyFund:     { icon: svgIcon('shield'),   label: 'Emergency Fund'    },
+    debtToIncome:      { icon: svgIcon('scales'),   label: 'Debt to Income'    },
+    netWorthTrend:     { icon: svgIcon('chartUp'),  label: 'Net Worth Trend'   },
+    cashFlowStability: { icon: svgIcon('drop'),     label: 'Cash Flow'         },
   };
 
   // Helper: clamp value into range
@@ -14094,7 +14265,7 @@
     { v: 'bnpl',        icon: '🛍️', label: 'Buy now, pay later' },
     { v: 'other',       icon: '📄', label: 'Other'          },
   ];
-  const LOAN_ICON  = Object.fromEntries(LOAN_TYPES.map(l => [l.v, l.icon]));
+  const LOAN_ICON  = LOAN_SVG;        // SVG markup for card rendering
   const LOAN_LABEL = Object.fromEntries(LOAN_TYPES.map(l => [l.v, l.label]));
 
   // Convert a loan's regular payment into its monthly equivalent, so all loans
@@ -14666,7 +14837,7 @@
     const categoryBreakdown = Object.entries(catAgg)
       .map(([key, amount]) => {
         const catObj = CATEGORIES.find(c => c.v === key);
-        const icon = catObj ? catObj.label.split(' ')[0] : '📦';
+        const icon = CATEGORY_ICONS[key] || svgIcon('box');
         const label = catObj ? catObj.label.split(' ').slice(1).join(' ') : key.charAt(0).toUpperCase() + key.slice(1);
         return { key, amount, pct: catTotal > 0 ? (amount / catTotal) * 100 : 0, icon, label };
       })
