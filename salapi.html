@@ -3948,11 +3948,15 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    align-items: end;   /* bottom-align inputs when one label wraps to 2 lines */
   }
-  .two-col-fields .field { margin-bottom: 14px; }
-  /* When .two-col-fields is inside a .form container, the form's own gap handles
-     vertical spacing — kill the child bottom margin so gaps don't stack. */
+  .two-col-fields .field {
+    margin-bottom: 14px;
+    /* Push content to the bottom so inputs bottom-align even if one label
+       wraps to a second line (e.g. "Interest rate (%/yr) (optional)"). */
+    justify-content: flex-end;
+  }
+  /* Inside a .form container, the form's own gap handles vertical spacing —
+     kill the child bottom margin so gaps don't stack. */
   .form .two-col-fields .field { margin-bottom: 0; }
 
   /* Loan balance banner + payment context */
@@ -6298,7 +6302,7 @@
 
       <div class="two-col-fields">
         <div class="field">
-          <label>Interest rate (%/yr) <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+          <label>Interest %/yr <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
           <input class="input" type="number" min="0" step="0.01" id="loanRateInput" placeholder="e.g. 6.5" />
         </div>
         <div class="field">
