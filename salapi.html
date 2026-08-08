@@ -1556,6 +1556,36 @@
     letter-spacing: -0.3px;
     flex: 1;
   }
+  /* Small home shortcut, sits on the right of any screen header so users can
+     always jump back to the dashboard without hunting for a drawer item. */
+  .home-btn {
+    background: var(--cream-2);
+    border: 0;
+    color: var(--navy);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, transform 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .home-btn:hover  { background: var(--sand); }
+  .home-btn:active { transform: scale(0.94); }
+  .home-btn svg { pointer-events: none; }
+
+  /* Nav bar sitting above content on onboarding + trapped screens.
+     Holds hamburger on the left and home shortcut on the right so users are
+     never stuck without an escape route. */
+  .screen-nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 4px 0;
+  }
   .view-header .edit-btn {
     background: var(--white);
     border: 1.5px solid var(--sand);
@@ -5099,22 +5129,22 @@
         <span class="icon">🧾</span> Transactions
       </button>
       <button class="drawer-item" type="button" data-nav="income-view">
-        <span class="icon">💵</span> Income
+        <span class="icon">💵</span> Sahod at Kita
       </button>
       <button class="drawer-item" type="button" data-nav="budget-view">
         <span class="icon">🎯</span> Budget
       </button>
       <button class="drawer-item" type="button" data-nav="savings-view">
-        <span class="icon">🌱</span> Savings goals
+        <span class="icon">🌱</span> Ipon
       </button>
       <button class="drawer-item" type="button" data-nav="wallets">
-        <span class="icon">🪙</span> Wallets
+        <span class="icon">🪙</span> Pitaka
       </button>
       <button class="drawer-item" type="button" data-nav="networth">
         <span class="icon">💎</span> Net worth
       </button>
       <button class="drawer-item" type="button" data-nav="loans">
-        <span class="icon">💳</span> Utang / Loans
+        <span class="icon">💳</span> Utang at Pautang
       </button>
       <button class="drawer-item" type="button" data-nav="review">
         <span class="icon">📅</span> Monthly recap
@@ -5355,6 +5385,12 @@
 
   <!-- ============ ACCOUNT SETUP ============ -->
   <section class="screen" id="screen-setup">
+    <div class="screen-nav-bar">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div style="flex:1;"></div>
+    </div>
     <div class="auth-head">
       <div class="setup-avatar">
         ☀️
@@ -5376,8 +5412,17 @@
 
   <!-- ============ INCOME SETUP ============ -->
   <section class="screen" id="screen-income">
+    <div class="screen-nav-bar">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div style="flex:1;"></div>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
+    </div>
     <div class="income-header">
-      <h1>Your income</h1>
+      <h1>Sahod at Kita</h1>
       <div class="step">Step 2 of 5</div>
     </div>
     <p class="income-intro">Let's set up what comes in. You can always add more sources or edit this later.</p>
@@ -5407,6 +5452,15 @@
 
   <!-- ============ BUDGET SETUP ============ -->
   <section class="screen" id="screen-budget">
+    <div class="screen-nav-bar">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div style="flex:1;"></div>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
+    </div>
     <div class="budget-header">
       <h1>Your budget</h1>
       <div class="step">Step 3 of 5</div>
@@ -5454,8 +5508,17 @@
 
   <!-- ============ SAVINGS GOALS ============ -->
   <section class="screen" id="screen-savings">
+    <div class="screen-nav-bar">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div style="flex:1;"></div>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
+    </div>
     <div class="savings-header">
-      <h1>Savings goals</h1>
+      <h1>Ipon</h1>
       <div class="step">Step 4 of 5</div>
     </div>
     <p class="savings-intro">Set aside a little, regularly. Add a goal for anything you're building toward — you can always update this later.</p>
@@ -5500,9 +5563,18 @@
 
   <!-- ============ WALLETS SETUP (Step 5 of 5) ============ -->
   <section class="screen" id="screen-wallets-setup">
+    <div class="screen-nav-bar">
+      <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div style="flex:1;"></div>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
+    </div>
     <div class="setup-head">
       <span class="step" id="walletsSetupStep">Step 5 of 5</span>
-      <h1>Wallets</h1>
+      <h1>Pitaka</h1>
     </div>
 
     <p class="income-intro" id="walletsSetupIntro">
@@ -5709,7 +5781,7 @@
       <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>Income</h1>
+      <h1>Sahod at Kita</h1>
       
     </div>
 
@@ -5765,7 +5837,7 @@
       <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>Savings</h1>
+      <h1>Ipon</h1>
       
     </div>
 
@@ -5791,9 +5863,12 @@
   <section class="screen" id="screen-entry-detail" style="padding: 24px;">
     <div class="view-header">
       <button class="hamburger" id="entryDetailBackBtn" type="button" aria-label="Back">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="pointer-events:none;"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <h1 id="entryDetailTitle">Entry</h1>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
     </div>
 
     <div id="entryDetailSummary"></div>
@@ -5823,7 +5898,7 @@
       <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>Wallets</h1>
+      <h1>Pitaka</h1>
     </div>
 
     <div class="wallets-intro">
@@ -5854,6 +5929,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <h1 id="walletEditTitle">Add wallet</h1>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
     </div>
 
     <div class="field">
@@ -5907,7 +5985,7 @@
       <div class="nw-split-side">
         <div class="lbl">Assets</div>
         <div class="val positive" id="nwAssetsTotal">₱0</div>
-        <div class="sub" id="nwAssetsSub">Wallets + manual</div>
+        <div class="sub" id="nwAssetsSub">Pitaka + manual</div>
       </div>
       <div class="nw-split-side">
         <div class="lbl">Liabilities</div>
@@ -5934,7 +6012,7 @@
     <!-- Manual assets management -->
     <div class="nw-section-head" style="margin-top: 24px;">
       <span>Other things you own</span>
-      <span class="hint">Wallet balances count automatically. Add anything else here.</span>
+      <span class="hint">Pitaka balances count automatically. Add anything else here.</span>
     </div>
     <div id="nwManualAssets"></div>
     <div class="expenses-empty" id="nwManualEmpty" style="display:none;">
@@ -5960,6 +6038,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <h1 id="assetEditTitle">Add asset</h1>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
     </div>
 
     <div class="field">
@@ -6002,7 +6083,7 @@
       <button class="hamburger" data-open-drawer type="button" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <h1>Utang / Loans</h1>
+      <h1>Utang at Pautang</h1>
     </div>
 
     <div class="loans-summary" id="loansSummary" style="display:none;">
@@ -6033,6 +6114,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <h1 id="loanEditTitle">Add loan</h1>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
     </div>
 
     <!-- Balance + record-payment banner (only visible when editing an existing loan) -->
@@ -6153,6 +6237,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <h1>Record payment</h1>
+      <button class="home-btn" data-nav="home" type="button" aria-label="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+      </button>
     </div>
 
     <div class="loan-payment-context" id="loanPaymentContext">
