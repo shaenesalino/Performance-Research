@@ -3704,6 +3704,69 @@
   }
 
   /* Loans screen */
+  .loans-intro {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: -6px 4px 14px;
+  }
+  .loans-filter-tabs {
+    display: flex;
+    background: var(--cream-2);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+  .loans-filter-btn {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 8px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .loans-filter-btn.active {
+    background: var(--white);
+    color: var(--navy);
+    box-shadow: 0 1px 3px rgba(10, 37, 64, 0.08);
+  }
+  .loans-add-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .loans-add-row .btn { margin: 0; }
+  /* Direction accents on loan cards */
+  .loan-card.receivable .icon {
+    background: rgba(44, 188, 177, 0.15) !important;
+    color: var(--teal) !important;
+  }
+  .loan-card.receivable .remaining {
+    color: var(--teal);
+  }
+  .loan-card .direction-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .loan-card .direction-tag.payable    { background: rgba(214, 69, 69, 0.10); color: var(--error); }
+  .loan-card .direction-tag.receivable { background: rgba(44, 188, 177, 0.14); color: var(--teal); }
+
   .loans-summary {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -6086,25 +6149,39 @@
       <h1>Utang at Pautang</h1>
     </div>
 
+    <p class="loans-intro" id="loansIntro">Track what you owe (utang) and what others owe you (pautang) — all in one place.</p>
+
+    <!-- Filter tabs — All / Utang / Pautang -->
+    <div class="loans-filter-tabs" id="loansFilterTabs">
+      <button type="button" class="loans-filter-btn active" data-loan-filter="all">All</button>
+      <button type="button" class="loans-filter-btn" data-loan-filter="payable">Utang</button>
+      <button type="button" class="loans-filter-btn" data-loan-filter="receivable">Pautang</button>
+    </div>
+
+    <!-- Summary tiles switch based on filter -->
     <div class="loans-summary" id="loansSummary" style="display:none;">
       <div class="lsum-card">
-        <div class="lbl">Total debt</div>
+        <div class="lbl" id="loansSummaryLbl1">Total utang</div>
         <div class="val" id="loansTotalDebt">₱0</div>
       </div>
       <div class="lsum-card">
-        <div class="lbl">Monthly payments</div>
+        <div class="lbl" id="loansSummaryLbl2">Monthly payments</div>
         <div class="val" id="loansMonthlyDue">₱0</div>
       </div>
     </div>
 
     <div class="expenses-empty" id="loansEmpty">
       <div class="ico">💳</div>
-      No loans tracked. Add credit cards, housing loans, family utang, or any BNPL to keep tabs on what you owe.
+      <span id="loansEmptyText">Nothing here yet. Add an utang you owe, or a pautang someone owes you.</span>
     </div>
 
     <div id="loansList"></div>
 
-    <button class="add-expense-btn" id="addLoanBtn" type="button" style="margin-top: 12px;">+ Add loan</button>
+    <!-- Two side-by-side add buttons -->
+    <div class="loans-add-row" style="margin-top: 12px;">
+      <button class="btn btn-outline" id="addUtangBtn" type="button">+ Utang</button>
+      <button class="btn btn-outline" id="addPautangBtn" type="button">+ Pautang</button>
+    </div>
   </section>
 
   <!-- ============ LOAN EDIT ============ -->
@@ -8776,7 +8853,7 @@
         case 'pay-bill':  openTransactionScreen(userCache, { type: 'expense', source: 'set' }); break;
         case 'add-goal':  showSavingsView(userCache); break;   // savings screen has the "+ Add goal" inline
         case 'add-asset': openAssetEdit(userCache, null); break;
-        case 'add-loan':  openLoanEdit(userCache, null); break;
+        case 'add-loan':  showLoansScreen(userCache); break;   // land on loans page — user picks Utang or Pautang there
       }
     });
   });
@@ -12351,6 +12428,48 @@
       }
     }
 
+    // --- 14. Outstanding pautang summary — total money owed to you
+    const receivables = (user.loans || []).filter(l =>
+      l.direction === 'receivable' && l.status !== 'paid' && (Number(l.currentBalance) || 0) > 0
+    );
+    if (receivables.length > 0) {
+      const totalOwed = receivables.reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+      const people = new Set(receivables.map(l => (l.lender || '').trim().toLowerCase()).filter(Boolean)).size;
+      const peopleTxt = people > 0
+        ? `From ${people} ${people === 1 ? 'person' : 'people'}`
+        : `Across ${receivables.length} ${receivables.length === 1 ? 'pautang' : 'pautangs'}`;
+      insights.push({
+        priority: 7,
+        tone: 'info',
+        icon: '💛',
+        title: `${peso(totalOwed)} in outstanding pautang`,
+        sub: peopleTxt,
+      });
+    }
+
+    // --- 15. Stale pautang — no collection in 60+ days
+    // Look at the most recent linked-loan tx for each receivable; if none in 60d, flag it
+    const STALE_DAYS = 60;
+    const staleCutoff = new Date(now); staleCutoff.setDate(staleCutoff.getDate() - STALE_DAYS);
+    const staleCutoffStr = staleCutoff.toISOString().slice(0, 10);
+    receivables.forEach(l => {
+      const linked = txs.filter(t => t.linkedLoanId === l.id);
+      // Baseline for "last activity" — most recent linked tx, else the loan's addedAt
+      const lastTxDate = linked.length > 0
+        ? linked.reduce((max, t) => (t.date > max ? t.date : max), '0000-00-00')
+        : (l.addedAt || '').slice(0, 10);
+      if (!lastTxDate || lastTxDate >= staleCutoffStr) return;
+      const daysSince = Math.floor((now - new Date(lastTxDate)) / (24 * 60 * 60 * 1000));
+      const who = (l.lender || l.name || 'someone').trim();
+      insights.push({
+        priority: 6,
+        tone: 'caution',
+        icon: '⏳',
+        title: `${who}'s pautang hasn't moved in ${daysSince} days`,
+        sub: `${peso(l.currentBalance || 0)} still outstanding.`,
+      });
+    });
+
     // Sort by priority desc, cap at 4 (bumped from 3 now that we have more variety)
     return insights.sort((a, b) => b.priority - a.priority).slice(0, 4);
   }
@@ -12791,18 +12910,22 @@
     const manualTotal = assets.reduce((s, a) => s + (Number(a.value) || 0), 0);
 
     const loans = Array.isArray(user.loans) ? user.loans : [];
-    // Paid-off loans don't count toward current liabilities
-    const totalLiabilities = loans
-      .filter(l => l.status !== 'paid')
+    const active = loans.filter(l => l.status !== 'paid');
+    // Payables reduce net worth; receivables (money others owe us) add to it.
+    const totalLiabilities = active
+      .filter(l => (l.direction || 'payable') === 'payable')
+      .reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+    const totalReceivables = active
+      .filter(l => l.direction === 'receivable')
       .reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
 
-    const totalAssets = walletTotal + manualTotal;
+    const totalAssets = walletTotal + manualTotal + totalReceivables;
     return {
-      walletTotal, manualTotal, totalAssets,
+      walletTotal, manualTotal, totalReceivables, totalAssets,
       totalLiabilities,
       netWorth: totalAssets - totalLiabilities,
       assetsCount: assets.length,
-      loansCount: loans.filter(l => l.status !== 'paid').length,
+      loansCount: active.length,
     };
   }
 
@@ -12968,10 +13091,14 @@
     // Split cards
     document.getElementById('nwAssetsTotal').textContent = peso(nw.totalAssets);
     document.getElementById('nwLiabTotal').textContent   = peso(nw.totalLiabilities);
-    document.getElementById('nwAssetsSub').textContent   = `Wallets ${peso(nw.walletTotal)} · Manual ${peso(nw.manualTotal)}`;
+    // Assets sub-line — include pautang if we're carrying any
+    const assetParts = [`Pitaka ${peso(nw.walletTotal)}`];
+    if (nw.manualTotal > 0)      assetParts.push(`Assets ${peso(nw.manualTotal)}`);
+    if (nw.totalReceivables > 0) assetParts.push(`Pautang ${peso(nw.totalReceivables)}`);
+    document.getElementById('nwAssetsSub').textContent = assetParts.join(' · ');
     document.getElementById('nwLiabSub').textContent     = nw.loansCount === 0
-      ? 'No active loans'
-      : `${nw.loansCount} active ${nw.loansCount === 1 ? 'loan' : 'loans'}`;
+      ? 'No active utang'
+      : `${nw.loansCount} active ${nw.loansCount === 1 ? 'utang' : 'utangs'}`;
 
     // Assets breakdown (wallets first, then manual grouped by type)
     renderNwAssetBreakdown(user);
@@ -12991,6 +13118,7 @@
     const txs = user.transactions || [];
     const wallets = user.wallets || [];
     const assets  = user.assets  || [];
+    const loans   = user.loans   || [];
 
     const rows = [];
     wallets.forEach(w => {
@@ -13014,6 +13142,17 @@
         amt: agg.total,
       });
     });
+    // Pautang total — money others owe you counts as an asset
+    const receivables = loans.filter(l => l.direction === 'receivable' && l.status !== 'paid');
+    const pautangTotal = receivables.reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+    if (pautangTotal > 0) {
+      rows.push({
+        icon: '💛',
+        name: 'Outstanding pautang',
+        sub: `${receivables.length} ${receivables.length === 1 ? 'person' : 'people'} owe you`,
+        amt: pautangTotal,
+      });
+    }
 
     if (rows.length === 0) {
       wrap.innerHTML = `<div class="expenses-empty"><div class="ico">🪙</div>Add wallets and manual assets to see your breakdown.</div>`;
@@ -13158,88 +13297,150 @@
     return amt * (BUDGET_TO_MONTHLY[f] || 1);
   }
 
+  // Current filter for the loans list: 'all' | 'payable' | 'receivable'
+  let loansFilter = 'all';
+
   function showLoansScreen(user) {
     userCache = user;
     refreshDrawerUser(user);
+    renderLoansList(user);
+    goto('loans');
+  }
+
+  function renderLoansList(user) {
     const loans = Array.isArray(user.loans) ? user.loans : [];
     const summary = document.getElementById('loansSummary');
     const empty   = document.getElementById('loansEmpty');
+    const emptyText = document.getElementById('loansEmptyText');
     const list    = document.getElementById('loansList');
+    const lbl1    = document.getElementById('loansSummaryLbl1');
+    const lbl2    = document.getElementById('loansSummaryLbl2');
 
-    if (loans.length === 0) {
+    // Update active tab styling
+    document.querySelectorAll('[data-loan-filter]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.loanFilter === loansFilter);
+    });
+
+    // Filter set — treat missing direction as payable (backwards compat with existing data)
+    const inFilter = (l) => {
+      const dir = l.direction || 'payable';
+      if (loansFilter === 'all') return true;
+      return dir === loansFilter;
+    };
+    const filtered = loans.filter(inFilter);
+
+    if (filtered.length === 0) {
       empty.style.display = 'block';
       summary.style.display = 'none';
       list.innerHTML = '';
-    } else {
-      empty.style.display = 'none';
-      summary.style.display = 'grid';
-
-      const active = loans.filter(l => l.status !== 'paid');
-      const totalDebt   = active.reduce((s, l) => s + (Number(l.currentBalance)   || 0), 0);
-      const monthlyDue  = active.reduce((s, l) => s + loanMonthlyEquivalent(l), 0);
-      document.getElementById('loansTotalDebt').textContent = peso(totalDebt);
-      document.getElementById('loansMonthlyDue').textContent = peso(monthlyDue);
-
-      // Active first (largest balance first), then paid at the bottom
-      const sorted = [...loans].sort((a, b) => {
-        const aPaid = a.status === 'paid' ? 1 : 0;
-        const bPaid = b.status === 'paid' ? 1 : 0;
-        if (aPaid !== bPaid) return aPaid - bPaid;
-        return (Number(b.currentBalance) || 0) - (Number(a.currentBalance) || 0);
-      });
-
-      list.innerHTML = '';
-      sorted.forEach(l => {
-        const original = Number(l.originalAmount) || 0;
-        const remaining = Number(l.currentBalance) || 0;
-        const paid = Math.max(original - remaining, 0);
-        const pct = original > 0 ? Math.min(Math.round((paid / original) * 100), 100) : 0;
-        const isPaid = l.status === 'paid' || (original > 0 && remaining === 0);
-        const card = document.createElement('div');
-        card.className = 'loan-card' + (isPaid ? ' paid' : '');
-        card.innerHTML = `
-          <div class="loan-card-head">
-            <div class="icon">${LOAN_ICON[l.type] || '💳'}</div>
-            <div style="flex:1; min-width:0;">
-              <p class="name">${escapeAttr(l.name || LOAN_LABEL[l.type] || 'Loan')}</p>
-              <p class="lender">${LOAN_LABEL[l.type] || l.type}${l.lender ? ' · ' + escapeAttr(l.lender) : ''}</p>
-            </div>
-          </div>
-          <div class="loan-card-body">
-            <div>
-              <div class="remaining">${peso(remaining)}</div>
-              <div class="of">of ${peso(original)} · ${pct}% paid</div>
-            </div>
-            <div class="payment">
-              ${l.monthlyPayment ? `<strong>${peso(l.monthlyPayment)}</strong><br>${FREQ_LABEL[l.frequency || 'monthly'] || 'monthly'}${l.dueDay ? ' · ' + ordinal(l.dueDay) : ''}` : (isPaid ? '<strong>Paid off ✦</strong>' : '—')}
-            </div>
-          </div>
-          <div class="loan-progress"><div style="width:${pct}%"></div></div>
-          <div class="row-actions loan-actions">
-            <button class="row-edit-btn" type="button" data-action="edit">Edit</button>
-            <button class="row-edit-btn primary" type="button" data-action="pay" ${isPaid ? 'disabled' : ''}>+ Record payment</button>
-          </div>
-        `;
-        // Body click → detail (transactions + payment history)
-        card.addEventListener('click', ev => {
-          if (ev.target.closest('.row-actions')) return;
-          showEntryDetail(userCache, 'loan', l.id);
-        });
-        card.querySelector('[data-action="edit"]').addEventListener('click', ev => {
-          ev.stopPropagation();
-          openLoanEdit(userCache, l.id);
-        });
-        card.querySelector('[data-action="pay"]').addEventListener('click', ev => {
-          ev.stopPropagation();
-          if (isPaid) return;
-          openLoanPaymentScreen(userCache, l.id);
-        });
-        list.appendChild(card);
-      });
+      emptyText.textContent = loansFilter === 'payable'
+        ? 'No utang yet. Track credit cards, family debts, loans, or BNPL to keep tabs on what you owe.'
+        : loansFilter === 'receivable'
+        ? 'No pautang yet. Track money others owe you — friends, family, or unpaid invoices.'
+        : 'Nothing here yet. Add an utang you owe, or a pautang someone owes you.';
+      return;
     }
 
-    goto('loans');
+    empty.style.display = 'none';
+    summary.style.display = 'grid';
+
+    // Summary — content changes with the active tab
+    const active = filtered.filter(l => l.status !== 'paid');
+    if (loansFilter === 'receivable') {
+      const totalOwedToMe = active.reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+      lbl1.textContent = 'Total pautang';
+      lbl2.textContent = 'People owe you';
+      document.getElementById('loansTotalDebt').textContent = peso(totalOwedToMe);
+      document.getElementById('loansMonthlyDue').textContent = active.length;
+    } else if (loansFilter === 'payable') {
+      const totalDebt = active.reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+      const monthlyDue = active.reduce((s, l) => s + loanMonthlyEquivalent(l), 0);
+      lbl1.textContent = 'Total utang';
+      lbl2.textContent = 'Monthly payments';
+      document.getElementById('loansTotalDebt').textContent = peso(totalDebt);
+      document.getElementById('loansMonthlyDue').textContent = peso(monthlyDue);
+    } else {
+      // All view: side-by-side totals
+      const utang    = active.filter(l => (l.direction || 'payable') === 'payable').reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+      const pautang  = active.filter(l => l.direction === 'receivable').reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+      lbl1.textContent = 'Total utang';
+      lbl2.textContent = 'Total pautang';
+      document.getElementById('loansTotalDebt').textContent = peso(utang);
+      document.getElementById('loansMonthlyDue').textContent = peso(pautang);
+    }
+
+    // Sort: active first, largest balance first, then paid at the bottom
+    const sorted = [...filtered].sort((a, b) => {
+      const aPaid = a.status === 'paid' ? 1 : 0;
+      const bPaid = b.status === 'paid' ? 1 : 0;
+      if (aPaid !== bPaid) return aPaid - bPaid;
+      return (Number(b.currentBalance) || 0) - (Number(a.currentBalance) || 0);
+    });
+
+    list.innerHTML = '';
+    sorted.forEach(l => {
+      const direction = l.direction || 'payable';
+      const isReceivable = direction === 'receivable';
+      const original = Number(l.originalAmount) || 0;
+      const remaining = Number(l.currentBalance) || 0;
+      const paid = Math.max(original - remaining, 0);
+      const pct = original > 0 ? Math.min(Math.round((paid / original) * 100), 100) : 0;
+      const isPaid = l.status === 'paid' || (original > 0 && remaining === 0);
+      // Language flips based on direction
+      const paidWord    = isReceivable ? 'collected' : 'paid';
+      const paidLabel   = isReceivable ? 'Fully collected ✦' : 'Paid off ✦';
+      const payBtnLabel = isReceivable ? '+ Record collection' : '+ Record payment';
+      const dirTag      = isReceivable ? '<span class="direction-tag receivable">Pautang</span>' : '<span class="direction-tag payable">Utang</span>';
+
+      const card = document.createElement('div');
+      card.className = 'loan-card' + (isPaid ? ' paid' : '') + (isReceivable ? ' receivable' : '');
+      card.innerHTML = `
+        <div class="loan-card-head">
+          <div class="icon">${LOAN_ICON[l.type] || '💳'}</div>
+          <div style="flex:1; min-width:0;">
+            <p class="name">${escapeAttr(l.name || LOAN_LABEL[l.type] || 'Loan')}${loansFilter === 'all' ? dirTag : ''}</p>
+            <p class="lender">${LOAN_LABEL[l.type] || l.type}${l.lender ? ' · ' + escapeAttr(l.lender) : ''}</p>
+          </div>
+        </div>
+        <div class="loan-card-body">
+          <div>
+            <div class="remaining">${peso(remaining)}</div>
+            <div class="of">of ${peso(original)} · ${pct}% ${paidWord}</div>
+          </div>
+          <div class="payment">
+            ${l.monthlyPayment ? `<strong>${peso(l.monthlyPayment)}</strong><br>${FREQ_LABEL[l.frequency || 'monthly'] || 'monthly'}${l.dueDay ? ' · ' + ordinal(l.dueDay) : ''}` : (isPaid ? `<strong>${paidLabel}</strong>` : '—')}
+          </div>
+        </div>
+        <div class="loan-progress"><div style="width:${pct}%"></div></div>
+        <div class="row-actions loan-actions">
+          <button class="row-edit-btn" type="button" data-action="edit">Edit</button>
+          <button class="row-edit-btn primary" type="button" data-action="pay" ${isPaid ? 'disabled' : ''}>${payBtnLabel}</button>
+        </div>
+      `;
+      card.addEventListener('click', ev => {
+        if (ev.target.closest('.row-actions')) return;
+        showEntryDetail(userCache, 'loan', l.id);
+      });
+      card.querySelector('[data-action="edit"]').addEventListener('click', ev => {
+        ev.stopPropagation();
+        openLoanEdit(userCache, l.id);
+      });
+      card.querySelector('[data-action="pay"]').addEventListener('click', ev => {
+        ev.stopPropagation();
+        if (isPaid) return;
+        openLoanPaymentScreen(userCache, l.id);
+      });
+      list.appendChild(card);
+    });
   }
+
+  // Filter tabs — All / Utang / Pautang
+  document.querySelectorAll('[data-loan-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      loansFilter = btn.dataset.loanFilter;
+      renderLoansList(userCache);
+    });
+  });
 
   // -------- Loan add / edit / delete --------
   let editingLoanId = null;
@@ -13265,7 +13466,12 @@
     document.getElementById('loanStatusSelect').value = existing?.status   || 'active';
     document.getElementById('loanNoteInput').value    = existing?.note     || '';
 
-    document.getElementById('loanEditTitle').textContent = isEditing ? 'Edit loan' : 'Add loan';
+    // Title reflects the entry's direction (Edit utang / Edit pautang) so users
+    // know which bucket they're modifying.
+    const editingDir = existing?.direction || 'payable';
+    document.getElementById('loanEditTitle').textContent = isEditing
+      ? (editingDir === 'receivable' ? 'Edit pautang' : 'Edit utang')
+      : 'Add loan';
     document.getElementById('saveLoanBtn').textContent   = isEditing ? 'Save changes' : 'Save loan';
     document.getElementById('deleteLoanBtn').style.display = isEditing ? 'block' : 'none';
 
@@ -13308,7 +13514,21 @@
     }).join('');
   }
 
-  document.getElementById('addLoanBtn').addEventListener('click', () => openLoanEdit(userCache, null));
+  // Direction carried from whichever + button opens the loan editor.
+  // 'payable' = utang (I owe), 'receivable' = pautang (they owe me)
+  let pendingLoanDirection = 'payable';
+
+  document.getElementById('addUtangBtn').addEventListener('click', () => {
+    pendingLoanDirection = 'payable';
+    openLoanEdit(userCache, null);
+    // Retitle the edit screen so it's obvious which bucket we're adding to
+    document.getElementById('loanEditTitle').textContent = 'Add utang';
+  });
+  document.getElementById('addPautangBtn').addEventListener('click', () => {
+    pendingLoanDirection = 'receivable';
+    openLoanEdit(userCache, null);
+    document.getElementById('loanEditTitle').textContent = 'Add pautang';
+  });
 
   document.getElementById('saveLoanBtn').addEventListener('click', async () => {
     const type    = document.getElementById('loanTypeSelect').value;
@@ -13340,17 +13560,21 @@
           originalAmount: original, currentBalance: balance,
           interestRate: rate, monthlyPayment: payment,
           frequency: freq, dueDay, status, note,
+          // direction stays as it was — editing doesn't change utang↔pautang
           updatedAt: now,
         };
       }
     } else {
+      // pendingLoanDirection is set by whichever + button opened the editor.
+      // Falls back to 'payable' if opened via some legacy path.
       loans.push({
         id: 'ln_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         type, name, lender,
+        direction: pendingLoanDirection || 'payable',
         originalAmount: original, currentBalance: balance,
         interestRate: rate, monthlyPayment: payment,
         frequency: freq, dueDay, status, note,
-        payments: [],   // reserved for Phase 1c (payment history)
+        payments: [],
         addedAt: now, updatedAt: now,
       });
     }
@@ -13389,6 +13613,14 @@
     payingLoanId = loanId;
     const loan = (user.loans || []).find(l => l.id === loanId);
     if (!loan) { toast('Loan not found.', 'error'); showLoansScreen(user); return; }
+    const isReceivable = (loan.direction || 'payable') === 'receivable';
+
+    // Adjust screen title + labels so it reads right for pautang
+    const titleEl = document.querySelector('#screen-loan-payment .view-header h1');
+    if (titleEl) titleEl.textContent = isReceivable ? 'Record collection' : 'Record payment';
+    const contextLbl = document.querySelector('#loanPaymentContext .lbl');
+    if (contextLbl) contextLbl.textContent = isReceivable ? 'Collecting from' : 'Paying toward';
+    document.getElementById('saveLoanPaymentBtn').textContent = isReceivable ? 'Record collection' : 'Record payment';
 
     document.getElementById('loanPaymentLoanName').textContent = loan.name || LOAN_LABEL[loan.type] || 'Loan';
     document.getElementById('loanPaymentLoanBal').textContent  = `Balance ${peso(loan.currentBalance || 0)}`;
@@ -13487,21 +13719,24 @@
       updatedAt: new Date().toISOString(),
     };
 
-    // Also create a matching expense transaction so wallet balance + history reflect it
+    // Also create a matching transaction so wallet balance + history reflect it.
+    // Payable (utang): money leaves your wallet → expense
+    // Receivable (pautang): money comes back to your wallet → income
+    const isReceivable = (loan.direction || 'payable') === 'receivable';
     const txId = 'tx_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const tx = {
       id: txId,
-      type: 'expense',
+      type: isReceivable ? 'income' : 'expense',
       source: 'outside',
       amount,
       date,
-      note: note || `Payment: ${loan.name || 'loan'}`,
+      note: note || (isReceivable ? `Collected: ${loan.name || 'pautang'}` : `Payment: ${loan.name || 'loan'}`),
       paymentMethod: wallet ? wallet.method : 'cash',
       wallet: walletId,
-      linkedLoanId: payingLoanId,   // makes it easy to trace payments back to the loan
+      linkedLoanId: payingLoanId,
       linkedLoanPaymentId: paymentId,
       category: 'other',
-      label: `Loan: ${loan.name || LOAN_LABEL[loan.type] || 'loan'}`,
+      label: (isReceivable ? 'Collected: ' : 'Loan: ') + (loan.name || LOAN_LABEL[loan.type] || 'loan'),
       createdAt: new Date().toISOString(),
     };
     const transactions = Array.isArray(user.transactions) ? [tx, ...user.transactions] : [tx];
@@ -13513,7 +13748,10 @@
     if (error) { toast(error.message, 'error'); return; }
 
     const paidOff = newBalance === 0;
-    toast(paidOff ? `${loan.name || 'Loan'} paid off 🎉` : `Payment recorded ✦`, 'success');
+    const successMsg = paidOff
+      ? (isReceivable ? `${loan.name || 'Pautang'} fully collected 🎉` : `${loan.name || 'Loan'} paid off 🎉`)
+      : (isReceivable ? `Collection recorded ✦` : `Payment recorded ✦`);
+    toast(successMsg, 'success');
     payingLoanId = null;
     showLoansScreen(data.user);
   });
