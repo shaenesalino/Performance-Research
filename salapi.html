@@ -5870,6 +5870,62 @@
   }
   .ipon-budget-tile:active { transform: scale(0.99); }
   .ipon-budget-tile:hover { border-color: rgba(44, 188, 177, 0.4); }
+
+  /* Sinking-fund modifier — warm gold accent to distinguish from regular
+     Ipon goals. Read as "reserved for a specific future bill" rather than
+     "long-term savings goal". Applied on both Budget and Ipon page tiles. */
+  .ipon-budget-tile.sinking-fund,
+  .view-goal.sinking-fund {
+    background: linear-gradient(to right, rgba(249, 180, 0, 0.10), rgba(249, 180, 0, 0.03));
+    border-color: rgba(249, 180, 0, 0.35);
+  }
+  .ipon-budget-tile.sinking-fund:hover,
+  .view-goal.sinking-fund:hover {
+    border-color: rgba(249, 180, 0, 0.55);
+  }
+  .ipon-budget-tile.sinking-fund .view-item-icon.savings,
+  .view-goal.sinking-fund .view-item-icon.saving {
+    background: rgba(249, 180, 0, 0.18);
+    color: #C48E00;
+  }
+  .ipon-budget-tile.sinking-fund .view-item-amount.ipon {
+    color: #C48E00;
+  }
+  .ipon-budget-tile.sinking-fund .view-goal-mini-bar > div,
+  .view-goal.sinking-fund .view-goal-mini-bar > div {
+    background: linear-gradient(to right, var(--gold), #E8A600);
+  }
+  .ipon-budget-tile.sinking-fund .ipon-budget-footer .link {
+    color: #C48E00;
+  }
+
+  /* Pill next to the goal name marking it as a sinking fund */
+  .sinking-fund-pill {
+    display: inline-block;
+    background: var(--gold);
+    color: var(--navy);
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+    line-height: 1.4;
+  }
+
+  /* Read-only "Edit on Budget →" hint on the Ipon page tile in place of
+     the Edit/+Saved buttons for sinking-fund goals. */
+  .sinking-fund-hint {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #C48E00;
+    padding: 8px 0;
+    display: inline-block;
+  }
   .ipon-budget-tile .view-item-icon.savings {
     background: rgba(44, 188, 177, 0.14);
     color: var(--teal);
@@ -7850,7 +7906,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.10';
+  const APP_VERSION = '2026-08-10.12';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9430,27 +9486,16 @@
 
     wireDueBlock(card, exp);
 
-    // Delete — if this expense has a linked sinking-fund goal, ask the user
-    // whether the paired Ipon should also be removed.
+    // Delete — if this expense has a linked sinking-fund goal, delete it too
+    // automatically (sinking-fund goals are tightly coupled to their paired
+    // expense and shouldn't outlive it). No prompt.
     card.querySelector('[data-action="delete"]').addEventListener('click', async () => {
       if (exp.sinkingFundGoalId) {
-        const choice = await showConfirm({
-          icon: '⚠',
-          title: 'Delete linked Ipon too?',
-          bodyHtml: 'This expense has a matching sinking-fund goal on your Ipon page. Do you want to delete that goal as well, or keep it (just unlink)?',
-          okText: 'Delete both',
-          cancelText: 'Keep the Ipon',
-        });
-        if (choice) {
-          // Delete the paired goal on next save (mark it here; save handler
-          // will pick it up). Simplest way: do it now via updateUser.
-          const { data: sess } = await auth.getSession();
-          if (sess?.session) {
-            const u = sess.session.user;
-            const newGoals = (u.goals || []).filter(g => g.id !== exp.sinkingFundGoalId);
-            await auth.updateUser({ data: { goals: newGoals } });
-            toast('Sinking-fund goal removed', 'success');
-          }
+        const { data: sess } = await auth.getSession();
+        if (sess?.session) {
+          const u = sess.session.user;
+          const newGoals = (u.goals || []).filter(g => g.id !== exp.sinkingFundGoalId);
+          await auth.updateUser({ data: { goals: newGoals } });
         }
       }
       expenseDraft = expenseDraft.filter(x => x.id !== exp.id);
@@ -9509,14 +9554,22 @@
   function wireTimingSection(card, exp) {
     const timingSel = card.querySelector('[data-field="timing"]');
     if (timingSel) {
-      timingSel.addEventListener('change', () => {
+      timingSel.addEventListener('change', async () => {
         exp.timing = timingSel.value;
-        // If switching AWAY from sinking-fund, unlink the paired Ipon goal
-        // but leave the goal itself on the Ipon page (user can delete
-        // manually if they want). Warn them of the unlink.
+        // Switching AWAY from sinking-fund: the paired goal was created
+        // solely because of this pairing, so remove it. Silent — the user
+        // is actively changing the expense, they understand the goal was
+        // tied to it. (Deleting the expense outright still deletes both.)
         if (exp.timing !== 'sinking-fund' && exp.sinkingFundGoalId) {
+          const goalIdToRemove = exp.sinkingFundGoalId;
           exp.sinkingFundGoalId = null;
-          toast('Sinking-fund goal is unlinked but still on your Ipon page', 'success');
+          const { data: sess } = await auth.getSession();
+          if (sess?.session) {
+            const u = sess.session.user;
+            const newGoals = (u.goals || []).filter(g => g.id !== goalIdToRemove);
+            await auth.updateUser({ data: { goals: newGoals } });
+          }
+          toast('Sinking-fund Ipon removed', 'success');
         }
         const block = card.querySelector('[data-timing-block]');
         if (block) block.outerHTML = renderTimingPicker(exp);
@@ -9552,6 +9605,13 @@
       const { data: sess } = await auth.getSession();
       if (!sess?.session) return;
       const u = sess.session.user;
+      // Mirror the expense's paycheck assignment onto the paired goal.
+      // Without this the goal would fall back to "last payday of the cycle"
+      // (e.g. 31st for semi-monthly income) even when the expense is on the
+      // 15th — creating a confusing mismatch on the Budget page. Using
+      // manualPayFrom guarantees exact match regardless of whether the
+      // expense was auto-assigned or manually overridden.
+      const expensePay = assignPaycheck(exp, u);
       const goal = {
         id: 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         icon: 'shield',
@@ -9562,10 +9622,17 @@
         deadline: '',
         saved: 0,
         walletId: null,
-        contribDay: null,
+        contribDay: Number(exp.dueDay) || null,
         contribDay2: null,
         contribMonth: null,
-        manualPayFrom: null,
+        manualPayFrom: expensePay
+          ? { incomeId: expensePay.incomeId, payday: expensePay.payday }
+          : null,
+        // Back-reference to the paired expense — used by isSinkingFundGoal()
+        // to mark this goal as controlled by an expense (not directly editable
+        // from the Ipon page, values sync from the expense, deleted when the
+        // expense is deleted).
+        pairedExpenseId: exp.id,
       };
       exp.sinkingFundGoalId = goal.id;
       // Save BOTH the goal and the expense in one call. mergeSingle handles
@@ -9704,7 +9771,13 @@
 
     const btn = document.getElementById('saveBudgetBtn');
     setLoading(btn, true, 'Saving…');
-    const { data, error } = await auth.updateUser({ data: { expenses: cleaned } });
+    // Sync any paired sinking-fund goals during setup too (rare case where
+    // sinking funds are created inline before the first save, but harmless
+    // to always run).
+    const { data: existingSess } = await auth.getSession();
+    const existingGoals = existingSess?.session?.user?.goals || [];
+    const syncedGoals = syncPairedSinkingFundGoals(cleaned, existingGoals, existingSess?.session?.user);
+    const { data, error } = await auth.updateUser({ data: { expenses: cleaned, goals: syncedGoals } });
     setLoading(btn, false);
 
     if (error) { toast(error.message, 'error'); return; }
@@ -9759,12 +9832,23 @@
     if (singleEditMode && singleEditMode.type === 'savings') {
       if (singleEditMode.id) {
         const entry = (user.goals || []).find(g => g.id === singleEditMode.id);
+        // Safety net — sinking-fund goals should never be edited directly.
+        // If the user landed here somehow (bookmark, back button, code path
+        // we missed), redirect to the paired expense's edit form.
+        if (entry && isSinkingFundGoal(entry)) {
+          singleEditMode = { type: 'budget', id: entry.pairedExpenseId };
+          openBudgetScreen(user);
+          return;
+        }
         goalDraft = entry ? [JSON.parse(JSON.stringify(entry))] : [newGoal()];
       } else {
         goalDraft = [newGoal()];
       }
     } else if (Array.isArray(user.goals) && user.goals.length) {
-      goalDraft = JSON.parse(JSON.stringify(user.goals));
+      // Multi-edit: exclude sinking-fund goals from the editor (they're
+      // controlled by their paired expense). Kept as-is on the user record
+      // — they'll be merged back on save.
+      goalDraft = JSON.parse(JSON.stringify(user.goals.filter(g => !isSinkingFundGoal(g))));
     } else {
       goalDraft = [];
     }
@@ -10565,6 +10649,51 @@
   function sumMonthlySavings(user) {
     if (!Array.isArray(user.goals)) return 0;
     return user.goals.reduce((s, g) => s + ((Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1)), 0);
+  }
+  // A goal is a "sinking fund" if it was auto-created for a specific
+  // expense via the Budget → Sinking Fund flow. Such goals are tightly
+  // coupled to their paired expense: values sync from the expense, they
+  // aren't independently editable on the Ipon page, and they're deleted
+  // when the paired expense is deleted.
+  function isSinkingFundGoal(goal) {
+    return !!(goal && goal.pairedExpenseId);
+  }
+
+  // Given a set of expenses and goals, return an updated goals array where
+  // every sinking-fund goal is refreshed to mirror its paired expense's
+  // current values (amount, dueDay, frequency, paycheck assignment). Orphaned
+  // sinking-fund goals (paired expense no longer exists) are removed.
+  // Used by every code path that saves expenses so the paired goals stay
+  // in lock-step without needing separate edits.
+  function syncPairedSinkingFundGoals(expenses, goals, user) {
+    if (!Array.isArray(goals)) return goals;
+    const expById = new Map((expenses || []).map(e => [e.id, e]));
+    return goals
+      .map(g => {
+        if (!isSinkingFundGoal(g)) return g;
+        const exp = expById.get(g.pairedExpenseId);
+        if (!exp) return null;   // orphaned — will be filtered out below
+        // Only sync while the expense is still a sinking-fund. If timing
+        // was changed away, the expense's sinkingFundGoalId should also be
+        // cleared by the change handler, so the goal here becomes orphaned.
+        if (exp.timing !== 'sinking-fund' || exp.sinkingFundGoalId !== g.id) return null;
+        const monthly = (Number(exp.amount) || 0) * (BUDGET_TO_MONTHLY[exp.frequency] || 1);
+        const expensePay = assignPaycheck(exp, { ...(user || {}), incomes: user?.incomes });
+        return {
+          ...g,
+          name: `${exp.name} sinking fund`,
+          target: Number(exp.amount) || 0,
+          contribution: Math.round(monthly),
+          frequency: 'monthly',
+          contribDay: Number(exp.dueDay) || null,
+          contribDay2: null,
+          contribMonth: null,
+          manualPayFrom: expensePay
+            ? { incomeId: expensePay.incomeId, payday: expensePay.payday }
+            : null,
+        };
+      })
+      .filter(Boolean);
   }
 
   function showHome(user) {
@@ -11776,33 +11905,44 @@
   // it opens the Ipon edit page (all editing happens there, keeps a single
   // source of truth for goal data).
   function renderIponBudgetItem(g, user) {
+    const isSinking = isSinkingFundGoal(g);
     const item = document.createElement('div');
-    item.className = 'view-goal expense-tile ipon-budget-tile';
+    item.className = 'view-goal expense-tile ipon-budget-tile' + (isSinking ? ' sinking-fund' : '');
     item.dataset.tapDetail = 'goal';
     item.dataset.entryId = g.id;
     const icon = renderGoalIcon(g.icon);
     const monthly = (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1);
     const contribText = `${peso(g.contribution)}${FREQ_LABEL[g.frequency] ? ' ' + FREQ_LABEL[g.frequency].toLowerCase() : ''}`;
     const dueLine = g.contribDay ? ` · ${ordinal(g.contribDay)}` : '';
-    const linkedTag = g.walletId ? '<span class="ipon-linked-pin">wallet-linked</span>' : '';
+    const linkedTag  = g.walletId ? '<span class="ipon-linked-pin">wallet-linked</span>' : '';
+    const sinkingPill = isSinking ? '<span class="sinking-fund-pill">Sinking Fund</span>' : '';
+    const footerLbl = isSinking ? 'Reserved for future bill' : 'Monthly contribution';
+    const footerLink = isSinking ? 'Edit on Budget →' : 'Edit on Ipon →';
     item.innerHTML = `
       <div class="view-goal-head">
         <div class="view-item-icon savings">${icon}</div>
         <div class="view-item-info">
-          <p class="name">${escapeAttr(g.name || 'Ipon')} ${linkedTag}</p>
+          <p class="name">${escapeAttr(g.name || 'Ipon')} ${sinkingPill}${linkedTag}</p>
           <p class="meta">${contribText}${dueLine}</p>
           ${paycheckLineHtml(g, user)}
         </div>
         <div class="view-item-amount ipon">${peso(monthly)}</div>
       </div>
       <div class="ipon-budget-footer">
-        <span class="lbl">Monthly contribution</span>
-        <span class="link">Edit on Ipon →</span>
+        <span class="lbl">${footerLbl}</span>
+        <span class="link">${footerLink}</span>
       </div>
     `;
     item.addEventListener('click', async () => {
       const { data } = await auth.getSession();
       if (!data.session) return;
+      if (isSinking) {
+        // Sinking fund goals are controlled by the paired expense — jump to
+        // the Budget edit form for that expense instead of the Ipon edit.
+        singleEditMode = { type: 'budget', id: g.pairedExpenseId };
+        openBudgetScreen(data.session.user);
+        return;
+      }
       singleEditMode = { type: 'savings', id: g.id };
       openSavingsScreen(data.session.user);
     });
@@ -11829,6 +11969,7 @@
       banner.style.display = 'block';
 
       user.goals.forEach(g => {
+        const isSinking = isSinkingFundGoal(g);
         const target = Number(g.target) || 0;
         const saved = totalSavedFor(g, user.transactions);
         const pct = target > 0 ? Math.min((saved / target) * 100, 100) : 0;
@@ -11844,16 +11985,26 @@
         const metaLine = linkedName
           ? `In ${escapeAttr(linkedName)} · target ${peso(target)}`
           : `${peso(monthlyContrib)}/mo${cdt ? ' · ' + cdt : ''} · target ${peso(target)}`;
+        const sinkingPill = isSinking ? '<span class="sinking-fund-pill">Sinking Fund</span>' : '';
 
         const card = document.createElement('div');
-        card.className = 'view-goal';
+        card.className = 'view-goal' + (isSinking ? ' sinking-fund' : '');
         card.dataset.tapDetail = 'goal';
         card.dataset.entryId = g.id;
+        // Sinking-fund goals: no direct edit/log buttons — they're controlled
+        // by the paired expense on the Budget page. Tap the tile to jump to
+        // the expense edit form.
+        const actionButtons = isSinking
+          ? `<div class="view-item-action"><span class="sinking-fund-hint">Edit on Budget →</span></div>`
+          : `<div class="view-item-action">
+              <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
+              <button class="row-edit-btn primary" type="button" data-log-goal="${g.id}">+ Saved</button>
+            </div>`;
         card.innerHTML = `
           <div class="view-goal-head">
             <div class="view-item-icon saving">${renderGoalIcon(g.icon)}</div>
             <div class="view-item-info">
-              <p class="name">${escapeAttr(g.name || 'Goal')}</p>
+              <p class="name">${escapeAttr(g.name || 'Goal')} ${sinkingPill}</p>
               <p class="meta">${metaLine}</p>
             </div>
             <div class="view-item-amount">${Math.round(pct)}%</div>
@@ -11863,12 +12014,22 @@
             <span>${peso(saved)} saved</span>
             <span>${isDone ? '🎉 Reached' : peso(Math.max(target - saved, 0)) + ' to go'}</span>
           </div>
-          <div class="view-item-action">
-            <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
-            <button class="row-edit-btn primary" type="button" data-log-goal="${g.id}">+ Saved</button>
-          </div>
+          ${actionButtons}
         `;
         list.appendChild(card);
+
+        // For sinking-fund goals, tapping the tile jumps to the paired
+        // expense's edit form. No Edit or + Saved buttons — the expense
+        // is the source of truth.
+        if (isSinking) {
+          card.addEventListener('click', async () => {
+            const { data } = await auth.getSession();
+            if (!data.session) return;
+            singleEditMode = { type: 'budget', id: g.pairedExpenseId };
+            openBudgetScreen(data.session.user);
+          });
+          return;   // skip the +Saved/Edit wiring below
+        }
 
         // Direct handler for + Saved.
         // For wallet-linked goals: open a transfer form with the linked wallet
@@ -12663,9 +12824,13 @@
     if (singleEditMode && singleEditMode.type === 'budget') {
       const isNew = !singleEditMode.id;
       if (!cleaned.length) { setLoading(btn, false); toast('Add a name and amount.', 'error'); return; }
-      updates = { expenses: mergeSingle(userCache.expenses, cleaned[0], isNew) };
+      const newExpenses = mergeSingle(userCache.expenses, cleaned[0], isNew);
+      // Sync any paired sinking-fund goals so they reflect the new values
+      const newGoals = syncPairedSinkingFundGoals(newExpenses, userCache.goals, userCache);
+      updates = { expenses: newExpenses, goals: newGoals };
     } else {
-      updates = { expenses: cleaned };
+      const newGoals = syncPairedSinkingFundGoals(cleaned, userCache.goals, userCache);
+      updates = { expenses: cleaned, goals: newGoals };
     }
     const { data, error } = await auth.updateUser({ data: updates });
     setLoading(btn, false);
@@ -12687,6 +12852,8 @@
         frequency: g.frequency, deadline: g.deadline || '', saved: Number(g.saved) || 0,
         walletId: g.walletId || null,
         contribDay: g.contribDay, contribDay2: g.contribDay2, contribMonth: g.contribMonth,
+        manualPayFrom: g.manualPayFrom || null,
+        pairedExpenseId: g.pairedExpenseId || null,
       }));
     if (cleaned.length === 0 && goalDraft.length > 0) {
       toast('Add a name and target amount to each goal first.', 'error');
@@ -12713,7 +12880,10 @@
       if (!cleaned.length) { setLoading(btn, false); toast('Add a name and target amount.', 'error'); return; }
       updates = { goals: mergeSingle(userCache.goals, cleaned[0], isNew) };
     } else {
-      updates = { goals: cleaned };
+      // Multi-edit: the editor only shows non-sinking goals (see openSavingsScreen).
+      // Merge sinking-fund goals back so they aren't accidentally deleted.
+      const preservedSinking = (userCache.goals || []).filter(g => isSinkingFundGoal(g));
+      updates = { goals: [...cleaned, ...preservedSinking] };
     }
     const { data, error } = await auth.updateUser({ data: updates });
     setLoading(btn, false);
