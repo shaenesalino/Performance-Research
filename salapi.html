@@ -708,6 +708,9 @@
     gap: 12px;
   }
   .field-row .field.wide { grid-column: 1 / -1; }
+  /* Bottom-align inputs when one label wraps to a second line
+     (e.g. "STARTING AMOUNT (optional)" vs single-line "DEADLINE"). */
+  .field-row .field { justify-content: flex-end; }
   @media (max-width: 380px) {
     .field-row { grid-template-columns: 1fr; }
   }
@@ -1260,8 +1263,11 @@
     gap: 6px;
   }
   .goal-tag .goal-icon {
-    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    color: var(--teal);
   }
+  .goal-tag .goal-icon .svg-inline-icon { width: 14px; height: 14px; }
   .goal-delete {
     background: transparent;
     border: 1px solid var(--sand);
@@ -4827,7 +4833,7 @@
   }
   .goals-carousel::-webkit-scrollbar { display: none; }
   .goals-carousel { scrollbar-width: none; }
-  .goal-card {
+  #goalsCarousel .goal-card {
     flex-shrink: 0;
     width: 170px;
     background: var(--white);
@@ -4839,15 +4845,15 @@
     transition: transform 0.15s, border-color 0.15s;
     -webkit-tap-highlight-color: transparent;
   }
-  .goal-card:hover  { border-color: var(--muted); }
-  .goal-card:active { transform: scale(0.98); }
-  .goal-card-head {
+  #goalsCarousel .goal-card:hover  { border-color: var(--muted); }
+  #goalsCarousel .goal-card:active { transform: scale(0.98); }
+  #goalsCarousel .goal-card-head {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 10px;
   }
-  .goal-card-head .icon {
+  #goalsCarousel .goal-card-head .icon {
     width: 34px; height: 34px;
     border-radius: 10px;
     background: var(--cream-2);
@@ -4855,8 +4861,8 @@
     color: var(--navy);
     flex-shrink: 0;
   }
-  .goal-card-head .icon .svg-inline-icon { width: 18px; height: 18px; }
-  .goal-card-head .name {
+  #goalsCarousel .goal-card-head .icon .svg-inline-icon { width: 18px; height: 18px; }
+  #goalsCarousel .goal-card-head .name {
     font-family: 'Inter', sans-serif;
     font-size: 13px;
     color: var(--navy);
@@ -4868,7 +4874,7 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
   }
-  .goal-card .goal-amt {
+  #goalsCarousel .goal-card .goal-amt {
     font-family: 'Inter', sans-serif;
     font-size: 11px;
     color: var(--muted);
@@ -4876,27 +4882,27 @@
     margin-bottom: 6px;
     font-variant-numeric: tabular-nums;
   }
-  .goal-card .goal-bar {
+  #goalsCarousel .goal-card .goal-bar {
     height: 6px;
     background: var(--sand);
     border-radius: 999px;
     overflow: hidden;
     margin-bottom: 6px;
   }
-  .goal-card .goal-bar > div {
+  #goalsCarousel .goal-card .goal-bar > div {
     height: 100%;
     background: linear-gradient(90deg, var(--teal), var(--blue));
     border-radius: 999px;
     transition: width 0.4s;
   }
-  .goal-card .goal-pct {
+  #goalsCarousel .goal-card .goal-pct {
     font-family: 'Inter', sans-serif;
     font-size: 12px;
     font-weight: 700;
     color: var(--teal);
     font-variant-numeric: tabular-nums;
   }
-  .goal-card .goal-deadline {
+  #goalsCarousel .goal-card .goal-deadline {
     font-family: 'Inter', sans-serif;
     font-size: 10px;
     color: var(--muted);
@@ -5459,6 +5465,32 @@
     flex-shrink: 0;
   }
   .wallet-icon .svg-inline-icon { width: 22px; height: 22px; }
+
+  /* Ipon goals living in a wallet — small chip below the wallet name */
+  .wallet-linked-goals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .wallet-goal-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(44, 188, 177, 0.10);
+    color: var(--teal);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .wallet-goal-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--teal);
+  }
+  .wallet-goal-icon .svg-inline-icon { width: 11px; height: 11px; }
   .wallet-info h3 {
     font-family: 'Inter', sans-serif;
     font-size: 15px;
@@ -6631,42 +6663,13 @@
         <input class="input" type="text" id="loanLenderInput" placeholder="e.g. BPI, PayLater, Mom" maxlength="60" />
       </div>
 
-      <div class="two-col-fields">
-        <div class="field">
-          <label id="loanOriginalLbl">Original amount</label>
-          <div class="input-wrap">
-            <span class="prefix-icon">₱</span>
-            <input class="input" type="number" min="0" step="0.01" id="loanOriginalInput" placeholder="0" style="padding-left:32px;" />
-          </div>
-        </div>
-        <div class="field">
-          <label id="loanBalanceLbl">Remaining</label>
-          <div class="input-wrap">
-            <span class="prefix-icon">₱</span>
-            <input class="input" type="number" min="0" step="0.01" id="loanBalanceInput" placeholder="0" style="padding-left:32px;" />
-          </div>
-        </div>
-      </div>
-
-      <div class="two-col-fields">
-        <div class="field">
-          <label>Interest %/yr <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
-          <input class="input" type="number" min="0" step="0.01" id="loanRateInput" placeholder="e.g. 6.5" />
-        </div>
-        <div class="field">
-          <label id="loanPaymentLbl">Monthly payment</label>
-          <div class="input-wrap">
-            <span class="prefix-icon">₱</span>
-            <input class="input" type="number" min="0" step="0.01" id="loanPaymentInput" placeholder="0" style="padding-left:32px;" />
-          </div>
-        </div>
-      </div>
-
+      <!-- Frequency + Due — Due input adapts (day-of-month for recurring, full date for one-time) -->
       <div class="two-col-fields">
         <div class="field">
           <label>Frequency</label>
           <div class="select-wrap">
             <select class="input select" id="loanFreqSelect">
+              <option value="one-time">One-time</option>
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
               <option value="semi-monthly">Semi-monthly</option>
@@ -6678,7 +6681,44 @@
         </div>
         <div class="field">
           <label id="loanDueDayLbl">Due day</label>
+          <!-- Day-of-month input (shown for recurring frequencies) -->
           <input class="input" type="number" min="1" max="31" id="loanDueDayInput" placeholder="e.g. 15" />
+          <!-- Full date input (shown for one-time) -->
+          <input class="input" type="date" id="loanDueDateInput" style="display:none;" />
+        </div>
+      </div>
+
+      <div class="two-col-fields">
+        <div class="field">
+          <label id="loanOriginalLbl">Original amount</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanOriginalInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+        <div class="field">
+          <label id="loanTotalLbl">Total to pay</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanTotalInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col-fields" id="loanBalancePayRow">
+        <div class="field">
+          <label id="loanBalanceLbl">Remaining balance</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanBalanceInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+        <div class="field" id="loanPaymentField">
+          <label id="loanPaymentLbl">Monthly payment</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanPaymentInput" placeholder="0" style="padding-left:32px;" />
+          </div>
         </div>
       </div>
 
@@ -8498,7 +8538,8 @@
       contribution: 0,
       frequency: 'monthly',
       deadline: '',    // 'YYYY-MM' string, optional
-      saved: 0,        // optional starting amount
+      saved: 0,        // optional starting amount (unlinked goals only)
+      walletId: null,  // if set, goal progress mirrors this wallet's balance
       contribDay: null,  // day of week (weekly) OR day of month (semi/monthly/quarterly/annually)
       contribDay2: null, // semi-monthly only (second day)
       contribMonth: null,// annually only (1-12)
@@ -8598,7 +8639,7 @@
     card.innerHTML = `
       <div class="goal-card-head">
         <span class="goal-tag">
-          <span class="goal-icon">${goal.icon || '✨'}</span> Savings goal
+          <span class="goal-icon">${renderGoalIcon(goal.icon)}</span> Savings goal
         </span>
         <button type="button" class="goal-delete" data-action="delete" title="Remove">✕</button>
       </div>
@@ -8650,6 +8691,27 @@
         <div class="field">
           <label>Deadline <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
           <input class="input" type="month" value="${escapeAttr(goal.deadline || '')}" data-field="deadline" style="padding-left: 16px;" />
+        </div>
+
+        <div class="field wide">
+          <label>Saved in wallet <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional — auto-tracks wallet balance)</span></label>
+          <div class="select-wrap">
+            <select class="input select" data-field="walletId">
+              <option value="">Not linked to a wallet</option>
+              ${(userCache?.wallets || []).map(w => {
+                const label = (w.label && w.label.trim()) || (PAYMENT_NAME[w.method] || 'Wallet');
+                // A wallet can only back one ipon at a time. Show wallets already
+                // claimed by another goal as disabled with a hint, but keep this
+                // goal's own wallet selectable so it stays visible when editing.
+                const claimedBy = (userCache?.goals || []).find(og => og.id !== goal.id && og.walletId === w.id);
+                const draftClaim = goalDraft.find(og => og.id !== goal.id && og.walletId === w.id);
+                const taken = claimedBy || draftClaim;
+                const takenName = taken ? (taken.name || 'another goal') : '';
+                return `<option value="${w.id}" ${goal.walletId === w.id ? 'selected' : ''} ${taken ? 'disabled' : ''}>${escapeAttr(label)}${taken ? ` — used by ${escapeAttr(takenName)}` : ''}</option>`;
+              }).join('')}
+            </select>
+            <span class="select-caret">▾</span>
+          </div>
         </div>
       </div>
 
@@ -8832,6 +8894,13 @@
       goal.deadline = e.target.value || '';
       refreshProgress();
     });
+    const walletSel = card.querySelector('[data-field="walletId"]');
+    if (walletSel) {
+      walletSel.addEventListener('change', e => {
+        goal.walletId = e.target.value || null;
+        refreshProgress();
+      });
+    }
 
     wireContribBlock(card, goal);
 
@@ -8946,6 +9015,7 @@
         frequency: g.frequency,
         deadline: g.deadline || '',
         saved: Number(g.saved) || 0,
+        walletId: g.walletId || null,
         contribDay:   g.contribDay,
         contribDay2:  g.contribDay2,
         contribMonth: g.contribMonth,
@@ -8954,6 +9024,18 @@
     if (cleaned.length === 0 && goalDraft.length > 0) {
       toast('Add a name and target amount to each goal first.', 'error');
       return;
+    }
+
+    // Enforce 1-wallet-per-goal: if any wallet appears on more than one goal,
+    // bail with a clear message rather than silently saving conflicting state.
+    const walletClaims = {};
+    for (const g of cleaned) {
+      if (!g.walletId) continue;
+      if (walletClaims[g.walletId]) {
+        toast('Two goals can\'t share the same wallet. Pick a different wallet for one of them.', 'error');
+        return;
+      }
+      walletClaims[g.walletId] = g.name;
     }
 
     const btn = document.getElementById('saveGoalsBtn');
@@ -9054,6 +9136,15 @@
   // Total saved for a goal = user-entered starting amount + all-time contributions from transactions.
   // Kept as a helper so display never gets out of sync with the transaction log.
   function totalSavedFor(goal, transactions) {
+    // Wallet-linked ipon: the goal's saved amount IS the linked wallet's balance.
+    // Money in that wallet is the money set aside for this goal — deposits and
+    // withdrawals flow through naturally without needing separate "contribution"
+    // transactions.
+    if (goal.walletId && userCache) {
+      const wallet = (userCache.wallets || []).find(w => w.id === goal.walletId);
+      if (wallet) return computeWalletBalance(wallet, transactions);
+    }
+    // Unlinked goal (classic model): starting amount + logged contributions.
     return (Number(goal.saved) || 0) + totalContributedTo(goal.id, transactions);
   }
 
@@ -9333,9 +9424,11 @@
       const saved  = totalSavedFor(g, txs);
       const pct    = target > 0 ? Math.min(100, (saved / target) * 100) : 0;
       const icon   = renderGoalIcon(g.icon);
-      const deadline = g.deadline
-        ? `Target ${new Date(g.deadline).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}`
-        : '';
+      const linkedWallet = g.walletId ? (user.wallets || []).find(w => w.id === g.walletId) : null;
+      const linkedName = linkedWallet ? ((linkedWallet.label && linkedWallet.label.trim()) || PAYMENT_NAME[linkedWallet.method] || 'Wallet') : '';
+      const footerText = linkedName
+        ? `In ${escapeAttr(linkedName)}`
+        : (g.deadline ? `Target ${new Date(g.deadline).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}` : '');
       return `
         <div class="goal-card" data-goal-id="${escapeAttr(g.id)}">
           <div class="goal-card-head">
@@ -9345,7 +9438,7 @@
           <div class="goal-amt">${peso(saved)} / ${peso(target)}</div>
           <div class="goal-bar"><div style="width:${pct.toFixed(1)}%"></div></div>
           <div class="goal-pct">${pct.toFixed(0)}%</div>
-          ${deadline ? `<div class="goal-deadline">${deadline}</div>` : ''}
+          ${footerText ? `<div class="goal-deadline">${footerText}</div>` : ''}
         </div>
       `;
     }).join('');
@@ -10023,7 +10116,7 @@
   // VIEW SCREENS
   // =========================================================================
   const FREQ_LABEL = {
-    weekly: 'weekly', 'semi-monthly': 'semi-monthly', monthly: 'monthly',
+    'one-time': 'one-time', weekly: 'weekly', 'semi-monthly': 'semi-monthly', monthly: 'monthly',
     quarterly: 'quarterly', annually: 'annually'
   };
   const DOW_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -10319,6 +10412,14 @@
         const monthlyContrib = (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1);
         const contribs = contributionsThisMonth(g.id, user.transactions);
         const cdt = contribDateText(g);
+        // Wallet link info — if this goal mirrors a wallet's balance
+        const linkedWallet = g.walletId ? (user.wallets || []).find(w => w.id === g.walletId) : null;
+        const linkedName = linkedWallet ? ((linkedWallet.label && linkedWallet.label.trim()) || PAYMENT_NAME[linkedWallet.method] || 'Wallet') : null;
+        // For wallet-linked goals, the "monthly contribution" concept doesn't apply
+        // (progress tracks the wallet directly). Show "in [Wallet]" instead.
+        const metaLine = linkedName
+          ? `In ${escapeAttr(linkedName)} · target ${peso(target)}`
+          : `${peso(monthlyContrib)}/mo${cdt ? ' · ' + cdt : ''} · target ${peso(target)}`;
 
         const card = document.createElement('div');
         card.className = 'view-goal';
@@ -10329,7 +10430,7 @@
             <div class="view-item-icon saving">${renderGoalIcon(g.icon)}</div>
             <div class="view-item-info">
               <p class="name">${escapeAttr(g.name || 'Goal')}</p>
-              <p class="meta">${peso(monthlyContrib)}/mo${cdt ? ' · ' + cdt : ''} · target ${peso(target)}</p>
+              <p class="meta">${metaLine}</p>
             </div>
             <div class="view-item-amount">${Math.round(pct)}%</div>
           </div>
@@ -10345,7 +10446,11 @@
         `;
         list.appendChild(card);
 
-        // Direct handler for + Saved
+        // Direct handler for + Saved.
+        // For wallet-linked goals: open a transfer form with the linked wallet
+        //   as the destination — user picks the source wallet and the amount
+        //   flows into the linked wallet (which auto-updates goal progress).
+        // For unlinked goals: existing saving-flow (abstract contribution).
         const savedBtn = card.querySelector('[data-log-goal]');
         if (savedBtn) {
           savedBtn.addEventListener('click', async ev => {
@@ -10353,9 +10458,19 @@
             ev.stopPropagation();
             const { data } = await auth.getSession();
             if (!data.session) { toast('Not signed in — please refresh.', 'error'); return; }
-            openTransactionScreen(data.session.user, {
-              type: 'saving', source: 'set', linkedId: g.id,
-            });
+            if (linkedName) {
+              // Transfer to the linked wallet — pre-select destination + amount
+              openTransactionScreen(data.session.user, {
+                type: 'transfer',
+                toWallet: g.walletId,
+                linkedId: g.id,   // still tag it with the goal for history/detail views
+                amount: Number(g.contribution) || 0,
+              });
+            } else {
+              openTransactionScreen(data.session.user, {
+                type: 'saving', source: 'set', linkedId: g.id,
+              });
+            }
           });
         }
 
@@ -11053,11 +11168,25 @@
         id: g.id, icon: g.icon || 'spark', name: g.name.trim(),
         target: Number(g.target) || 0, contribution: Number(g.contribution) || 0,
         frequency: g.frequency, deadline: g.deadline || '', saved: Number(g.saved) || 0,
+        walletId: g.walletId || null,
         contribDay: g.contribDay, contribDay2: g.contribDay2, contribMonth: g.contribMonth,
       }));
     if (cleaned.length === 0 && goalDraft.length > 0) {
       toast('Add a name and target amount to each goal first.', 'error');
       return;
+    }
+    // Enforce 1-wallet-per-goal (for single-edit, check against existing goals too)
+    const otherGoals = (singleEditMode && singleEditMode.type === 'savings')
+      ? (userCache.goals || []).filter(g => g.id !== (singleEditMode.id || null))
+      : [];
+    const walletClaims = {};
+    for (const g of [...otherGoals, ...cleaned]) {
+      if (!g.walletId) continue;
+      if (walletClaims[g.walletId] && walletClaims[g.walletId] !== g.id) {
+        toast('That wallet already backs another ipon. Pick a different wallet.', 'error');
+        return;
+      }
+      walletClaims[g.walletId] = g.id;
     }
     const btn = document.getElementById('saveGoalsBtn');
     setLoading(btn, true, 'Saving…');
@@ -12424,7 +12553,9 @@
             <div class="stat"><div class="lbl">Original amount</div><div class="val">${peso(original)}</div></div>
             <div class="stat"><div class="lbl">Paid so far</div><div class="val done">${peso(paid)}</div></div>
             <div class="stat"><div class="lbl">Progress</div><div class="val">${pct.toFixed(0)}%</div></div>
-            <div class="stat"><div class="lbl">${FREQ_LABEL[l.frequency || 'monthly'] || 'Monthly'} payment</div><div class="val">${peso(l.monthlyPayment || 0)}</div></div>
+            ${l.frequency === 'one-time'
+              ? `<div class="stat"><div class="lbl">Due date</div><div class="val">${l.dueDate ? new Date(l.dueDate + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</div></div>`
+              : `<div class="stat"><div class="lbl">${(FREQ_LABEL[l.frequency || 'monthly'] || 'Monthly').replace(/^\w/, c => c.toUpperCase())} payment</div><div class="val">${peso(l.monthlyPayment || 0)}</div></div>`}
             <div class="stat"><div class="lbl">Payments logged</div><div class="val">${(l.payments || []).length}</div></div>
           </div>
           <div class="entry-summary-progress">
@@ -13165,6 +13296,13 @@
     const freq  = entry.frequency || 'monthly';
 
     switch (freq) {
+      case 'one-time': {
+        // One-time entries store the full ISO date in entry.dueDate.
+        // Match exactly, once.
+        if (!entry.dueDate) return false;
+        const ymd = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+        return entry.dueDate === ymd;
+      }
       case 'monthly':
         return dayA !== null && dom === dayA;
       case 'semi-monthly':
@@ -13473,6 +13611,17 @@
         const deltaText = delta > 0 ? `↑ ${peso(delta)}` : delta < 0 ? `↓ ${peso(Math.abs(delta))}` : 'unchanged';
         const deltaClass = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
         const name = w.label ? escapeAttr(w.label) : PAYMENT_NAME[w.method] || 'Wallet';
+        // The one ipon goal (if any) that lives in this wallet — wallets are
+        // exclusive to a single goal.
+        const linkedGoal = (user.goals || []).find(g => g.walletId === w.id);
+        const linkedTag = linkedGoal
+          ? `<div class="wallet-linked-goals">
+              <span class="wallet-goal-tag">
+                <span class="wallet-goal-icon">${renderGoalIcon(linkedGoal.icon)}</span>
+                ${escapeAttr(linkedGoal.name || 'Ipon')}
+              </span>
+            </div>`
+          : '';
         const row = document.createElement('div');
         row.className = 'wallet-row has-actions';
         row.dataset.walletId = w.id;
@@ -13481,6 +13630,7 @@
           <div class="wallet-info">
             <h3>${name}</h3>
             <div class="method">${PAYMENT_NAME[w.method] || w.method}</div>
+            ${linkedTag}
           </div>
           <div class="wallet-balance">
             <div class="amt ${balance < 0 ? 'negative' : ''}">${peso(balance)}</div>
@@ -14271,6 +14421,9 @@
   // Convert a loan's regular payment into its monthly equivalent, so all loans
   // can be summed on a consistent monthly basis on the Loans summary tile.
   function loanMonthlyEquivalent(loan) {
+    // One-time loans have no recurring monthly obligation, so they contribute
+    // 0 to any monthly-summary calculation.
+    if (loan.frequency === 'one-time') return 0;
     const amt = Number(loan.monthlyPayment) || 0;
     const f = loan.frequency || 'monthly';
     return amt * (BUDGET_TO_MONTHLY[f] || 1);
@@ -14387,7 +14540,20 @@
             <div class="of">of ${peso(original)} · ${pct}% ${paidWord}</div>
           </div>
           <div class="payment">
-            ${l.monthlyPayment ? `<strong>${peso(l.monthlyPayment)}</strong><br>${FREQ_LABEL[l.frequency || 'monthly'] || 'monthly'}${l.dueDay ? ' · ' + ordinal(l.dueDay) : ''}` : (isPaid ? `<strong>${paidLabel}</strong>` : '—')}
+            ${(() => {
+              if (isPaid) return `<strong>${paidLabel}</strong>`;
+              // One-time loans show the full due date instead of a frequency + day
+              if (l.frequency === 'one-time') {
+                if (!l.dueDate) return '<strong>One-time</strong>';
+                const d = new Date(l.dueDate + 'T00:00:00');
+                return `<strong>${peso(remaining)}</strong><br>due ${d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}`;
+              }
+              // Recurring: monthly payment + frequency + day-of-month
+              if (l.monthlyPayment) {
+                return `<strong>${peso(l.monthlyPayment)}</strong><br>${FREQ_LABEL[l.frequency || 'monthly'] || 'monthly'}${l.dueDay ? ' · ' + ordinal(l.dueDay) : ''}`;
+              }
+              return '—';
+            })()}
           </div>
         </div>
         <div class="loan-progress"><div style="width:${pct}%"></div></div>
@@ -14424,6 +14590,37 @@
   // -------- Loan add / edit / delete --------
   let editingLoanId = null;
 
+  // Frequency-driven label + input-swap logic. Called on open and whenever the
+  // frequency select changes so the form always reads correctly.
+  function updateLoanFormForFrequency(isReceivable) {
+    const freq = document.getElementById('loanFreqSelect').value;
+    const isOneTime = freq === 'one-time';
+
+    // Due Day (recurring) vs Due Date (one-time)
+    const dayInput  = document.getElementById('loanDueDayInput');
+    const dateInput = document.getElementById('loanDueDateInput');
+    const dueLbl    = document.getElementById('loanDueDayLbl');
+    dayInput.style.display  = isOneTime ? 'none' : '';
+    dateInput.style.display = isOneTime ? '' : 'none';
+    if (isOneTime) {
+      dueLbl.textContent = isReceivable ? 'Expected due date' : 'Due date';
+    } else {
+      dueLbl.textContent = isReceivable ? 'Expected due day' : 'Due day';
+    }
+
+    // Payment field label adapts to frequency; hidden entirely for one-time
+    // (one-time loans are paid in a single lump — the "Total to pay" IS the payment).
+    const payField = document.getElementById('loanPaymentField');
+    const payLbl   = document.getElementById('loanPaymentLbl');
+    payField.style.display = isOneTime ? 'none' : '';
+    const freqLabel = freq === 'weekly'       ? 'Weekly'
+                    : freq === 'semi-monthly' ? 'Semi-monthly'
+                    : freq === 'quarterly'    ? 'Quarterly'
+                    : freq === 'annually'     ? 'Annual'
+                    : 'Monthly';
+    payLbl.textContent = isReceivable ? `Expected ${freqLabel.toLowerCase()} repayment` : `${freqLabel} payment`;
+  }
+
   function openLoanEdit(user, loanId) {
     userCache = user;
     editingLoanId = loanId || null;
@@ -14437,11 +14634,13 @@
     document.getElementById('loanNameInput').value    = existing?.name    || '';
     document.getElementById('loanLenderInput').value  = existing?.lender  || '';
     document.getElementById('loanOriginalInput').value= existing?.originalAmount || '';
+    // Total to pay defaults to originalAmount for existing loans that predate this field.
+    document.getElementById('loanTotalInput').value   = existing?.totalToPay ?? existing?.originalAmount ?? '';
     document.getElementById('loanBalanceInput').value = existing?.currentBalance || '';
-    document.getElementById('loanRateInput').value    = existing?.interestRate   || '';
     document.getElementById('loanPaymentInput').value = existing?.monthlyPayment || '';
     document.getElementById('loanFreqSelect').value   = existing?.frequency || 'monthly';
     document.getElementById('loanDueDayInput').value  = existing?.dueDay   || '';
+    document.getElementById('loanDueDateInput').value = existing?.dueDate  || '';
     document.getElementById('loanStatusSelect').value = existing?.status   || 'active';
     document.getElementById('loanNoteInput').value    = existing?.note     || '';
 
@@ -14457,16 +14656,14 @@
       : (isReceivable ? 'Save pautang' : 'Save utang');
     document.getElementById('deleteLoanBtn').style.display = isEditing ? 'block' : 'none';
 
-    // Flip labels + placeholders + status options so the form reads correctly
-    // from the lender's perspective (pautang) vs the borrower's (utang).
+    // Flip static labels + placeholders + status options for direction
     const setOptional = (base) => `${base} <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span>`;
     if (isReceivable) {
       document.getElementById('loanLenderLbl').innerHTML   = setOptional('Borrower');
       document.getElementById('loanLenderInput').placeholder = 'e.g. Kuya Ben, Ate Rose, JC';
       document.getElementById('loanOriginalLbl').textContent  = 'Amount lent';
+      document.getElementById('loanTotalLbl').textContent     = 'Total to collect';
       document.getElementById('loanBalanceLbl').textContent   = 'Still owed to you';
-      document.getElementById('loanPaymentLbl').textContent   = 'Expected repayment';
-      document.getElementById('loanDueDayLbl').textContent    = 'Expected due day';
       document.getElementById('loanStatusLbl').textContent    = 'Status';
       const statusSel = document.getElementById('loanStatusSelect');
       statusSel.options[0].textContent = 'Outstanding';
@@ -14476,9 +14673,8 @@
       document.getElementById('loanLenderLbl').innerHTML   = setOptional('Lender');
       document.getElementById('loanLenderInput').placeholder = 'e.g. BPI, PayLater, Mom';
       document.getElementById('loanOriginalLbl').textContent  = 'Original amount';
-      document.getElementById('loanBalanceLbl').textContent   = 'Remaining';
-      document.getElementById('loanPaymentLbl').textContent   = 'Monthly payment';
-      document.getElementById('loanDueDayLbl').textContent    = 'Due day';
+      document.getElementById('loanTotalLbl').textContent     = 'Total to pay';
+      document.getElementById('loanBalanceLbl').textContent   = 'Remaining balance';
       document.getElementById('loanStatusLbl').textContent    = 'Status';
       const statusSel = document.getElementById('loanStatusSelect');
       statusSel.options[0].textContent = 'Active';
@@ -14486,8 +14682,13 @@
       statusSel.options[2].textContent = 'In default';
     }
 
+    // Frequency-driven label + input-swap
+    updateLoanFormForFrequency(isReceivable);
+    // Rebind so the change handler always uses the current direction
+    const freqSel = document.getElementById('loanFreqSelect');
+    freqSel.onchange = () => updateLoanFormForFrequency(isReceivable);
+
     // Balance banner + payment history are now on the loan DETAIL view.
-    // The edit screen focuses on the form only, to avoid duplication.
     const banner = document.getElementById('loanBalanceBanner');
     if (banner) banner.style.display = 'none';
     const historyWrap = document.getElementById('loanPaymentHistory');
@@ -14563,16 +14764,24 @@
     const name    = document.getElementById('loanNameInput').value.trim();
     const lender  = document.getElementById('loanLenderInput').value.trim();
     const original= Number(document.getElementById('loanOriginalInput').value) || 0;
+    const total   = Number(document.getElementById('loanTotalInput').value)    || 0;
     const balance = Number(document.getElementById('loanBalanceInput').value) || 0;
-    const rate    = Number(document.getElementById('loanRateInput').value)    || 0;
     const payment = Number(document.getElementById('loanPaymentInput').value) || 0;
     const freq    = document.getElementById('loanFreqSelect').value;
     const dueDay  = parseInt(document.getElementById('loanDueDayInput').value, 10) || null;
+    const dueDate = document.getElementById('loanDueDateInput').value || null;
     const status  = document.getElementById('loanStatusSelect').value;
     const note    = document.getElementById('loanNoteInput').value.trim();
+    const isOneTime = freq === 'one-time';
 
     if (!name) { toast('Please name this loan.', 'error'); return; }
-    if (original <= 0) { toast('Enter the original loan amount.', 'error'); return; }
+    if (original <= 0) { toast('Enter the original amount.', 'error'); return; }
+
+    // Total-to-pay defaults to original if user left it blank
+    const totalToPay = total > 0 ? total : original;
+    // For one-time loans, "payment" is meaningless — the whole thing is one payment.
+    // Store 0 so nothing shows in the monthly-summary computation.
+    const monthlyPayment = isOneTime ? 0 : payment;
 
     const { data: sess } = await auth.getSession();
     const user = sess.session.user;
@@ -14585,23 +14794,31 @@
         loans[idx] = {
           ...loans[idx],
           type, name, lender,
-          originalAmount: original, currentBalance: balance,
-          interestRate: rate, monthlyPayment: payment,
-          frequency: freq, dueDay, status, note,
+          originalAmount: original,
+          totalToPay,
+          currentBalance: balance,
+          monthlyPayment,
+          frequency: freq,
+          dueDay: isOneTime ? null : dueDay,
+          dueDate: isOneTime ? dueDate : null,
+          status, note,
           // direction stays as it was — editing doesn't change utang↔pautang
           updatedAt: now,
         };
       }
     } else {
-      // pendingLoanDirection is set by whichever + button opened the editor.
-      // Falls back to 'payable' if opened via some legacy path.
       loans.push({
         id: 'ln_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         type, name, lender,
         direction: pendingLoanDirection || 'payable',
-        originalAmount: original, currentBalance: balance,
-        interestRate: rate, monthlyPayment: payment,
-        frequency: freq, dueDay, status, note,
+        originalAmount: original,
+        totalToPay,
+        currentBalance: balance,
+        monthlyPayment,
+        frequency: freq,
+        dueDay: isOneTime ? null : dueDay,
+        dueDate: isOneTime ? dueDate : null,
+        status, note,
         payments: [],
         addedAt: now, updatedAt: now,
       });
