@@ -2442,44 +2442,21 @@
   }
   .txh-empty-search .ico { font-size: 40px; margin-bottom: 8px; }
 
-  /* Filter tabs — like tx-tabs but smaller */
-  .txh-filter {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    background: var(--white);
-    border: 1.5px solid var(--sand);
-    border-radius: 14px;
-    padding: 4px;
+  /* Filter dropdown — replaces the tab strip */
+  .txh-filter-wrap {
     margin-bottom: 20px;
-    gap: 3px;
   }
-  .txh-filter-btn {
-    background: transparent;
-    border: none;
-    color: var(--navy);
-    font-family: inherit;
-    font-size: 12px;
+  .txh-filter-select {
     font-weight: 700;
-    padding: 9px 4px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.2s;
+    font-size: 14px;
   }
-  .txh-filter-btn.active[data-filter="all"] {
-    background: var(--navy); color: var(--cream);
-  }
-  .txh-filter-btn.active[data-filter="expense"] {
-    background: var(--blue); color: var(--white);
-  }
-  .txh-filter-btn.active[data-filter="income"] {
-    background: var(--orange); color: var(--white);
-  }
-  .txh-filter-btn.active[data-filter="saving"] {
-    background: var(--teal); color: var(--white);
-  }
-  .txh-filter-btn.active[data-filter="transfer"] {
-    background: var(--navy); color: var(--white);
-  }
+  /* Color-accent the select border based on the currently-selected filter,
+     so the visual feedback the old tab strip provided still comes through. */
+  .txh-filter-select[data-filter="all"]      { border-color: var(--navy); }
+  .txh-filter-select[data-filter="expense"]  { border-color: var(--blue); color: var(--blue); }
+  .txh-filter-select[data-filter="income"]   { border-color: var(--orange); color: var(--orange); }
+  .txh-filter-select[data-filter="saving"]   { border-color: var(--teal); color: var(--teal); }
+  .txh-filter-select[data-filter="transfer"] { border-color: var(--navy); }
 
   /* Month group */
   .txh-month {
@@ -7095,12 +7072,17 @@
       <button type="button" class="txh-search-clear" id="txhSearchClear" aria-label="Clear search" style="display:none;">×</button>
     </div>
 
-    <div class="txh-filter" id="txhFilter">
-      <button class="txh-filter-btn active" type="button" data-filter="all">All</button>
-      <button class="txh-filter-btn" type="button" data-filter="expense">Expense</button>
-      <button class="txh-filter-btn" type="button" data-filter="income">Income</button>
-      <button class="txh-filter-btn" type="button" data-filter="saving">Saving</button>
-      <button class="txh-filter-btn" type="button" data-filter="transfer">Transfer</button>
+    <div class="txh-filter-wrap">
+      <div class="select-wrap">
+        <select class="input select txh-filter-select" id="txhFilterSelect">
+          <option value="all">All transactions</option>
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+          <option value="saving">Saving</option>
+          <option value="transfer">Transfer</option>
+        </select>
+        <span class="select-caret">▾</span>
+      </div>
     </div>
 
     <div id="txhContent"></div>
@@ -12135,13 +12117,14 @@
   const showTransactionsScreen = showTransactionsHistory;
 
   // Filter tabs
-  document.querySelectorAll('#txhFilter .txh-filter-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      txhFilter = b.dataset.filter;
-      document.querySelectorAll('#txhFilter .txh-filter-btn').forEach(x =>
-        x.classList.toggle('active', x.dataset.filter === txhFilter));
-      renderTxhContent();
-    });
+  // Filter dropdown — set data-filter on the select itself so the color-accent
+  // CSS can reflect the current choice.
+  const txhFilterSelect = document.getElementById('txhFilterSelect');
+  txhFilterSelect.setAttribute('data-filter', txhFilter);
+  txhFilterSelect.addEventListener('change', () => {
+    txhFilter = txhFilterSelect.value;
+    txhFilterSelect.setAttribute('data-filter', txhFilter);
+    renderTxhContent();
   });
 
   // Search input — live-filter as you type, with a clear button
