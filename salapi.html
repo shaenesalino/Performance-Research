@@ -7918,7 +7918,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.13';
+  const APP_VERSION = '2026-08-10.14';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -10676,6 +10676,25 @@
     return !!(goal && goal.pairedExpenseId);
   }
 
+  // Sweep sinking-fund goals whose paired expense no longer exists. Runs
+  // opportunistically on every showBudgetView / showSavingsView call so
+  // orphans introduced by any code path missing the cascade (or by data
+  // imports, etc.) get cleaned up quietly. Mutates user.goals in-place and
+  // fires a background save so the next render uses the cleaned list.
+  function purgeOrphanedSinkingFundGoals(user) {
+    if (!user || !Array.isArray(user.goals)) return;
+    const expIds = new Set((user.expenses || []).map(e => e.id));
+    const cleaned = user.goals.filter(g =>
+      !isSinkingFundGoal(g) || expIds.has(g.pairedExpenseId)
+    );
+    if (cleaned.length !== user.goals.length) {
+      user.goals = cleaned;   // in-place so subsequent renders see it
+      auth.updateUser({ data: { goals: cleaned } }).catch(err => {
+        console.warn('[Silak] Background orphan-purge failed:', err.message);
+      });
+    }
+  }
+
   // Given a set of expenses and goals, return an updated goals array where
   // every sinking-fund goal is refreshed to mirror its paired expense's
   // current values (amount, dueDay, frequency, paycheck assignment). Orphaned
@@ -11614,6 +11633,7 @@
   }
 
   function showBudgetView(user) {
+    purgeOrphanedSinkingFundGoals(user);
     refreshDrawerUser(user);
     const list = document.getElementById('budgetViewList');
     const emptyEl = document.getElementById('budgetViewEmpty');
@@ -11969,10 +11989,14 @@
         <span class="link">${footerLink}</span>
       </div>
     `;
-    item.addEventListener('click', async () => {
+    item.addEventListener('click', async (ev) => {
       const { data } = await auth.getSession();
       if (!data.session) return;
       if (isSinking) {
+        // Stop the global [data-tap-detail] click handler on document from
+        // ALSO firing (it would open the goal detail modal, overriding our
+        // scroll/navigate action).
+        ev.stopPropagation();
         // On the Budget page, the paired expense already has its own tile
         // in its category section — scroll to it and flash it instead of
         // opening the edit form. Feels lightweight and shows the connection.
@@ -11983,8 +12007,10 @@
           setTimeout(() => target.classList.remove('flash-highlight'), 1600);
           return;
         }
-        // Fallback: if we can't find the tile (shouldn't happen but just in
-        // case), open the edit form for the paired expense.
+        // Fallback: if we can't find the tile (paired expense may have been
+        // deleted, leaving the goal orphaned — purgeOrphanedSinkingFundGoals
+        // will clean this up on next Budget/Ipon view load), open the edit
+        // form for the paired expense.
         singleEditMode = { type: 'budget', id: g.pairedExpenseId };
         openBudgetScreen(data.session.user);
         return;
@@ -11996,6 +12022,7 @@
   }
 
   function showSavingsView(user) {
+    purgeOrphanedSinkingFundGoals(user);
     refreshDrawerUser(user);
     const list = document.getElementById('savingsViewList');
     const emptyEl = document.getElementById('savingsViewEmpty');
@@ -12069,7 +12096,10 @@
         // rather than opening any edit form. The expense is the source of
         // truth — Ipon is just a mirror.
         if (isSinking) {
-          card.addEventListener('click', async () => {
+          card.addEventListener('click', async (ev) => {
+            // Stop the global [data-tap-detail] click handler from opening
+            // the goal detail modal — we're doing our own navigation.
+            ev.stopPropagation();
             const { data } = await auth.getSession();
             if (!data.session) return;
             pendingScrollToExpense = g.pairedExpenseId;
@@ -12958,8 +12988,17 @@
   document.getElementById('deleteBudgetBtn').addEventListener('click', async () => {
     if (!singleEditMode || singleEditMode.type !== 'budget' || !singleEditMode.id) return;
     if (!confirm('Delete this expense? This can\'t be undone.')) return;
-    const list = (userCache.expenses || []).filter(e => e.id !== singleEditMode.id);
-    const { data, error } = await auth.updateUser({ data: { expenses: list } });
+    // Find the expense we're deleting so we can check for a paired sinking-fund goal
+    const exp = (userCache.expenses || []).find(e => e.id === singleEditMode.id);
+    const goalIdToRemove = exp && exp.sinkingFundGoalId;
+    const newExpenses = (userCache.expenses || []).filter(e => e.id !== singleEditMode.id);
+    // Also purge any paired sinking-fund goal (tightly coupled — a sinking
+    // fund exists solely because of its paired expense). Also sweep any
+    // orphaned sinking-fund goals for extra safety.
+    const newGoals = (userCache.goals || [])
+      .filter(g => g.id !== goalIdToRemove)
+      .filter(g => !isSinkingFundGoal(g) || newExpenses.some(e => e.id === g.pairedExpenseId));
+    const { data, error } = await auth.updateUser({ data: { expenses: newExpenses, goals: newGoals } });
     if (error) { toast(error.message, 'error'); return; }
     toast('Expense deleted', 'success');
     singleEditMode = null;
