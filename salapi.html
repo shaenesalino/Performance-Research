@@ -7191,6 +7191,19 @@
       <span class="pa-chev">›</span>
     </button>
 
+    <!-- Recovery — restore from an auto-backup snapshot. Every save writes to
+         a rolling ring of 5 backups, so accidental wipes can be undone. -->
+    <button type="button" class="profile-action-card" id="recoveryCard">
+      <div class="pa-icon" style="background: rgba(214, 69, 69, 0.10); color: var(--error);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title">Recovery</div>
+        <div class="pa-sub" id="recoveryCardSub">Restore from a recent auto-backup snapshot if something goes wrong.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
     <button class="btn btn-outline" type="button" id="profileLogoutBtn" style="margin-top:20px;">Log out</button>
     <button type="button" id="profileResetBtn" class="profile-reset-btn">Reset all data</button>
   </section>
@@ -7445,12 +7458,71 @@
   }
 
   // ==== Offline mode helpers (localStorage only, no network) ====
+  // Auto-backup: every save also writes to a rolling ring of 5 backup slots
+  // so accidental wipes / bugs can be recovered from the Profile → Recovery
+  // section. Each backup carries a timestamp for the UI.
+  const BACKUP_SLOTS = 5;
+  const BACKUP_PREFIX = 'silak-salapi-backup-';
+  function writeAutoBackup(user) {
+    try {
+      const now = new Date().toISOString();
+      // Skip backing up empty/onboarding states — a wiped state shouldn't
+      // pollute all 5 slots and overwrite good backups.
+      const hasContent = user && (
+        (user.wallets?.length > 0) || (user.transactions?.length > 0) ||
+        (user.incomes?.length > 0) || (user.expenses?.length > 0) ||
+        (user.goals?.length > 0)   || (user.loans?.length > 0)
+      );
+      if (!hasContent) return;
+      // Find the oldest slot (or empty slot) to overwrite
+      const slots = [];
+      for (let i = 1; i <= BACKUP_SLOTS; i++) {
+        const raw = localStorage.getItem(BACKUP_PREFIX + i);
+        slots.push(raw ? JSON.parse(raw).ts : null);
+      }
+      let targetSlot = 1;
+      for (let i = 0; i < BACKUP_SLOTS; i++) {
+        if (!slots[i]) { targetSlot = i + 1; break; }
+        if (!slots[targetSlot - 1] || slots[i] < slots[targetSlot - 1]) targetSlot = i + 1;
+      }
+      // Skip if the newest existing backup is identical to what we'd write
+      // (avoids filling all 5 slots with dupes when the same data is re-saved)
+      const newestIdx = slots.reduce((best, ts, i) => (ts && (!slots[best] || ts > slots[best])) ? i : best, 0);
+      const newestRaw = localStorage.getItem(BACKUP_PREFIX + (newestIdx + 1));
+      const userJSON = JSON.stringify(user);
+      if (newestRaw) {
+        try {
+          const newest = JSON.parse(newestRaw);
+          if (JSON.stringify(newest.user) === userJSON) return;  // no change
+        } catch {}
+      }
+      localStorage.setItem(BACKUP_PREFIX + targetSlot, JSON.stringify({ ts: now, user: JSON.parse(userJSON) }));
+    } catch (err) {
+      console.warn('[Silak] Auto-backup failed:', err);
+    }
+  }
+  function listAutoBackups() {
+    const out = [];
+    for (let i = 1; i <= BACKUP_SLOTS; i++) {
+      const raw = localStorage.getItem(BACKUP_PREFIX + i);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        out.push({ slot: i, ts: parsed.ts, user: parsed.user });
+      } catch {}
+    }
+    return out.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+  }
+
   function loadLocalUser() {
     try { return JSON.parse(localStorage.getItem(DEV_LOCAL_KEY) || 'null'); }
     catch { return null; }
   }
   function saveLocalUser(u) {
     localStorage.setItem(DEV_LOCAL_KEY, JSON.stringify(u));
+    // Fire-and-forget backup so any bug that clears the main record has
+    // recovery slots to fall back on.
+    writeAutoBackup(u);
   }
   function newLocalUser() {
     return {
@@ -10765,6 +10837,11 @@
     document.getElementById('testDataSub').textContent   = inTest
       ? 'Currently in sample mode. Tap to restore your real data.'
       : 'Explore all features with realistic sample data. Your real data will be saved and restored when you exit.';
+    // Recovery card — show how many backups are available
+    const backups = listAutoBackups();
+    document.getElementById('recoveryCardSub').textContent = backups.length > 0
+      ? `${backups.length} snapshot${backups.length !== 1 ? 's' : ''} available — tap to browse and restore.`
+      : 'Restore from a recent auto-backup snapshot if something goes wrong.';
     goto('profile');
   }
 
@@ -16299,10 +16376,19 @@
     // Snapshot every real-data field into a single backup blob
     const realDataBackup = {};
     REAL_DATA_KEYS.forEach(k => { realDataBackup[k] = user[k]; });
-    const sample = buildSampleData();
+    // Also snapshot flags so exit can restore user's original preview state
+    realDataBackup.__flags__ = {
+      isPreview: user.isPreview || false,
+      exitedPreview: user.exitedPreview || false,
+    };
+    // Strip flags from sample data so they don't leak into user state and
+    // trigger the preview-exit wipe path later.
+    const { isPreview: _sIP, ...sampleClean } = buildSampleData();
     const payload = {
-      ...sample,
+      ...sampleClean,
       isTestMode: true,
+      isPreview: false,       // explicit — test mode is not preview
+      exitedPreview: true,    // explicit — prevent maybeEnterPreview from re-triggering
       realDataBackup,
     };
     const btn = document.getElementById('testDataCard');
@@ -16322,9 +16408,17 @@
     const user = sess.session.user;
     if (!user.isTestMode) return;
     const backup = user.realDataBackup || {};
-    // Restore each field from the backup — undefined for a key means the user
-    // never had that data, so we clear it back to undefined.
-    const restore = { isTestMode: false, realDataBackup: null };
+    const originalFlags = backup.__flags__ || {};
+    // Restore each field from the backup. undefined for a key means user never
+    // had that data, so leave it undefined (Object.assign will set it explicitly).
+    const restore = {
+      isTestMode: false,
+      realDataBackup: null,
+      // Restore original preview flags — critical: prevents the banner from
+      // reappearing after test-mode exit and creating a second, destructive tap.
+      isPreview: !!originalFlags.isPreview,
+      exitedPreview: !!originalFlags.exitedPreview,
+    };
     REAL_DATA_KEYS.forEach(k => { restore[k] = backup[k] !== undefined ? backup[k] : undefined; });
     const btn = document.getElementById('exitPreviewBtn');
     setLoading(btn, true, 'Restoring…');
@@ -16349,12 +16443,35 @@
   }
 
   async function exitPreviewMode() {
-    // The banner's "Exit" button does double duty — restore real data if in
-    // test mode, or clear sample data + start onboarding if it's the initial
-    // first-time preview.
+    // The banner's "Exit" button does double duty. First priority: test mode
+    // exit (restores real data). Second: check for meaningful user data before
+    // running the destructive preview-wipe path — if the user has actual data
+    // (wallets, transactions), they're NOT in a first-time preview and should
+    // NEVER be wiped. This is the safety net for the previous data-loss bug.
     const { data: sess } = await auth.getSession();
-    if (sess?.session?.user?.isTestMode) return exitTestMode();
-    if (!confirm('Exit the preview? This will clear the sample data so you can set up your own.')) return;
+    const u = sess?.session?.user;
+    if (u?.isTestMode) return exitTestMode();
+    // SAFETY: never wipe a user who has actual data
+    const hasRealData = (u?.wallets?.length > 0) || (u?.transactions?.length > 0)
+      || (u?.incomes?.length > 0)  || (u?.expenses?.length > 0)
+      || (u?.goals?.length > 0)    || (u?.loans?.length > 0);
+    if (hasRealData) {
+      // Not a real preview — just clear the isPreview flag so the banner goes
+      // away, DON'T touch any user data.
+      await auth.updateUser({ data: { isPreview: false, exitedPreview: true } });
+      hidePreviewBanner();
+      toast('Preview banner hidden — your data is safe', 'success');
+      return;
+    }
+    // Original wipe path — only reached if user genuinely has no data yet.
+    const ok = await showConfirm({
+      icon: '↩',
+      title: 'Exit preview?',
+      bodyHtml: 'This will clear the sample data so you can set up your own account. This is only meant for brand-new users — <strong>if you already have your own data, tap Cancel and open the Profile page instead.</strong>',
+      okText: 'Yes, clear sample',
+      cancelText: 'Cancel',
+    });
+    if (!ok) return;
     // Clear every user-data field we populated, plus set the exitedPreview flag
     // so a refresh doesn't drop us back into the preview.
     const clearing = {
@@ -16391,6 +16508,56 @@
   }
 
   document.getElementById('exitPreviewBtn').addEventListener('click', exitPreviewMode);
+
+  // Recovery card in Profile — lists auto-backup snapshots and lets user
+  // restore any of them if their current data got wiped or corrupted.
+  document.getElementById('recoveryCard').addEventListener('click', async () => {
+    const backups = listAutoBackups();
+    if (backups.length === 0) {
+      toast('No backup snapshots available yet', 'error');
+      return;
+    }
+    // Build the picker options — most recent first, with human-readable timestamps
+    const options = backups.map(b => {
+      const d = new Date(b.ts);
+      const when = d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      const wallets = b.user.wallets?.length || 0;
+      const txs = b.user.transactions?.length || 0;
+      return {
+        key: 'slot-' + b.slot,
+        label: when,
+        sub: `${wallets} wallet${wallets !== 1 ? 's' : ''} · ${txs} transaction${txs !== 1 ? 's' : ''}`,
+        icon: '↩',
+      };
+    });
+    const picked = await showPicker({
+      icon: '↩',
+      title: 'Restore from backup',
+      options,
+    });
+    if (!picked) return;
+    const chosen = backups.find(b => 'slot-' + b.slot === picked);
+    if (!chosen) return;
+    const confirmed = await showConfirm({
+      icon: '⚠',
+      title: 'Restore this backup?',
+      bodyHtml: `Replace your current data with the snapshot from <strong>${new Date(chosen.ts).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</strong>. Your current data will be auto-backed-up before the restore, so this can be undone.`,
+      okText: 'Restore',
+      cancelText: 'Cancel',
+    });
+    if (!confirmed) return;
+    // Also clear isTestMode / isPreview flags on restore, since those are
+    // session-mode flags that shouldn't survive a restore.
+    const clean = { ...chosen.user, isTestMode: false, isPreview: false, realDataBackup: null };
+    const { error } = await auth.updateUser({ data: clean });
+    if (error) { toast(error.message || 'Restore failed', 'error'); return; }
+    hidePreviewBanner();
+    toast('Backup restored ✦', 'success');
+    // Route to home after a beat so user sees the toast
+    setTimeout(() => {
+      auth.getSession().then(({ data }) => data.session && showHome(data.session.user));
+    }, 500);
+  });
 
   // Test-data button in Profile — flips between "View sample data" and "Exit
   // sample data" based on current mode.
