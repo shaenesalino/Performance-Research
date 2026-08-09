@@ -350,6 +350,17 @@
     transition: border-color 0.2s, box-shadow 0.2s;
   }
   .input::placeholder { color: #9a9a9a; }
+  /* iOS renders native date/month/time inputs at their intrinsic content width
+     (which includes the placeholder date format), so they overflow narrow grid
+     cells. Force them to respect the parent's width everywhere. */
+  input[type="date"].input,
+  input[type="month"].input,
+  input[type="time"].input,
+  input[type="datetime-local"].input {
+    max-width: 100%;
+    width: 100%;
+    min-width: 0;
+  }
   .input:focus {
     outline: none;
     border-color: var(--blue);
@@ -708,9 +719,11 @@
     gap: 12px;
   }
   .field-row .field.wide { grid-column: 1 / -1; }
-  /* Bottom-align inputs when one label wraps to a second line
-     (e.g. "STARTING AMOUNT (optional)" vs single-line "DEADLINE"). */
-  .field-row .field { justify-content: flex-end; }
+  /* Bottom-align inputs + prevent iOS date inputs from overflowing the grid cell.
+     Grid children default to `min-width: auto` (content width) — the native
+     "MMM DD, YYYY" placeholder is wide enough to push the field off-screen. */
+  .field-row .field { justify-content: flex-end; min-width: 0; }
+  .field-row .field .input { max-width: 100%; }
   @media (max-width: 380px) {
     .field-row { grid-template-columns: 1fr; }
   }
@@ -1632,6 +1645,58 @@
   .close-btn:active { transform: scale(0.94); }
   .close-btn svg    { pointer-events: none; }
 
+  /* Toggle switch — used inline in forms (e.g. "Revolving credit" on utang form) */
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 8px 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--navy);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .toggle-label input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .toggle-slider {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    background: var(--sand);
+    border-radius: 999px;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .toggle-slider::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 18px;
+    height: 18px;
+    background: var(--white);
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(10, 37, 64, 0.15);
+  }
+  .toggle-label input:checked + .toggle-slider {
+    background: var(--blue);
+  }
+  .toggle-label input:checked + .toggle-slider::after {
+    transform: translateX(16px);
+  }
+  .toggle-text { flex: 1; line-height: 1.3; }
+  .revolving-toggle-row {
+    padding: 12px 14px;
+    background: var(--cream-2);
+    border-radius: 12px;
+  }
+
   /* Nav bar sitting above content on onboarding + trapped screens.
      Holds hamburger on the left and home shortcut on the right so users are
      never stuck without an escape route. */
@@ -2198,6 +2263,34 @@
     background: var(--navy);
     color: var(--cream);
     border-color: var(--navy);
+  }
+  /* Revolving credit chip variant — visually distinct so users know they're
+     charging credit, not drawing from a wallet balance. */
+  .payment-chip.revolving-chip {
+    border-color: rgba(26, 71, 214, 0.35);
+    background: rgba(26, 71, 214, 0.04);
+  }
+  .payment-chip.revolving-chip.active {
+    background: var(--blue);
+    color: var(--white);
+    border-color: var(--blue);
+  }
+  .payment-chip.revolving-chip .icon { color: var(--blue); }
+  .payment-chip.revolving-chip.active .icon { color: var(--white); }
+  .payment-chip .rev-tag {
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: var(--blue);
+    color: var(--white);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
+    font-weight: 700;
+  }
+  .payment-chip.revolving-chip.active .rev-tag {
+    background: var(--white);
+    color: var(--blue);
   }
 
   /* Sub-field label above small groups */
@@ -3855,6 +3948,12 @@
   }
   .loan-card .direction-tag.payable    { background: rgba(214, 69, 69, 0.10); color: var(--error); }
   .loan-card .direction-tag.receivable { background: rgba(44, 188, 177, 0.14); color: var(--teal); }
+  .loan-card .direction-tag.revolving  { background: rgba(26, 71, 214, 0.10); color: var(--blue); }
+  /* Credit-utilization bar for revolving cards — color changes with % used */
+  .loan-progress.revolving-util > div { transition: background 0.3s; }
+  .loan-progress.revolving-util.low  > div { background: var(--teal); }
+  .loan-progress.revolving-util.mid  > div { background: var(--orange); }
+  .loan-progress.revolving-util.high > div { background: var(--error); }
 
   .loans-summary {
     display: grid;
@@ -3989,7 +4088,14 @@
     /* Push content to the bottom so inputs bottom-align even if one label
        wraps to a second line (e.g. "Interest rate (%/yr) (optional)"). */
     justify-content: flex-end;
+    /* Grid children default to `min-width: auto` which uses the child's
+       intrinsic content width. Native date/time inputs on iOS have a large
+       intrinsic width based on their placeholder format ("Oct 15, 2026"),
+       which pushes them beyond the grid cell. Setting min-width: 0 lets
+       the child shrink to its grid track. */
+    min-width: 0;
   }
+  .two-col-fields .field .input { max-width: 100%; }
   /* Inside a .form container, the form's own gap handles vertical spacing —
      kill the child bottom margin so gaps don't stack. */
   .form .two-col-fields .field { margin-bottom: 0; }
@@ -6637,8 +6743,38 @@
         <input class="input" type="text" id="loanLenderInput" placeholder="e.g. BPI, PayLater, Mom" maxlength="60" />
       </div>
 
-      <!-- Frequency + Due — Due input adapts (day-of-month for recurring, full date for one-time) -->
-      <div class="two-col-fields">
+      <!-- Revolving credit toggle — for credit cards, SPayLater, BNPL wallets
+           where the balance grows and shrinks over time and there's no fixed
+           payoff schedule. Toggles a whole different set of fields below. -->
+      <div class="field revolving-toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="loanRevolvingToggle" />
+          <span class="toggle-slider"></span>
+          <span class="toggle-text">Revolving credit (credit card, SPayLater, etc.)</span>
+        </label>
+      </div>
+
+      <!-- Revolving-only fields: credit limit + starting balance -->
+      <div class="two-col-fields" id="loanRevolvingRow" style="display:none;">
+        <div class="field">
+          <label>Credit limit</label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanCreditLimitInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Starting balance <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+          <div class="input-wrap">
+            <span class="prefix-icon">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="loanStartingBalInput" placeholder="0" style="padding-left:32px;" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Frequency + Due — Due input adapts (day-of-month for recurring, full date for one-time).
+           Hidden for revolving accounts (which are always monthly with a fixed due day). -->
+      <div class="two-col-fields" id="loanFreqDueRow">
         <div class="field">
           <label>Frequency</label>
           <div class="select-wrap">
@@ -6662,7 +6798,13 @@
         </div>
       </div>
 
-      <div class="two-col-fields">
+      <!-- For revolving accounts, show just the due day (no frequency picker) -->
+      <div class="field" id="loanRevolvingDueRow" style="display:none;">
+        <label>Due day</label>
+        <input class="input" type="number" min="1" max="31" id="loanRevolvingDueInput" placeholder="e.g. 15" />
+      </div>
+
+      <div class="two-col-fields" id="loanAmountRow">
         <div class="field">
           <label id="loanOriginalLbl">Original amount</label>
           <div class="input-wrap">
@@ -9471,9 +9613,12 @@
       const dateStr = formatTxDate(t.date);
       const sign = t.type === 'expense' ? '−' : t.type === 'income' ? '+' : '';
       const amt = `${sign}${peso(t.amount)}`;
-      // Meta: wallet name if we have one, else the source label
+      // Meta: wallet or revolving-account name if we have one, else source label
       const wallet = (user.wallets || []).find(w => w.id === t.wallet);
-      const walletName = wallet ? (wallet.label || PAYMENT_NAME[wallet.method] || 'Wallet') : '';
+      const revAcct = wallet ? null : (user.loans || []).find(l => l.id === t.wallet && l.isRevolving);
+      const walletName = wallet
+        ? (wallet.label || PAYMENT_NAME[wallet.method] || 'Wallet')
+        : (revAcct ? `${revAcct.name || 'Credit'} · Credit` : '');
       const meta = [dateStr, walletName].filter(Boolean).join(' · ');
       return `
         <div class="recent-tx-row" data-tx-id="${escapeAttr(t.id)}">
@@ -11664,8 +11809,15 @@
     const wrap = document.getElementById('txPaymentGrid');
     wrap.innerHTML = '';
     const wallets = Array.isArray(userCache?.wallets) ? userCache.wallets : [];
+    // Revolving credit accounts also appear as pickable "payment methods".
+    // Only shown for expenses/income (not transfers or saves — those must go
+    // between real wallets). Cleared / closed revolving accounts are excluded.
+    const revolvingAccounts = (userCache?.loans || []).filter(l =>
+      l.isRevolving && l.status !== 'closed' && l.status !== 'cleared'
+    );
+    const showRevolving = revolvingAccounts.length > 0 && (txDraft.type === 'expense' || txDraft.type === 'income');
 
-    if (wallets.length === 0) {
+    if (wallets.length === 0 && !showRevolving) {
       wrap.innerHTML = `
         <div class="no-wallets-notice">
           You need at least one wallet before you can log transactions.
@@ -11693,6 +11845,25 @@
       });
       wrap.appendChild(btn);
     });
+
+    // Revolving accounts — visually distinct so users understand these charge
+    // credit rather than draw from a wallet balance.
+    if (showRevolving) {
+      revolvingAccounts.forEach(l => {
+        const icon = LOAN_ICON[l.type] || svgIcon('card');
+        const name = l.name || LOAN_LABEL[l.type] || 'Credit';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'payment-chip revolving-chip' + (txDraft.wallet === l.id ? ' active' : '');
+        btn.innerHTML = `<span class="icon">${icon}</span> ${escapeAttr(name)}<span class="rev-tag">Credit</span>`;
+        btn.addEventListener('click', () => {
+          txDraft.wallet = l.id;
+          txDraft.paymentMethod = 'revolving';
+          renderPaymentGrid();
+        });
+        wrap.appendChild(btn);
+      });
+    }
   }
 
   // Wire type tabs
@@ -12685,6 +12856,32 @@
       else if (t.type === 'expense' || t.type === 'saving') delta -= amt;
     });
     return (Number(wallet.initialBalance) || 0) + delta;
+  }
+
+  // Revolving credit balance = starting balance + charges − payments.
+  // Charges = expense transactions whose "wallet" field is this loan's id
+  //   (i.e. the user picked this revolving account as the payment method).
+  // Payments = expense transactions linked to this loan via linkedLoanId
+  //   AND drawn from a real Pitaka wallet (not the revolving account itself).
+  // Refunds = income transactions charged back to this account.
+  function computeRevolvingBalance(loan, txs) {
+    let balance = Number(loan.startingBalance) || 0;
+    (txs || []).forEach(t => {
+      const amt = Number(t.amount) || 0;
+      if (t.wallet === loan.id && t.type === 'expense')       balance += amt;   // charge
+      if (t.wallet === loan.id && t.type === 'income')        balance -= amt;   // refund
+      if (t.linkedLoanId === loan.id && t.wallet !== loan.id && t.type === 'expense') {
+        balance -= amt;   // payment from a real wallet
+      }
+    });
+    return Math.max(balance, 0);
+  }
+
+  // Minimum payment for a revolving account — 5% of balance, floor ₱500.
+  function computeMinPayment(loan, txs) {
+    const bal = computeRevolvingBalance(loan, txs);
+    if (bal <= 0) return 0;
+    return Math.max(500, Math.round(bal * 0.05));
   }
 
   // Compact wallet summary on home
@@ -14054,14 +14251,19 @@
     const manualTotal = assets.reduce((s, a) => s + (Number(a.value) || 0), 0);
 
     const loans = Array.isArray(user.loans) ? user.loans : [];
-    const active = loans.filter(l => l.status !== 'paid');
+    // Consider a loan active unless it's explicitly finished (paid off / cleared / closed).
+    const active = loans.filter(l => l.status !== 'paid' && l.status !== 'cleared' && l.status !== 'closed');
+    // For revolving loans, current balance is derived from transactions live.
+    const loanBalance = (l) => l.isRevolving
+      ? computeRevolvingBalance(l, txs)
+      : (Number(l.currentBalance) || 0);
     // Payables reduce net worth; receivables (money others owe us) add to it.
     const totalLiabilities = active
       .filter(l => (l.direction || 'payable') === 'payable')
-      .reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+      .reduce((s, l) => s + loanBalance(l), 0);
     const totalReceivables = active
       .filter(l => l.direction === 'receivable')
-      .reduce((s, l) => s + (Number(l.currentBalance) || 0), 0);
+      .reduce((s, l) => s + loanBalance(l), 0);
 
     const totalAssets = walletTotal + manualTotal + totalReceivables;
     return {
@@ -14528,20 +14730,62 @@
     sorted.forEach(l => {
       const direction = l.direction || 'payable';
       const isReceivable = direction === 'receivable';
+      const isRevolving = !!l.isRevolving;
+      const txs = user.transactions || [];
+      // For revolving, current balance derives from transactions live
+      const remaining = isRevolving ? computeRevolvingBalance(l, txs) : (Number(l.currentBalance) || 0);
       const original = Number(l.originalAmount) || 0;
-      const remaining = Number(l.currentBalance) || 0;
       const paid = Math.max(original - remaining, 0);
       const pct = original > 0 ? Math.min(Math.round((paid / original) * 100), 100) : 0;
-      const isPaid = l.status === 'paid' || (original > 0 && remaining === 0);
+      const isPaid = !isRevolving && (l.status === 'paid' || (original > 0 && remaining === 0));
+      const isRevCleared = isRevolving && (l.status === 'cleared' || (l.status !== 'active' && remaining === 0));
       // Language flips based on direction
       const paidWord    = isReceivable ? 'collected' : 'paid';
       const paidLabel   = isReceivable ? 'Fully collected ✦' : 'Paid off ✦';
       const payBtnLabel = isReceivable ? '+ Record collection' : '+ Record payment';
       const dirTag      = isReceivable ? '<span class="direction-tag receivable">Pautang</span>' : '<span class="direction-tag payable">Utang</span>';
+      const disabledPay = isPaid || isRevCleared;
 
       const card = document.createElement('div');
-      card.className = 'loan-card' + (isPaid ? ' paid' : '') + (isReceivable ? ' receivable' : '');
-      card.innerHTML = `
+      card.className = 'loan-card' + (isPaid ? ' paid' : '') + (isReceivable ? ' receivable' : '') + (isRevolving ? ' revolving' : '');
+
+      if (isRevolving) {
+        // Revolving credit layout — running balance + credit-utilization bar +
+        // minimum payment + due day. No "of original" percentage since revolving
+        // has no fixed original amount.
+        const limit = Number(l.creditLimit) || 0;
+        const utilPct = limit > 0 ? Math.min(Math.round((remaining / limit) * 100), 100) : 0;
+        const utilClass = utilPct >= 80 ? 'high' : utilPct >= 50 ? 'mid' : 'low';
+        const minPay = computeMinPayment(l, txs);
+        card.innerHTML = `
+          <div class="loan-card-head">
+            <div class="icon">${LOAN_ICON[l.type] || svgIcon('card')}</div>
+            <div style="flex:1; min-width:0;">
+              <p class="name">${escapeAttr(l.name || LOAN_LABEL[l.type] || 'Credit')}<span class="direction-tag revolving">Revolving</span></p>
+              <p class="lender">${LOAN_LABEL[l.type] || l.type}${l.lender ? ' · ' + escapeAttr(l.lender) : ''}</p>
+            </div>
+          </div>
+          <div class="loan-card-body">
+            <div>
+              <div class="remaining">${peso(remaining)}</div>
+              <div class="of">${limit > 0 ? `${utilPct}% of ${peso(limit)} limit` : 'No limit set'}</div>
+            </div>
+            <div class="payment">
+              ${isRevCleared
+                ? `<strong>Cleared ✦</strong>`
+                : (minPay > 0
+                  ? `<strong>Min ${peso(minPay)}</strong>${l.dueDay ? '<br>due ' + ordinal(l.dueDay) : ''}`
+                  : '<strong>—</strong>')}
+            </div>
+          </div>
+          <div class="loan-progress revolving-util ${utilClass}"><div style="width:${utilPct}%"></div></div>
+          <div class="row-actions loan-actions">
+            <button class="row-edit-btn" type="button" data-action="edit">Edit</button>
+            <button class="row-edit-btn primary" type="button" data-action="pay" ${isRevCleared ? 'disabled' : ''}>${payBtnLabel}</button>
+          </div>
+        `;
+      } else {
+        card.innerHTML = `
         <div class="loan-card-head">
           <div class="icon">${LOAN_ICON[l.type] || '💳'}</div>
           <div style="flex:1; min-width:0;">
@@ -14577,6 +14821,7 @@
           <button class="row-edit-btn primary" type="button" data-action="pay" ${isPaid ? 'disabled' : ''}>${payBtnLabel}</button>
         </div>
       `;
+      }
       card.addEventListener('click', ev => {
         if (ev.target.closest('.row-actions')) return;
         showEntryDetail(userCache, 'loan', l.id);
@@ -14659,6 +14904,12 @@
     document.getElementById('loanStatusSelect').value = existing?.status   || 'active';
     document.getElementById('loanNoteInput').value    = existing?.note     || '';
 
+    // Revolving fields
+    document.getElementById('loanRevolvingToggle').checked = !!existing?.isRevolving;
+    document.getElementById('loanCreditLimitInput').value  = existing?.creditLimit    || '';
+    document.getElementById('loanStartingBalInput').value  = existing?.startingBalance || '';
+    document.getElementById('loanRevolvingDueInput').value = existing?.dueDay          || '';
+
     // Title reflects the entry's direction (Edit utang / Edit pautang) so users
     // know which bucket they're modifying.
     const editingDir = existing?.direction || (isEditing ? 'payable' : pendingLoanDirection);
@@ -14702,6 +14953,30 @@
     // Rebind so the change handler always uses the current direction
     const freqSel = document.getElementById('loanFreqSelect');
     freqSel.onchange = () => updateLoanFormForFrequency(isReceivable);
+
+    // Revolving toggle: swap the whole form's field set depending on mode.
+    // Revolving accounts don't have "original amount / total to pay / remaining
+    // balance / monthly payment / frequency" — they have credit limit, running
+    // balance, and a monthly due day.
+    const applyRevolvingMode = () => {
+      const isRev = document.getElementById('loanRevolvingToggle').checked;
+      // Revolving-only fields
+      document.getElementById('loanRevolvingRow').style.display    = isRev ? '' : 'none';
+      document.getElementById('loanRevolvingDueRow').style.display = isRev ? '' : 'none';
+      // Fixed-loan-only fields
+      document.getElementById('loanFreqDueRow').style.display   = isRev ? 'none' : '';
+      document.getElementById('loanAmountRow').style.display    = isRev ? 'none' : '';
+      document.getElementById('loanBalancePayRow').style.display = isRev ? 'none' : '';
+      // Status options change too
+      const statusSel = document.getElementById('loanStatusSelect');
+      if (isRev) {
+        statusSel.options[0].textContent = 'Active';
+        statusSel.options[1].textContent = 'Cleared';
+        statusSel.options[2].textContent = 'Closed';
+      }
+    };
+    applyRevolvingMode();
+    document.getElementById('loanRevolvingToggle').onchange = applyRevolvingMode;
 
     // Balance banner + payment history are now on the loan DETAIL view.
     const banner = document.getElementById('loanBalanceBanner');
@@ -14775,65 +15050,74 @@
   });
 
   document.getElementById('saveLoanBtn').addEventListener('click', async () => {
+    const isRevolving = document.getElementById('loanRevolvingToggle').checked;
     const type    = document.getElementById('loanTypeSelect').value;
     const name    = document.getElementById('loanNameInput').value.trim();
     const lender  = document.getElementById('loanLenderInput').value.trim();
-    const original= Number(document.getElementById('loanOriginalInput').value) || 0;
-    const total   = Number(document.getElementById('loanTotalInput').value)    || 0;
-    const balance = Number(document.getElementById('loanBalanceInput').value) || 0;
-    const payment = Number(document.getElementById('loanPaymentInput').value) || 0;
-    const freq    = document.getElementById('loanFreqSelect').value;
-    const dueDay  = parseInt(document.getElementById('loanDueDayInput').value, 10) || null;
-    const dueDate = document.getElementById('loanDueDateInput').value || null;
     const status  = document.getElementById('loanStatusSelect').value;
     const note    = document.getElementById('loanNoteInput').value.trim();
-    const isOneTime = freq === 'one-time';
 
     if (!name) { toast('Please name this loan.', 'error'); return; }
-    if (original <= 0) { toast('Enter the original amount.', 'error'); return; }
 
-    // Total-to-pay defaults to original if user left it blank
-    const totalToPay = total > 0 ? total : original;
-    // For one-time loans, "payment" is meaningless — the whole thing is one payment.
-    // Store 0 so nothing shows in the monthly-summary computation.
-    const monthlyPayment = isOneTime ? 0 : payment;
-
-    const { data: sess } = await auth.getSession();
-    const user = sess.session.user;
-    const loans = Array.isArray(user.loans) ? [...user.loans] : [];
+    let record;
     const now = new Date().toISOString();
 
-    if (editingLoanId) {
-      const idx = loans.findIndex(l => l.id === editingLoanId);
-      if (idx >= 0) {
-        loans[idx] = {
-          ...loans[idx],
-          type, name, lender,
-          originalAmount: original,
-          totalToPay,
-          currentBalance: balance,
-          monthlyPayment,
-          frequency: freq,
-          dueDay: isOneTime ? null : dueDay,
-          dueDate: isOneTime ? dueDate : null,
-          status, note,
-          // direction stays as it was — editing doesn't change utang↔pautang
-          updatedAt: now,
-        };
-      }
-    } else {
-      loans.push({
-        id: 'ln_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    if (isRevolving) {
+      // Revolving credit — different fields, balance auto-derived from transactions
+      const creditLimit    = Number(document.getElementById('loanCreditLimitInput').value) || 0;
+      const startingBalance= Number(document.getElementById('loanStartingBalInput').value) || 0;
+      const revDueDay      = parseInt(document.getElementById('loanRevolvingDueInput').value, 10) || null;
+      if (creditLimit <= 0) { toast('Enter the credit limit.', 'error'); return; }
+      record = {
         type, name, lender,
-        direction: pendingLoanDirection || 'payable',
-        originalAmount: original,
-        totalToPay,
-        currentBalance: balance,
-        monthlyPayment,
+        isRevolving: true,
+        creditLimit,
+        startingBalance,
+        dueDay: revDueDay,
+        frequency: 'monthly',      // revolving is implicitly monthly
+        status, note,
+        // Fields not used but kept for backward compat with fixed-loan renderers
+        originalAmount: 0, totalToPay: 0, currentBalance: 0, monthlyPayment: 0,
+        dueDate: null,
+      };
+    } else {
+      // Fixed loan — original + total + balance + monthly payment + frequency
+      const original= Number(document.getElementById('loanOriginalInput').value) || 0;
+      const total   = Number(document.getElementById('loanTotalInput').value)    || 0;
+      const balance = Number(document.getElementById('loanBalanceInput').value) || 0;
+      const payment = Number(document.getElementById('loanPaymentInput').value) || 0;
+      const freq    = document.getElementById('loanFreqSelect').value;
+      const dueDay  = parseInt(document.getElementById('loanDueDayInput').value, 10) || null;
+      const dueDate = document.getElementById('loanDueDateInput').value || null;
+      const isOneTime = freq === 'one-time';
+      if (original <= 0) { toast('Enter the original amount.', 'error'); return; }
+      const totalToPay = total > 0 ? total : original;
+      const monthlyPayment = isOneTime ? 0 : payment;
+      record = {
+        type, name, lender,
+        isRevolving: false,
+        originalAmount: original, totalToPay, currentBalance: balance, monthlyPayment,
         frequency: freq,
         dueDay: isOneTime ? null : dueDay,
         dueDate: isOneTime ? dueDate : null,
         status, note,
+      };
+    }
+
+    const { data: sess } = await auth.getSession();
+    const user = sess.session.user;
+    const loans = Array.isArray(user.loans) ? [...user.loans] : [];
+
+    if (editingLoanId) {
+      const idx = loans.findIndex(l => l.id === editingLoanId);
+      if (idx >= 0) {
+        loans[idx] = { ...loans[idx], ...record, updatedAt: now };
+      }
+    } else {
+      loans.push({
+        id: 'ln_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        ...record,
+        direction: pendingLoanDirection || 'payable',
         payments: [],
         addedAt: now, updatedAt: now,
       });
@@ -14883,10 +15167,20 @@
     document.getElementById('saveLoanPaymentBtn').textContent = isReceivable ? 'Record collection' : 'Record payment';
 
     document.getElementById('loanPaymentLoanName').textContent = loan.name || LOAN_LABEL[loan.type] || 'Loan';
-    document.getElementById('loanPaymentLoanBal').textContent  = `Balance ${peso(loan.currentBalance || 0)}`;
+    // Revolving accounts have a derived balance; fixed loans have a stored one.
+    const displayBalance = loan.isRevolving
+      ? computeRevolvingBalance(loan, user.transactions || [])
+      : (Number(loan.currentBalance) || 0);
+    document.getElementById('loanPaymentLoanBal').textContent  = `Balance ${peso(displayBalance)}`;
 
-    // Default amount = suggested payment (monthlyPayment) but capped at remaining balance
-    const suggested = Math.min(Number(loan.monthlyPayment) || 0, Number(loan.currentBalance) || 0);
+    // Default amount: for revolving suggest the minimum payment; for fixed suggest
+    // the monthly-payment amount capped at remaining balance.
+    let suggested;
+    if (loan.isRevolving) {
+      suggested = Math.min(computeMinPayment(loan, user.transactions || []), displayBalance);
+    } else {
+      suggested = Math.min(Number(loan.monthlyPayment) || 0, displayBalance);
+    }
     document.getElementById('lpAmount').value = suggested > 0 ? String(suggested) : '';
     document.getElementById('lpDate').value = new Date().toISOString().slice(0, 10);
     document.getElementById('lpNote').value = '';
@@ -14957,10 +15251,16 @@
     if (idx < 0) { toast('Loan not found.', 'error'); return; }
     const loan = loans[idx];
     const wallet = (user.wallets || []).find(w => w.id === walletId);
+    const isRevolving = !!loan.isRevolving;
 
     // Record the payment on the loan
     const paymentId = 'lp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const newBalance = Math.max(0, (Number(loan.currentBalance) || 0) - amount);
+    // For revolving, balance is derived from transactions (not stored) — the
+    // transaction created below is what actually reduces the balance.
+    const currentBal = isRevolving
+      ? computeRevolvingBalance(loan, user.transactions || [])
+      : (Number(loan.currentBalance) || 0);
+    const newBalance = Math.max(0, currentBal - amount);
     const payments = Array.isArray(loan.payments) ? [...loan.payments] : [];
     payments.push({
       id: paymentId,
@@ -14973,9 +15273,12 @@
     });
     loans[idx] = {
       ...loan,
-      currentBalance: newBalance,
+      // Fixed loans store currentBalance; revolving derives it, so leave 0.
+      currentBalance: isRevolving ? 0 : newBalance,
       payments,
-      status: newBalance === 0 && (Number(loan.originalAmount) || 0) > 0 ? 'paid' : loan.status,
+      status: isRevolving
+        ? (newBalance === 0 ? 'cleared' : loan.status || 'active')
+        : (newBalance === 0 && (Number(loan.originalAmount) || 0) > 0 ? 'paid' : loan.status),
       updatedAt: new Date().toISOString(),
     };
 
