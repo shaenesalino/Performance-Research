@@ -5773,6 +5773,13 @@
     top: 74px;
     z-index: 25;
   }
+  /* When the sticky banner directly follows the view header, pull it up by
+     the header's bottom margin so header + banner appear as ONE visual unit
+     with no cream gap between them. This matches how the sticky positions
+     stack (header ends at 74px, banner sticks at 74px). */
+  .view-header + .sticky-banner {
+    margin-top: -20px;
+  }
   /* When preview/test banner is at the top (44px), push sticky banners
      further down: 44 (banner) + 74 (header) = 118px. */
   body.has-preview-banner .sticky-banner { top: 118px; }
@@ -6906,13 +6913,13 @@
       <h1>Pitaka</h1><button class="header-add-btn" type="button" id="walletsHeaderAddBtn" aria-label="Add wallet">+</button>
     </div>
 
-    <div class="wallets-intro">
-      Track how much you have where. Balances update automatically from your transactions.
-    </div>
-
     <div class="wallets-total sticky-banner" id="walletsTotalBanner" style="display:none;">
       <div class="lbl">Total across wallets</div>
       <div class="val" id="walletsTotalVal">₱0</div>
+    </div>
+
+    <div class="wallets-intro">
+      Track how much you have where. Balances update automatically from your transactions.
     </div>
 
     <div class="expenses-empty" id="walletsEmpty">
@@ -7082,15 +7089,6 @@
       <button class="header-add-btn" type="button" id="loansHeaderAddBtn" aria-label="Add">+</button>
     </div>
 
-    <p class="loans-intro" id="loansIntro">Track what you owe (utang) and what others owe you (pautang) — all in one place.</p>
-
-    <!-- Filter tabs — All / Utang / Pautang -->
-    <div class="loans-filter-tabs" id="loansFilterTabs">
-      <button type="button" class="loans-filter-btn active" data-loan-filter="all">All</button>
-      <button type="button" class="loans-filter-btn" data-loan-filter="payable">Utang</button>
-      <button type="button" class="loans-filter-btn" data-loan-filter="receivable">Pautang</button>
-    </div>
-
     <!-- Headline banner — same style as Budget/Ipon, adapts to filter -->
     <div class="budget-banner sticky-banner" id="loansBanner" style="display:none;">
       <div class="top">
@@ -7103,6 +7101,15 @@
           <div class="amt-side" id="loansMonthlyDue">₱0</div>
         </div>
       </div>
+    </div>
+
+    <p class="loans-intro" id="loansIntro">Track what you owe (utang) and what others owe you (pautang) — all in one place.</p>
+
+    <!-- Filter tabs — All / Utang / Pautang -->
+    <div class="loans-filter-tabs" id="loansFilterTabs">
+      <button type="button" class="loans-filter-btn active" data-loan-filter="all">All</button>
+      <button type="button" class="loans-filter-btn" data-loan-filter="payable">Utang</button>
+      <button type="button" class="loans-filter-btn" data-loan-filter="receivable">Pautang</button>
     </div>
 
     <div class="expenses-empty" id="loansEmpty">
@@ -7753,7 +7760,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.02';
+  const APP_VERSION = '2026-08-10.03';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
