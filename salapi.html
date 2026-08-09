@@ -5904,6 +5904,84 @@
   .ipon-budget-footer .lbl { color: var(--muted); }
   .ipon-budget-footer .link { color: var(--teal); font-weight: 700; }
 
+  /* Collapsible savings summary tile — replaces the Savings section header +
+     stack of goal tiles. Tapping expands/collapses the goals list. Same
+     teal accent family as the individual goal tiles for visual continuity. */
+  .ipon-summary-tile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(to right, rgba(44, 188, 177, 0.10), rgba(44, 188, 177, 0.04));
+    border: 1.5px solid rgba(44, 188, 177, 0.22);
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ipon-summary-tile:active { transform: scale(0.99); }
+  .ipon-summary-tile:hover {
+    border-color: rgba(44, 188, 177, 0.4);
+    background: linear-gradient(to right, rgba(44, 188, 177, 0.14), rgba(44, 188, 177, 0.06));
+  }
+  .ipon-summary-icon {
+    background: rgba(44, 188, 177, 0.16);
+    color: var(--teal);
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .ipon-summary-icon .svg-inline-icon { width: 22px; height: 22px; }
+  .ipon-summary-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .ipon-summary-label {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 2px;
+  }
+  .ipon-summary-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0;
+  }
+  .ipon-summary-amt {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--teal);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-align: right;
+  }
+  .ipon-summary-amt .per {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+  .ipon-summary-chev {
+    color: var(--teal);
+    font-size: 14px;
+    font-weight: 700;
+    margin-left: 4px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+  .ipon-summary-tile[data-expanded="1"] .ipon-summary-chev {
+    transform: rotate(0deg);
+  }
+  .ipon-goals-wrap {
+    margin-bottom: 8px;
+  }
+
   /* Savings section header on Budget page — teal accent + hint text */
   .budget-group-head.savings {
     color: var(--teal);
@@ -7772,7 +7850,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.07';
+  const APP_VERSION = '2026-08-10.09';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9453,22 +9531,31 @@
       ev.preventDefault();
       const monthly = (Number(exp.amount) || 0) * (BUDGET_TO_MONTHLY[exp.frequency] || 1);
       if (monthly <= 0) { toast('Set an amount first.', 'error'); return; }
+      // Both the expense AND the goal need to be persisted together.
+      // Require enough info on the expense to save it as a valid record
+      // (name + category), otherwise the goal would end up orphaned when
+      // the user navigates away without hitting the main Save button.
+      const nameOk = (exp.name || '').trim().length > 0;
+      const catOk  = !!(exp.category);
+      if (!nameOk || !catOk) {
+        toast('Please add a name and category first, then create the sinking fund.', 'error');
+        return;
+      }
       const ok = await showConfirm({
         icon: '✦',
         title: `Create sinking-fund Ipon?`,
-        bodyHtml: `An Ipon goal will be created that saves <strong>${peso(monthly)}/month</strong> toward this ${exp.frequency === 'annually' ? 'annual' : 'quarterly'} bill. When the bill hits, log the payment from that Ipon and your budget stays clean.`,
-        okText: 'Create Ipon',
+        bodyHtml: `An Ipon goal will be created that saves <strong>${peso(monthly)}/month</strong> toward this ${exp.frequency === 'annually' ? 'annual' : 'quarterly'} bill. This will also save the <strong>${escapeAttr(exp.name)}</strong> expense so both are linked. When the bill hits, log the payment from that Ipon and your budget stays clean.`,
+        okText: 'Create both',
         cancelText: 'Cancel',
       });
       if (!ok) return;
-      // Create a matching goal via auth.updateUser
       const { data: sess } = await auth.getSession();
       if (!sess?.session) return;
       const u = sess.session.user;
       const goal = {
         id: 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         icon: 'shield',
-        name: `${exp.name || exp.frequency} sinking fund`,
+        name: `${exp.name} sinking fund`,
         target: Number(exp.amount) || 0,
         contribution: Math.round(monthly),
         frequency: 'monthly',
@@ -9481,9 +9568,28 @@
         manualPayFrom: null,
       };
       exp.sinkingFundGoalId = goal.id;
+      // Save BOTH the goal and the expense in one call. mergeSingle handles
+      // both "already in list" (update) and "new" (append) cases so this
+      // works whether the user just started the form or is editing an
+      // existing entry.
+      const isNewExpense = !(u.expenses || []).some(e => e.id === exp.id);
+      const cleanedExpense = {
+        id: exp.id,
+        name: (exp.name || '').trim(),
+        category: exp.category || 'other',
+        amount: Number(exp.amount) || 0,
+        frequency: exp.frequency,
+        dueDay: exp.dueDay,
+        dueDay2: exp.dueDay2,
+        dueMonth: exp.dueMonth,
+        manualPayFrom: exp.manualPayFrom || null,
+        timing: exp.timing || 'sinking-fund',
+        sinkingFundGoalId: exp.sinkingFundGoalId,
+      };
+      const newExpenses = mergeSingle(u.expenses, cleanedExpense, isNewExpense);
       const newGoals = [...(u.goals || []), goal];
-      await auth.updateUser({ data: { goals: newGoals } });
-      toast(`Sinking fund created — save ${peso(monthly)}/month ✦`, 'success');
+      await auth.updateUser({ data: { goals: newGoals, expenses: newExpenses } });
+      toast(`Sinking fund created and expense saved ✦`, 'success');
       // Re-render timing block to show the linked state
       const block = card.querySelector('[data-timing-block]');
       if (block) block.outerHTML = renderTimingPicker(exp);
@@ -11567,20 +11673,51 @@
       });
 
       // -------- Savings section (Ipon goals as line items) --------
-      // Rendered FIRST so "pay yourself first" gets visual priority. Read-only
-      // here; tapping opens the goal on the Ipon page.
+      // Rendered FIRST so "pay yourself first" gets visual priority.
+      // Collapsed by default (with a summary tile) to keep the Budget page
+      // scannable — tap the summary to expand into individual goal tiles.
+      // State is remembered per-device via localStorage.
       if (contributingGoals.length > 0) {
-        const head = document.createElement('div');
-        head.className = 'budget-group-head savings';
-        head.innerHTML = 'Savings <span class="tag-hint">edit on Ipon page</span>';
-        list.appendChild(head);
-        // Sort by contribution day, then name
+        const EXPANDED_KEY = 'silak-savings-expanded';
+        const isExpanded = localStorage.getItem(EXPANDED_KEY) === '1';
+        const goalCount = contributingGoals.length;
+
+        // Summary tile — always visible, doubles as the section header
+        const summary = document.createElement('div');
+        summary.className = 'ipon-summary-tile';
+        summary.dataset.expanded = isExpanded ? '1' : '0';
+        summary.innerHTML = `
+          <div class="ipon-summary-icon">${svgIcon('savings')}</div>
+          <div class="ipon-summary-info">
+            <p class="ipon-summary-label">Savings</p>
+            <p class="ipon-summary-sub">${goalCount} ${goalCount === 1 ? 'goal' : 'goals'} · tap to ${isExpanded ? 'collapse' : 'see'}</p>
+          </div>
+          <div class="ipon-summary-amt">${peso(savingsTotal)}<span class="per">/mo</span></div>
+          <div class="ipon-summary-chev" aria-hidden="true">${isExpanded ? '▾' : '▸'}</div>
+        `;
+        list.appendChild(summary);
+
+        // Individual goal tiles inside a container that toggles display
+        const goalsWrap = document.createElement('div');
+        goalsWrap.className = 'ipon-goals-wrap';
+        goalsWrap.style.display = isExpanded ? 'block' : 'none';
         contributingGoals.slice().sort((a, b) => {
           const ad = Number(a.contribDay) || 99;
           const bd = Number(b.contribDay) || 99;
           if (ad !== bd) return ad - bd;
           return (a.name || '').localeCompare(b.name || '');
-        }).forEach(g => list.appendChild(renderIponBudgetItem(g, user)));
+        }).forEach(g => goalsWrap.appendChild(renderIponBudgetItem(g, user)));
+        list.appendChild(goalsWrap);
+
+        summary.addEventListener('click', () => {
+          const nowExpanded = summary.dataset.expanded !== '1';
+          summary.dataset.expanded = nowExpanded ? '1' : '0';
+          goalsWrap.style.display = nowExpanded ? 'block' : 'none';
+          summary.querySelector('.ipon-summary-chev').textContent = nowExpanded ? '▾' : '▸';
+          summary.querySelector('.ipon-summary-sub').textContent =
+            `${goalCount} ${goalCount === 1 ? 'goal' : 'goals'} · tap to ${nowExpanded ? 'collapse' : 'see'}`;
+          localStorage.setItem(EXPANDED_KEY, nowExpanded ? '1' : '0');
+        });
       }
 
       const singleGroup = Object.keys(byCategory).length === 1;
