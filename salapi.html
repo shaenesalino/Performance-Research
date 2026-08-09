@@ -4579,8 +4579,56 @@
     letter-spacing: 0.7px;
     color: var(--muted);
     font-weight: 700;
-    margin: 6px 4px 10px;
+    margin: 6px 4px 4px;
   }
+  .review-section-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 4px 12px;
+    line-height: 1.35;
+  }
+
+  /* Cash flow + debt position — table-like rows inside a card */
+  .review-flow-card {
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 16px;
+    padding: 4px 16px;
+    margin-bottom: 22px;
+  }
+  .review-flow-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--sand);
+    font-family: 'Inter', sans-serif;
+  }
+  .review-flow-row:last-child { border-bottom: none; }
+  .review-flow-row.indent { padding-left: 14px; }
+  .review-flow-row .flow-lbl {
+    font-size: 13px;
+    color: var(--navy);
+    font-weight: 500;
+  }
+  .review-flow-row.indent .flow-lbl {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .review-flow-row .flow-val {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+  }
+  .review-flow-row.total { border-top: 1.5px solid var(--sand); border-bottom: none; padding-top: 14px; margin-top: 4px; }
+  .review-flow-row.total .flow-lbl { font-weight: 700; }
+  .review-flow-row.total .flow-val { font-size: 18px; }
+  .review-flow-row .flow-val.negative { color: var(--error); }
+  .review-flow-row .flow-val.positive { color: var(--teal); }
+  .review-flow-row .flow-val.muted { color: var(--muted); font-weight: 500; }
 
   .review-numbers {
     display: grid;
@@ -6937,8 +6985,19 @@
     </div>
 
     <!-- Numbers grid -->
-    <div class="review-section-head">By the numbers</div>
+    <div class="review-section-head">Consumption</div>
+    <div class="review-section-sub">What you actually bought or earned this month.</div>
     <div class="review-numbers" id="reviewNumbers"></div>
+
+    <!-- Cash Flow section — real money movement through wallets -->
+    <div class="review-section-head" id="reviewCashFlowHead" style="display:none;">Cash flow</div>
+    <div class="review-section-sub" id="reviewCashFlowSub" style="display:none;">Every peso that moved in and out of your wallets — including debt paid.</div>
+    <div id="reviewCashFlow" style="display:none;"></div>
+
+    <!-- Debt Position section — how debt changed this month -->
+    <div class="review-section-head" id="reviewDebtHead" style="display:none;">Debt position</div>
+    <div class="review-section-sub" id="reviewDebtSub" style="display:none;">How much you owe and how it changed.</div>
+    <div id="reviewDebt" style="display:none;"></div>
 
     <!-- Category breakdown -->
     <div class="review-section-head">Where your money went</div>
@@ -9507,8 +9566,9 @@
   function renderThisMonthCard(user) {
     const period = getCurrentPeriod('monthly');
     const txs = (user.transactions || []).filter(t => isDateInPeriod(t.date, period));
-    const income  = txs.filter(t => t.type === 'income').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const spent   = txs.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Filter out loan payments/collections — those are debt transfers, not consumption or earning.
+    const income  = txs.filter(t => t.type === 'income' && !isLoanPaymentTx(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const spent   = txs.filter(t => t.type === 'expense' && !isLoanPaymentTx(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const saved   = txs.filter(t => t.type === 'saving').reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const available = income - spent - saved;
 
@@ -9745,7 +9805,7 @@
     // Priority 3: show this month's spending vs budget
     const monthPeriod = getCurrentPeriod('monthly');
     const monthlySpend = txs
-      .filter(t => t.type === 'expense' && isDateInPeriod(t.date, monthPeriod))
+      .filter(t => t.type === 'expense' && !isLoanPaymentTx(t) && isDateInPeriod(t.date, monthPeriod))
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const monthlyBudget = expenses.reduce((s, e) => s + ((Number(e.amount) || 0) * (BUDGET_TO_MONTHLY[e.frequency] || 1)), 0);
 
@@ -9861,9 +9921,12 @@
       });
     }
 
-    // Bucket every transaction into its month (skip anything outside the window)
+    // Bucket every transaction into its month (skip anything outside the window).
+    // Loan payments/collections are debt transfers, not consumption/earning —
+    // exclude so the income/expense bars reflect real cash flow patterns.
     txs.forEach(t => {
       if (!t.date) return;
+      if (isLoanPaymentTx(t)) return;
       const [ty, tm] = t.date.split('-').map(Number);
       const bucket = months.find(mo => mo.y === ty && mo.m === (tm - 1));
       if (!bucket) return;
@@ -10074,8 +10137,9 @@
     const plannedSavings  = sumMonthlySavings(user);
     const plannedFree     = Math.max(monthlyIncome - plannedExpenses - plannedSavings, 0);
 
-    const actualIncome = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const actualSpent  = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Exclude loan payments/collections from consumption/earning totals
+    const actualIncome = monthTxs.filter(t => t.type === 'income' && !isLoanPaymentTx(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const actualSpent  = monthTxs.filter(t => t.type === 'expense' && !isLoanPaymentTx(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const actualSaved  = monthTxs.filter(t => t.type === 'saving').reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const actualRemaining = Math.max(actualIncome - actualSpent - actualSaved, 0);
 
@@ -10120,7 +10184,7 @@
 
     // ------ Chart 2: spending by category ------
     const categoryTotals = {};
-    monthTxs.filter(t => t.type === 'expense').forEach(t => {
+    monthTxs.filter(t => t.type === 'expense' && !isLoanPaymentTx(t)).forEach(t => {
       let cat = t.category || 'other';
       if (t.source === 'set' && t.linkedId) {
         const exp = (user.expenses || []).find(e => e.id === t.linkedId);
@@ -12841,6 +12905,17 @@
   // Balance = initialBalance + income − expense − saving (matched by wallet id;
   // legacy fallback to payment method when wallet id is missing on the tx).
   // Transfers: subtract from source wallet, add to destination wallet.
+  // A transaction is a loan-related transfer (not real consumption / income)
+  // when it's linked to a loan payment/collection. These SHOULD affect wallet
+  // balances (real cash moving in/out) but SHOULDN'T inflate top-line spending
+  // or income totals — paying an utang isn't consumption; collecting a pautang
+  // isn't earning. Charges to a revolving account are excluded from this rule
+  // because they represent real consumption; those set t.wallet=loanId (no
+  // linkedLoanId), so they're still counted correctly.
+  function isLoanPaymentTx(t) {
+    return !!(t && t.linkedLoanId);
+  }
+
   function computeWalletBalance(wallet, txs) {
     let delta = 0;
     (txs || []).forEach(t => {
@@ -13171,7 +13246,7 @@
 
     // --- 3. Budget pace check
     const monthlySpend = txs
-      .filter(t => t.type === 'expense' && inMonth(t, thisMonth))
+      .filter(t => t.type === 'expense' && !isLoanPaymentTx(t) && inMonth(t, thisMonth))
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const monthlyBudget = expenses.reduce((s, e) => s + ((Number(e.amount) || 0) * (BUDGET_TO_MONTHLY[e.frequency] || 1)), 0);
     if (monthlyBudget > 0 && monthlySpend > 0) {
@@ -14060,7 +14135,7 @@
     const txs = user.transactions || [];
     const period = getCurrentPeriod('monthly');
     const spent = txs
-      .filter(t => t.type === 'expense' && isDateInPeriod(t.date, period))
+      .filter(t => t.type === 'expense' && !isLoanPaymentTx(t) && isDateInPeriod(t.date, period))
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
 
     // Ratio of spent to budgeted. Under 1.0 = under budget (good).
@@ -14150,7 +14225,7 @@
         .filter(t => t.type === 'income' && isDateInPeriod(t.date, period))
         .reduce((s, t) => s + (Number(t.amount) || 0), 0);
       const expense = txs
-        .filter(t => t.type === 'expense' && isDateInPeriod(t.date, period))
+        .filter(t => t.type === 'expense' && !isLoanPaymentTx(t) && isDateInPeriod(t.date, period))
         .reduce((s, t) => s + (Number(t.amount) || 0), 0);
       flows.push(income - expense);
     }
@@ -15348,7 +15423,11 @@
     const thisMonthTxs = txs.filter(inThis);
     const prevMonthTxs = txs.filter(inPrev);
 
-    const sumBy = (list, type) => list.filter(t => t.type === type).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Consumption / earning totals: exclude loan payments and pautang
+    // collections, since those are debt transfers, not real income/expense.
+    const sumBy = (list, type) => list
+      .filter(t => t.type === type && !isLoanPaymentTx(t))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const income  = sumBy(thisMonthTxs, 'income');
     const expense = sumBy(thisMonthTxs, 'expense');
     const saving  = sumBy(thisMonthTxs, 'saving');
@@ -15359,12 +15438,70 @@
     const pExpense = sumBy(prevMonthTxs, 'expense');
     const pSaving  = sumBy(prevMonthTxs, 'saving');
 
+    // -------- Cash flow view (what actually moved through wallets) --------
+    // Every transaction that touched a REAL wallet (not a revolving account).
+    // Revolving IDs shouldn't count as wallets — charging a credit line isn't
+    // cash out of a wallet, it just increases what you owe.
+    const walletIds = new Set((user.wallets || []).map(w => w.id));
+    const revolvingIds = new Set((user.loans || []).filter(l => l.isRevolving).map(l => l.id));
+    const isFromWallet = (t) => t.wallet && walletIds.has(t.wallet);
+    const isToWallet   = (t) => t.toWallet && walletIds.has(t.toWallet);
+
+    // Money out of wallets this month, split by purpose
+    const cashOutLiving = thisMonthTxs
+      .filter(t => t.type === 'expense' && !isLoanPaymentTx(t) && isFromWallet(t))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const cashOutSaved = thisMonthTxs
+      .filter(t => t.type === 'saving' && isFromWallet(t))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const cashOutDebt = thisMonthTxs
+      .filter(t => t.type === 'expense' && isLoanPaymentTx(t) && isFromWallet(t))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const cashOutTotal = cashOutLiving + cashOutSaved + cashOutDebt;
+
+    // Money in to wallets this month (income lands, plus pautang collections)
+    const cashInEarned = thisMonthTxs
+      .filter(t => t.type === 'income' && !isLoanPaymentTx(t) && isFromWallet(t))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const cashInCollected = thisMonthTxs
+      .filter(t => t.type === 'income' && isLoanPaymentTx(t) && isFromWallet(t))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const cashInTotal = cashInEarned + cashInCollected;
+    const netCash = cashInTotal - cashOutTotal;
+
+    // -------- Debt position view --------
+    // Charges: expenses to a revolving account (new credit purchases)
+    const debtCharged = thisMonthTxs
+      .filter(t => t.type === 'expense' && revolvingIds.has(t.wallet))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Refunds on revolving accounts (credit backed out)
+    const debtRefunded = thisMonthTxs
+      .filter(t => t.type === 'income' && revolvingIds.has(t.wallet))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Payments toward any loan (both fixed and revolving)
+    const debtPaid = thisMonthTxs
+      .filter(t => t.type === 'expense' && t.linkedLoanId)
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Also count fresh utang added THIS month (new loan entries created in month)
+    // — these are new debt taken on. We infer by created-date on the loan record.
+    const isThisMonthISO = (iso) => iso && iso.slice(0, 7) === monthKey;
+    const newDebtTaken = (user.loans || [])
+      .filter(l => (l.direction || 'payable') === 'payable' && !l.isRevolving && isThisMonthISO(l.addedAt))
+      .reduce((s, l) => s + (Number(l.originalAmount) || 0), 0);
+    // Debt-position delta = new debt (charges + fresh loans) − debt paid − refunds
+    const debtDelta = debtCharged + newDebtTaken - debtPaid - debtRefunded;
+    // Current total debt (live snapshot as of now — approximation for end-of-month
+    // since accurate historical reconstruction requires per-tx-date balance sim)
+    const currentTotalDebt = (user.loans || [])
+      .filter(l => (l.direction || 'payable') === 'payable' && l.status !== 'paid' && l.status !== 'cleared' && l.status !== 'closed')
+      .reduce((s, l) => s + (l.isRevolving ? computeRevolvingBalance(l, txs) : (Number(l.currentBalance) || 0)), 0);
+
     // Any activity at all? Used to short-circuit empty months.
     const hasActivity = thisMonthTxs.length > 0;
 
     // Category breakdown from expense transactions
     const catAgg = {};
-    thisMonthTxs.filter(t => t.type === 'expense').forEach(t => {
+    thisMonthTxs.filter(t => t.type === 'expense' && !isLoanPaymentTx(t)).forEach(t => {
       const cat = t.category || 'other';
       catAgg[cat] = (catAgg[cat] || 0) + (Number(t.amount) || 0);
     });
@@ -15381,7 +15518,7 @@
 
     // Same categories, previous month — so we can call out big movers
     const catAggPrev = {};
-    prevMonthTxs.filter(t => t.type === 'expense').forEach(t => {
+    prevMonthTxs.filter(t => t.type === 'expense' && !isLoanPaymentTx(t)).forEach(t => {
       const cat = t.category || 'other';
       catAggPrev[cat] = (catAggPrev[cat] || 0) + (Number(t.amount) || 0);
     });
@@ -15498,6 +15635,26 @@
       },
       categoryBreakdown, topCategory,
       loanPayments,
+      // Cash flow view — real money movement through wallets
+      cashFlowView: {
+        inEarned:    cashInEarned,
+        inCollected: cashInCollected,
+        inTotal:     cashInTotal,
+        outLiving:   cashOutLiving,
+        outSaved:    cashOutSaved,
+        outDebt:     cashOutDebt,
+        outTotal:    cashOutTotal,
+        net:         netCash,
+      },
+      // Debt position — how debt moved this month + snapshot of current owed
+      debtView: {
+        charged:      debtCharged,
+        newDebtTaken: newDebtTaken,
+        paid:         debtPaid,
+        refunded:     debtRefunded,
+        delta:        debtDelta,     // + = debt grew, − = debt shrank
+        currentTotal: currentTotalDebt,
+      },
       netWorthEnd, netWorthChange,
       goalsReached,
       achievements, concerns,
@@ -15604,6 +15761,119 @@
         <div class="delta ${review.cashFlow > 0 ? 'up' : review.cashFlow < 0 ? 'down' : 'flat'}">${review.cashFlow > 0 ? 'in the green' : review.cashFlow < 0 ? 'in the red' : 'break even'}</div>
       </div>
     `;
+
+    // ---------- Cash Flow section — real money that moved through wallets ----------
+    // Shown only when there's activity beyond the basic consumption view — i.e.
+    // there were actual wallet flows, credit charges, or loan payments this month.
+    const cf = review.cashFlowView;
+    const cfHasActivity = cf.inTotal > 0 || cf.outTotal > 0;
+    const cfHead = document.getElementById('reviewCashFlowHead');
+    const cfSub  = document.getElementById('reviewCashFlowSub');
+    const cfWrap = document.getElementById('reviewCashFlow');
+    if (cfHasActivity) {
+      cfHead.style.display = '';
+      cfSub.style.display  = '';
+      cfWrap.style.display = '';
+      cfWrap.innerHTML = `
+        <div class="review-flow-card">
+          <div class="review-flow-row">
+            <span class="flow-lbl">Money in</span>
+            <span class="flow-val positive">${peso(cf.inTotal)}</span>
+          </div>
+          ${cf.inEarned > 0 ? `
+          <div class="review-flow-row indent">
+            <span class="flow-lbl">Earned</span>
+            <span class="flow-val muted">${peso(cf.inEarned)}</span>
+          </div>` : ''}
+          ${cf.inCollected > 0 ? `
+          <div class="review-flow-row indent">
+            <span class="flow-lbl">Pautang collected</span>
+            <span class="flow-val muted">${peso(cf.inCollected)}</span>
+          </div>` : ''}
+          <div class="review-flow-row">
+            <span class="flow-lbl">Money out</span>
+            <span class="flow-val negative">${peso(cf.outTotal)}</span>
+          </div>
+          ${cf.outLiving > 0 ? `
+          <div class="review-flow-row indent">
+            <span class="flow-lbl">Living expenses</span>
+            <span class="flow-val muted">${peso(cf.outLiving)}</span>
+          </div>` : ''}
+          ${cf.outSaved > 0 ? `
+          <div class="review-flow-row indent">
+            <span class="flow-lbl">Savings</span>
+            <span class="flow-val muted">${peso(cf.outSaved)}</span>
+          </div>` : ''}
+          ${cf.outDebt > 0 ? `
+          <div class="review-flow-row indent">
+            <span class="flow-lbl">Debt paid</span>
+            <span class="flow-val muted">${peso(cf.outDebt)}</span>
+          </div>` : ''}
+          <div class="review-flow-row total">
+            <span class="flow-lbl">Net cash</span>
+            <span class="flow-val ${cf.net > 0 ? 'positive' : cf.net < 0 ? 'negative' : ''}">${cf.net >= 0 ? '+' : '−'}${peso(Math.abs(cf.net))}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      cfHead.style.display = 'none';
+      cfSub.style.display  = 'none';
+      cfWrap.style.display = 'none';
+    }
+
+    // ---------- Debt Position section — only shown if user has any debt activity ----------
+    const dv = review.debtView;
+    const dvHasActivity = dv.charged > 0 || dv.paid > 0 || dv.newDebtTaken > 0 || dv.currentTotal > 0;
+    const dvHead = document.getElementById('reviewDebtHead');
+    const dvSub  = document.getElementById('reviewDebtSub');
+    const dvWrap = document.getElementById('reviewDebt');
+    if (dvHasActivity) {
+      dvHead.style.display = '';
+      dvSub.style.display  = '';
+      dvWrap.style.display = '';
+      const deltaLabel = Math.abs(dv.delta) < 1
+        ? 'unchanged'
+        : (dv.delta > 0
+           ? `+${peso(dv.delta)} (grew)`
+           : `−${peso(Math.abs(dv.delta))} (shrank)`);
+      const deltaClass = Math.abs(dv.delta) < 1 ? '' : (dv.delta > 0 ? 'negative' : 'positive');
+      dvWrap.innerHTML = `
+        <div class="review-flow-card">
+          ${dv.charged > 0 ? `
+          <div class="review-flow-row">
+            <span class="flow-lbl">Charged to credit</span>
+            <span class="flow-val negative">+${peso(dv.charged)}</span>
+          </div>` : ''}
+          ${dv.newDebtTaken > 0 ? `
+          <div class="review-flow-row">
+            <span class="flow-lbl">New utang taken</span>
+            <span class="flow-val negative">+${peso(dv.newDebtTaken)}</span>
+          </div>` : ''}
+          ${dv.paid > 0 ? `
+          <div class="review-flow-row">
+            <span class="flow-lbl">Debt paid down</span>
+            <span class="flow-val positive">−${peso(dv.paid)}</span>
+          </div>` : ''}
+          ${dv.refunded > 0 ? `
+          <div class="review-flow-row">
+            <span class="flow-lbl">Credit refunds</span>
+            <span class="flow-val positive">−${peso(dv.refunded)}</span>
+          </div>` : ''}
+          <div class="review-flow-row total">
+            <span class="flow-lbl">Net change this month</span>
+            <span class="flow-val ${deltaClass}">${deltaLabel}</span>
+          </div>
+          <div class="review-flow-row">
+            <span class="flow-lbl">Currently owed</span>
+            <span class="flow-val ${dv.currentTotal > 0 ? 'negative' : ''}">${peso(dv.currentTotal)}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      dvHead.style.display = 'none';
+      dvSub.style.display  = 'none';
+      dvWrap.style.display = 'none';
+    }
 
     // Categories — top 5, then group the rest as "Other categories"
     const catsWrap = document.getElementById('reviewCategories');
