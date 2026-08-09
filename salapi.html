@@ -8674,7 +8674,7 @@
           </div>
         </div>
 
-        <div class="field">
+        <div class="field" data-field-container="saved">
           <label>Starting amount <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
           <div class="amount-input-wrap">
             <span class="peso">₱</span>
@@ -8682,7 +8682,7 @@
           </div>
         </div>
 
-        <div class="field">
+        <div class="field" data-field-container="deadline">
           <label>Deadline <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
           <input class="input" type="month" value="${escapeAttr(goal.deadline || '')}" data-field="deadline" style="padding-left: 16px;" />
         </div>
@@ -8706,6 +8706,7 @@
             </select>
             <span class="select-caret">▾</span>
           </div>
+          <div class="payday-hint" data-wallet-hint style="display:none;"></div>
         </div>
       </div>
 
@@ -8890,8 +8891,28 @@
     });
     const walletSel = card.querySelector('[data-field="walletId"]');
     if (walletSel) {
+      const applyWalletLink = () => {
+        const isLinked = !!goal.walletId;
+        const startingContainer = card.querySelector('[data-field-container="saved"]');
+        const hint             = card.querySelector('[data-wallet-hint]');
+        if (startingContainer) startingContainer.style.display = isLinked ? 'none' : '';
+        if (hint) {
+          if (isLinked) {
+            const linkedWallet = (userCache?.wallets || []).find(w => w.id === goal.walletId);
+            const linkedName = linkedWallet
+              ? ((linkedWallet.label && linkedWallet.label.trim()) || PAYMENT_NAME[linkedWallet.method] || 'Wallet')
+              : 'this wallet';
+            hint.textContent = `Progress tracks ${linkedName}'s balance. Update the wallet's balance to change your saved amount.`;
+            hint.style.display = 'block';
+          } else {
+            hint.style.display = 'none';
+          }
+        }
+      };
+      applyWalletLink();   // initial render
       walletSel.addEventListener('change', e => {
         goal.walletId = e.target.value || null;
+        applyWalletLink();
         refreshProgress();
       });
     }
