@@ -1114,6 +1114,22 @@
     color: rgba(255, 247, 236, 0.65);
     padding-top: 4px;
   }
+  /* Loans banner variant — uses budget-banner base but has a second big
+     number on the right (monthly payments) instead of a small side text,
+     and no bar/compare row underneath. */
+  #loansBanner.budget-banner .top { margin-bottom: 0; }
+  #loansBanner.budget-banner .side {
+    text-align: right;
+    padding-top: 0;
+  }
+  #loansBanner .amt-side {
+    font-family: "Fraunces", serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--cream);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
   .budget-banner .bar {
     background: rgba(255, 247, 236, 0.15);
     border-radius: 999px;
@@ -5669,6 +5685,19 @@
     color: var(--teal);
   }
   .wallet-goal-icon .svg-inline-icon { width: 11px; height: 11px; }
+
+  /* Sticky headline banners — pin below the sticky header on the view screens
+     (Sahod at Kita, Budget, Ipon, Net worth, Utang at Pautang). The `top` value
+     matches the sticky header's rendered height so they sit flush underneath.
+     We only add position/top/z-index — each banner keeps its own padding, colors,
+     and margins so the visual design stays untouched. */
+  .sticky-banner {
+    position: sticky;
+    top: 68px;
+    z-index: 25;
+  }
+  /* When preview/test banner is at the top, push sticky banners down further */
+  body.has-preview-banner .sticky-banner { top: 112px; }
   .wallet-info h3 {
     font-family: 'Inter', sans-serif;
     font-size: 15px;
@@ -6456,7 +6485,7 @@
       <button class="header-add-btn" type="button" data-add-new="income" aria-label="Add income">+</button>
     </div>
 
-    <div class="total-banner" id="incomeViewBanner" style="display:none;">
+    <div class="total-banner sticky-banner" id="incomeViewBanner" style="display:none;">
       <div>
         <div class="lbl">Estimated monthly income</div>
         <div class="amt" id="incomeViewTotal">₱0</div>
@@ -6482,7 +6511,7 @@
       <button class="header-add-btn" type="button" data-add-new="budget" aria-label="Add expense">+</button>
     </div>
 
-    <div class="budget-banner" id="budgetViewBanner" style="display:none;">
+    <div class="budget-banner sticky-banner" id="budgetViewBanner" style="display:none;">
       <div class="top">
         <div>
           <div class="lbl">Total monthly budget</div>
@@ -6512,7 +6541,7 @@
       <button class="header-add-btn" type="button" data-add-new="savings" aria-label="Add savings goal">+</button>
     </div>
 
-    <div class="savings-banner" id="savingsViewBanner" style="display:none;">
+    <div class="savings-banner sticky-banner" id="savingsViewBanner" style="display:none;">
       <div class="top">
         <div>
           <div class="lbl">Total monthly savings</div>
@@ -6639,7 +6668,7 @@
     </div>
 
     <!-- The big number -->
-    <div class="nw-hero" id="nwHero">
+    <div class="nw-hero sticky-banner" id="nwHero">
       <div class="nw-hero-label">Your net worth</div>
       <div class="nw-hero-val" id="nwHeroVal">₱0</div>
       <div class="nw-hero-sub" id="nwHeroSub">Assets minus what you owe</div>
@@ -6758,15 +6787,17 @@
       <button type="button" class="loans-filter-btn" data-loan-filter="receivable">Pautang</button>
     </div>
 
-    <!-- Summary tiles switch based on filter -->
-    <div class="loans-summary" id="loansSummary" style="display:none;">
-      <div class="lsum-card">
-        <div class="lbl" id="loansSummaryLbl1">Total utang</div>
-        <div class="val" id="loansTotalDebt">₱0</div>
-      </div>
-      <div class="lsum-card">
-        <div class="lbl" id="loansSummaryLbl2">Monthly payments</div>
-        <div class="val" id="loansMonthlyDue">₱0</div>
+    <!-- Headline banner — same style as Budget/Ipon, adapts to filter -->
+    <div class="budget-banner sticky-banner" id="loansBanner" style="display:none;">
+      <div class="top">
+        <div>
+          <div class="lbl" id="loansSummaryLbl1">Total utang</div>
+          <div class="amt" id="loansTotalDebt">₱0</div>
+        </div>
+        <div class="side">
+          <div class="lbl" id="loansSummaryLbl2">Monthly payments</div>
+          <div class="amt-side" id="loansMonthlyDue">₱0</div>
+        </div>
       </div>
     </div>
 
@@ -11357,8 +11388,10 @@
       const methodSel = card.querySelector('[data-field="method"]');
       methodSel.addEventListener('change', () => {
         w.method = methodSel.value;
-        // Update the icon badge + placeholder inline without full re-render
-        card.querySelector('.wallet-type-badge').textContent = PAYMENT_ICON[w.method] || '💰';
+        // Update the icon badge + placeholder inline without full re-render.
+        // Icon value is SVG markup — must use innerHTML, not textContent
+        // (textContent would escape < > as text, rendering raw SVG source).
+        card.querySelector('.wallet-type-badge').innerHTML = PAYMENT_ICON[w.method] || '💰';
         const labelInp = card.querySelector('[data-field="label"]');
         labelInp.placeholder = PAYMENT_NAME[w.method] || 'Wallet';
       });
@@ -14857,7 +14890,7 @@
 
   function renderLoansList(user) {
     const loans = Array.isArray(user.loans) ? user.loans : [];
-    const summary = document.getElementById('loansSummary');
+    const summary = document.getElementById('loansBanner');
     const empty   = document.getElementById('loansEmpty');
     const emptyText = document.getElementById('loansEmptyText');
     const list    = document.getElementById('loansList');
