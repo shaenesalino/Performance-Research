@@ -16033,11 +16033,14 @@
     const isoNow = now.toISOString();
 
     // Wallets — realistic Filipino mix
-    const wCash    = { id: sid('w'), method: 'cash',  label: 'Cash on hand',     initialBalance: 3200,  addedAt: daysAgo(90) };
-    const wBpi     = { id: sid('w'), method: 'bank',  label: 'BPI Savings',      initialBalance: 32000, addedAt: daysAgo(90) };
-    const wGcash   = { id: sid('w'), method: 'gcash', label: 'GCash',            initialBalance: 4500,  addedAt: daysAgo(90) };
-    const wMetro   = { id: sid('w'), method: 'bank',  label: 'Metrobank Payroll',initialBalance: 8000,  addedAt: daysAgo(90) };
-    const wallets  = [wCash, wBpi, wGcash, wMetro];
+    const wCash    = { id: sid('w'), method: 'cash',  label: 'Cash on hand',        initialBalance: 3200,  addedAt: daysAgo(90) };
+    const wBpi     = { id: sid('w'), method: 'bank',  label: 'BPI Savings',         initialBalance: 32000, addedAt: daysAgo(90) };
+    const wGcash   = { id: sid('w'), method: 'gcash', label: 'GCash',               initialBalance: 4500,  addedAt: daysAgo(90) };
+    const wMetro   = { id: sid('w'), method: 'bank',  label: 'Metrobank Payroll',   initialBalance: 8000,  addedAt: daysAgo(90) };
+    // Dedicated wallet backing the Emergency Fund ipon — mimics the common
+    // Filipino pattern of "kaltas sa hiwalay na account para di gagalawin"
+    const wEmerg   = { id: sid('w'), method: 'bank',  label: 'BPI Emergency Fund',  initialBalance: 62000, addedAt: daysAgo(90) };
+    const wallets  = [wCash, wBpi, wGcash, wMetro, wEmerg];
 
     // Income sources
     const iSalary = { id: sid('inc'), label: 'Software Engineer salary', amount: 37500, frequency: 'semi-monthly', payday: 15, payday2: 30, payMonth: null };
@@ -16050,21 +16053,30 @@
     const eWater     = { id: sid('exp'), name: 'Water bill',      category: 'bills',         amount: 600,   frequency: 'monthly', dueDay: 20, dueDay2: null, dueMonth: null };
     const eInternet  = { id: sid('exp'), name: 'PLDT Fibr',       category: 'bills',         amount: 1899,  frequency: 'monthly', dueDay: 8,  dueDay2: null, dueMonth: null };
     const eGroceries = { id: sid('exp'), name: 'Groceries',       category: 'food',          amount: 7500,  frequency: 'monthly', dueDay: null, dueDay2: null, dueMonth: null };
+    const eShopping  = { id: sid('exp'), name: 'Online shopping', category: 'personal',      amount: 3000,  frequency: 'monthly', dueDay: null, dueDay2: null, dueMonth: null };
     const eNetflix   = { id: sid('exp'), name: 'Netflix',         category: 'subscriptions', amount: 549,   frequency: 'monthly', dueDay: 20, dueDay2: null, dueMonth: null };
     const eSpotify   = { id: sid('exp'), name: 'Spotify Family',  category: 'subscriptions', amount: 194,   frequency: 'monthly', dueDay: 20, dueDay2: null, dueMonth: null };
     const eGym       = { id: sid('exp'), name: 'Gym membership',  category: 'health',        amount: 1500,  frequency: 'monthly', dueDay: 1,  dueDay2: null, dueMonth: null };
-    const expenses   = [eRent, eElectric, eWater, eInternet, eGroceries, eNetflix, eSpotify, eGym];
+    const expenses   = [eRent, eElectric, eWater, eInternet, eGroceries, eShopping, eNetflix, eSpotify, eGym];
 
-    // Savings goals
-    const gEmergency = { id: sid('g'), icon: '🛡️', name: 'Emergency Fund',   target: 180000, contribution: 10000, frequency: 'monthly', deadline: '', saved: 62000, contribDay: 16, contribDay2: null, contribMonth: null };
-    const gJapan     = { id: sid('g'), icon: '✈️',  name: 'Japan Trip 2027', target: 200000, contribution: 8000,  frequency: 'monthly', deadline: '2027-04-01', saved: 44000, contribDay: 16, contribDay2: null, contribMonth: null };
-    const gMacbook   = { id: sid('g'), icon: '💻', name: 'MacBook Pro',      target: 120000, contribution: 6000,  frequency: 'monthly', deadline: '2026-06-01', saved: 29000, contribDay: 16, contribDay2: null, contribMonth: null };
+    // Savings goals — Emergency Fund is wallet-linked to wEmerg (progress
+    // auto-tracks wallet balance). The other two are unlinked (classic model).
+    const gEmergency = { id: sid('g'), icon: 'shield', name: 'Emergency Fund',   target: 180000, contribution: 10000, frequency: 'monthly', deadline: '',            saved: 0,     walletId: wEmerg.id, contribDay: 16, contribDay2: null, contribMonth: null };
+    const gJapan     = { id: sid('g'), icon: 'plane',  name: 'Japan Trip 2027', target: 200000, contribution: 8000,  frequency: 'monthly', deadline: '2027-04-01', saved: 44000, walletId: null,      contribDay: 16, contribDay2: null, contribMonth: null };
+    const gMacbook   = { id: sid('g'), icon: 'spark',  name: 'MacBook Pro',      target: 120000, contribution: 6000,  frequency: 'monthly', deadline: '2026-06-01', saved: 29000, walletId: null,      contribDay: 16, contribDay2: null, contribMonth: null };
     const goals      = [gEmergency, gJapan, gMacbook];
 
-    // Loans / utang
-    const lPersonal  = { id: sid('ln'), type: 'personal',    name: 'BPI Personal Loan',    lender: 'BPI',   originalAmount: 150000, currentBalance: 82000, interestRate: 8.5, monthlyPayment: 8000, frequency: 'monthly', dueDay: 20, status: 'active', note: '3-year term', payments: [], addedAt: daysAgo(120), updatedAt: daysAgo(30) };
-    const lBnpl      = { id: sid('ln'), type: 'bnpl',        name: 'GGives — Nintendo',    lender: 'GCash', originalAmount: 12000,  currentBalance: 6000,  interestRate: 0,   monthlyPayment: 2000, frequency: 'monthly', dueDay: 5,  status: 'active', note: '6-month installment', payments: [], addedAt: daysAgo(90),  updatedAt: daysAgo(20) };
-    const loans      = [lPersonal, lBnpl];
+    // Loans / utang — covers every type: recurring fixed, one-time, pautang, revolving
+    const lPersonal  = { id: sid('ln'), type: 'personal', name: 'BPI Personal Loan', lender: 'BPI', direction: 'payable', isRevolving: false, originalAmount: 150000, totalToPay: 165000, currentBalance: 82000, monthlyPayment: 8000, frequency: 'monthly', dueDay: 20, dueDate: null, status: 'active', note: '3-year term', payments: [], addedAt: daysAgo(120), updatedAt: daysAgo(30) };
+    const lBnpl      = { id: sid('ln'), type: 'bnpl',     name: 'GGives — Nintendo', lender: 'GCash', direction: 'payable', isRevolving: false, originalAmount: 12000, totalToPay: 12000, currentBalance: 6000, monthlyPayment: 2000, frequency: 'monthly', dueDay: 5, dueDate: null, status: 'active', note: '6-month installment', payments: [], addedAt: daysAgo(90), updatedAt: daysAgo(20) };
+    // One-time utang — car repair loan due next month on a specific date
+    const oneTimeDue = (() => { const d = new Date(); d.setDate(d.getDate() + 20); return d.toISOString().slice(0, 10); })();
+    const lOneTime   = { id: sid('ln'), type: 'family',   name: 'Car repair (Tito Ben)', lender: 'Tito Ben', direction: 'payable', isRevolving: false, originalAmount: 8000, totalToPay: 8000, currentBalance: 8000, monthlyPayment: 0, frequency: 'one-time', dueDay: null, dueDate: oneTimeDue, status: 'active', note: 'Balikbayan trip', payments: [], addedAt: daysAgo(15), updatedAt: daysAgo(15) };
+    // Pautang — JC still owes ₱3,000 after paying ₱2,000
+    const lPautang   = { id: sid('ln'), type: 'personal', name: 'Utang ni JC',       lender: 'JC (kaibigan)', direction: 'receivable', isRevolving: false, originalAmount: 5000, totalToPay: 5000, currentBalance: 3000, monthlyPayment: 1000, frequency: 'monthly', dueDay: 20, dueDate: null, status: 'active', note: 'Emergency loan', payments: [], addedAt: daysAgo(60), updatedAt: daysAgo(20) };
+    // Revolving — Shopee SPayLater with ₱30k limit and a real balance from charges
+    const lSpaylater = { id: sid('ln'), type: 'bnpl',     name: 'Shopee SPayLater', lender: 'Shopee', direction: 'payable', isRevolving: true, creditLimit: 30000, startingBalance: 0, originalAmount: 0, totalToPay: 0, currentBalance: 0, monthlyPayment: 0, frequency: 'monthly', dueDay: 15, dueDate: null, status: 'active', note: 'Auto-pay from GCash', payments: [], addedAt: daysAgo(75), updatedAt: daysAgo(3) };
+    const loans      = [lPersonal, lBnpl, lOneTime, lPautang, lSpaylater];
 
     // Manual assets outside wallets
     const assets = [
@@ -16073,7 +16085,7 @@
       { id: sid('a'), type: 'investment', name: 'BPI Mutual Fund',        value: 125000,  note: 'ALFM Money Market', addedAt: daysAgo(60),  updatedAt: daysAgo(60) },
     ];
 
-    // Transactions — 45+ across the last ~60 days so charts, insights, and trends have data
+    // Transactions — 60+ across the last ~60 days so charts, insights, and trends have data
     const tx = (type, source, amount, date, wallet, linkedId, label, category, note) => ({
       id: sid('tx'),
       type, source, amount, date,
@@ -16084,6 +16096,50 @@
       linkedId: linkedId || null,
       category: category || '',
       label: label || '',
+      createdAt: date + 'T09:00:00.000Z',
+    });
+    // Charge to a revolving credit account — wallet is the loan.id (not a real
+    // wallet), matches how the app records credit purchases. Real category is
+    // still tracked so the Shopping budget picks it up.
+    const txCredit = (amount, date, loan, label, category, note) => ({
+      id: sid('tx'),
+      type: 'expense', source: 'outside', amount, date,
+      note: note || '',
+      paymentMethod: 'revolving',
+      wallet: loan.id,
+      toWallet: null,
+      linkedId: null,
+      category: category || 'personal',
+      label: label || '',
+      createdAt: date + 'T09:00:00.000Z',
+    });
+    // Payment TOWARD a loan — real wallet debits, loan balance drops via linkedLoanId
+    const txLoanPay = (amount, date, wallet, loan, note) => ({
+      id: sid('tx'),
+      type: 'expense', source: 'outside', amount, date,
+      note: note || `Loan: ${loan.name}`,
+      paymentMethod: wallet.method,
+      wallet: wallet.id,
+      toWallet: null,
+      linkedId: null,
+      linkedLoanId: loan.id,
+      category: 'other',
+      label: `Loan payment: ${loan.name}`,
+      createdAt: date + 'T09:00:00.000Z',
+    });
+    // Collection FROM a pautang — income into a real wallet, linkedLoanId
+    // marks it as debt collection (not new income).
+    const txPautangCollect = (amount, date, wallet, loan, note) => ({
+      id: sid('tx'),
+      type: 'income', source: 'outside', amount, date,
+      note: note || `Collected from ${loan.name}`,
+      paymentMethod: wallet.method,
+      wallet: wallet.id,
+      toWallet: null,
+      linkedId: null,
+      linkedLoanId: loan.id,
+      category: '',
+      label: `Collection: ${loan.name}`,
       createdAt: date + 'T09:00:00.000Z',
     });
 
@@ -16144,16 +16200,39 @@
       tx('expense', 'outside', 1250,daysAgo(28), wCash,  null, 'Sunday brunch',    'food','Wildflour'),
       tx('expense', 'outside', 620, daysAgo(11), wCash,  null, 'Dinner out',       'food','Mesa'),
 
-      // Savings deposits — mirror the goal contributions
-      tx('saving',  'set', 10000, daysAgo(35), wBpi, gEmergency.id, '', '', ''),
+      // Savings deposits — mirror the Japan + MacBook goals (Emergency is
+      // wallet-linked, no separate saving-type tx needed; income to the wallet
+      // IS the contribution).
       tx('saving',  'set', 8000,  daysAgo(35), wBpi, gJapan.id,     '', '', ''),
       tx('saving',  'set', 6000,  daysAgo(35), wBpi, gMacbook.id,   '', '', ''),
-      tx('saving',  'set', 10000, daysAgo(5),  wBpi, gEmergency.id, '', '', 'June deposit'),
       tx('saving',  'set', 8000,  daysAgo(5),  wBpi, gJapan.id,     '', '', 'June deposit'),
       tx('saving',  'set', 6000,  daysAgo(5),  wBpi, gMacbook.id,   '', '', 'June deposit'),
 
+      // ---- CREDIT CHARGES to SPayLater (revolving) — hit Shopping budget,
+      //      increase SPayLater balance, don't touch any wallet balance
+      txCredit(1800, daysAgo(42), lSpaylater, 'Shopee — clothes',    'personal', 'H&M summer haul'),
+      txCredit(2450, daysAgo(30), lSpaylater, 'Shopee — kitchenware','personal', 'Air fryer'),
+      txCredit(750,  daysAgo(18), lSpaylater, 'Shopee — books',      'personal', ''),
+      txCredit(1200, daysAgo(8),  lSpaylater, 'Shopee — supplements','health',   'Whey + vitamins'),
+      txCredit(3200, daysAgo(4),  lSpaylater, 'Shopee — birthday gift','personal','For Mama'),
+
+      // ---- LOAN PAYMENTS (linkedLoanId set) — hit real wallet, reduce loan
+      //      balance, DON'T count as consumption in Reports "spent"
+      txLoanPay(8000, daysAgo(45), wMetro, lPersonal, 'BPI payment — May 20'),
+      txLoanPay(8000, daysAgo(15), wMetro, lPersonal, 'BPI payment — Jun 20'),
+      txLoanPay(2000, daysAgo(35), wGcash, lBnpl,     'GGives — May installment'),
+      txLoanPay(2000, daysAgo(5),  wGcash, lBnpl,     'GGives — June installment'),
+      txLoanPay(2000, daysAgo(20), wGcash, lSpaylater,'SPayLater bill — May'),
+
+      // ---- PAUTANG COLLECTION — income to wallet, linkedLoanId marks debt
+      //      collection (excluded from top-line income too)
+      txPautangCollect(2000, daysAgo(22), wGcash, lPautang, 'JC transferred via GCash'),
+
       // Wallet-to-wallet transfer example
       { id: sid('tx'), type: 'transfer', source: 'outside', amount: 5000, date: daysAgo(18), note: 'Cash withdrawal', paymentMethod: wBpi.method, wallet: wBpi.id, toWallet: wCash.id, linkedId: null, category: '', label: '', createdAt: daysAgo(18) + 'T10:00:00.000Z' },
+      // Also mirror a transfer INTO the Emergency Fund wallet (this is how the
+      // user "contributes" to a wallet-linked ipon)
+      { id: sid('tx'), type: 'transfer', source: 'outside', amount: 5000, date: daysAgo(5),  note: 'June ipon contribution', paymentMethod: wMetro.method, wallet: wMetro.id, toWallet: wEmerg.id, linkedId: gEmergency.id, category: '', label: '', createdAt: daysAgo(5) + 'T10:00:00.000Z' },
     ];
 
     // Newest-first order (like real user data)
