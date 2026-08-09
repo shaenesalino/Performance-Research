@@ -5899,21 +5899,21 @@
     color: #C48E00;
   }
 
-  /* Pill next to the goal name marking it as a sinking fund */
+  /* Pill next to the goal name marking it as a sinking fund. Same visual
+     pattern as .ipon-linked-pin (subtle tinted background + colored text)
+     but with the sinking-fund gold accent instead of teal. */
   .sinking-fund-pill {
     display: inline-block;
-    background: var(--gold);
-    color: var(--navy);
-    font-family: 'Inter', sans-serif;
     font-size: 9px;
     font-weight: 700;
+    letter-spacing: 0.3px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    border-radius: 999px;
+    background: rgba(249, 180, 0, 0.18);
+    color: #B37F00;
+    padding: 1px 6px;
+    border-radius: 4px;
     margin-left: 6px;
     vertical-align: middle;
-    line-height: 1.4;
   }
 
   /* Read-only "Edit on Budget →" hint on the Ipon page tile in place of
@@ -5925,6 +5925,18 @@
     color: #C48E00;
     padding: 8px 0;
     display: inline-block;
+  }
+
+  /* Flash highlight — briefly ring a tile in gold when the user is scrolled
+     to it (e.g. after tapping a sinking-fund goal to jump to its paired
+     expense). Fades out over 1.5s. */
+  @keyframes flash-highlight-anim {
+    0%   { box-shadow: 0 0 0 0   rgba(249, 180, 0, 0);    }
+    15%  { box-shadow: 0 0 0 4px rgba(249, 180, 0, 0.75); }
+    100% { box-shadow: 0 0 0 0   rgba(249, 180, 0, 0);    }
+  }
+  .flash-highlight {
+    animation: flash-highlight-anim 1.6s ease-out;
   }
   .ipon-budget-tile .view-item-icon.savings {
     background: rgba(44, 188, 177, 0.14);
@@ -7906,7 +7918,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.12';
+  const APP_VERSION = '2026-08-10.13';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -8657,7 +8669,10 @@
     const isSemi = item.frequency === 'semi-monthly';
     const dueDay1 = Number(item.dueDay ?? item.contribDay) || null;
     const dueDay2 = Number(item.dueDay2 ?? item.contribDay2) || null;
-    const isManual = !!item.manualPayFrom;
+    // Sinking-fund goals always carry an auto-mirrored manualPayFrom (copied
+    // from the paired expense on creation), which shouldn't display as a
+    // user-set manual override. Suppress the "manual" pin for those.
+    const isManual = !!item.manualPayFrom && !isSinkingFundGoal(item);
     if (isSemi && dueDay1 && dueDay2) {
       const pay1 = assignPaycheckForDay(item, user, dueDay1);
       const pay2 = assignPaycheckForDay(item, user, dueDay2);
@@ -9615,7 +9630,9 @@
       const goal = {
         id: 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         icon: 'shield',
-        name: `${exp.name} sinking fund`,
+        // Name matches the expense — the SINKING FUND pill on the tile
+        // communicates the type; no need to duplicate that in the name.
+        name: exp.name,
         target: Number(exp.amount) || 0,
         contribution: Math.round(monthly),
         frequency: 'monthly',
@@ -10681,7 +10698,7 @@
         const expensePay = assignPaycheck(exp, { ...(user || {}), incomes: user?.incomes });
         return {
           ...g,
-          name: `${exp.name} sinking fund`,
+          name: exp.name,
           target: Number(exp.amount) || 0,
           contribution: Math.round(monthly),
           frequency: 'monthly',
@@ -11452,6 +11469,10 @@
   // Edit buttons on view screens → open setup screens in edit mode
   let editMode = false;
   let singleEditMode = null; // { type: 'income'|'budget'|'savings', id: string|null }
+  // When the user taps a sinking-fund goal on the Ipon page, we set this
+  // to the paired expense's id so the next showBudgetView() call knows
+  // to scroll that tile into view + flash it.
+  let pendingScrollToExpense = null;
 
   // Empty-state "Add X" buttons on view screens
   document.addEventListener('click', async e => {
@@ -11899,6 +11920,21 @@
         list.appendChild(card);
       }
     goto('budget-view');
+    // Fulfill any pending scroll-to-expense request (e.g. from tapping a
+    // sinking-fund goal on the Ipon page). Do it on the next paint so the
+    // DOM has settled and the view is visible.
+    if (pendingScrollToExpense) {
+      const targetId = pendingScrollToExpense;
+      pendingScrollToExpense = null;
+      requestAnimationFrame(() => {
+        const target = document.querySelector(`[data-tap-detail="expense"][data-entry-id="${targetId}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.classList.add('flash-highlight');
+          setTimeout(() => target.classList.remove('flash-highlight'), 1600);
+        }
+      });
+    }
   }
 
   // Render an Ipon goal as a read-only line item on the Budget page. Tapping
@@ -11937,8 +11973,18 @@
       const { data } = await auth.getSession();
       if (!data.session) return;
       if (isSinking) {
-        // Sinking fund goals are controlled by the paired expense — jump to
-        // the Budget edit form for that expense instead of the Ipon edit.
+        // On the Budget page, the paired expense already has its own tile
+        // in its category section — scroll to it and flash it instead of
+        // opening the edit form. Feels lightweight and shows the connection.
+        const target = document.querySelector(`[data-tap-detail="expense"][data-entry-id="${g.pairedExpenseId}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.classList.add('flash-highlight');
+          setTimeout(() => target.classList.remove('flash-highlight'), 1600);
+          return;
+        }
+        // Fallback: if we can't find the tile (shouldn't happen but just in
+        // case), open the edit form for the paired expense.
         singleEditMode = { type: 'budget', id: g.pairedExpenseId };
         openBudgetScreen(data.session.user);
         return;
@@ -12018,15 +12064,16 @@
         `;
         list.appendChild(card);
 
-        // For sinking-fund goals, tapping the tile jumps to the paired
-        // expense's edit form. No Edit or + Saved buttons — the expense
-        // is the source of truth.
+        // For sinking-fund goals, tapping the tile jumps to the Budget view
+        // and scrolls to the paired expense tile (with a flash highlight),
+        // rather than opening any edit form. The expense is the source of
+        // truth — Ipon is just a mirror.
         if (isSinking) {
           card.addEventListener('click', async () => {
             const { data } = await auth.getSession();
             if (!data.session) return;
-            singleEditMode = { type: 'budget', id: g.pairedExpenseId };
-            openBudgetScreen(data.session.user);
+            pendingScrollToExpense = g.pairedExpenseId;
+            showBudgetView(data.session.user);
           });
           return;   // skip the +Saved/Edit wiring below
         }
