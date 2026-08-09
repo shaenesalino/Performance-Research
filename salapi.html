@@ -55,7 +55,10 @@
     margin: 0 auto;
     min-height: 100vh;
     position: relative;
-    overflow: hidden;
+    /* overflow-x: clip prevents horizontal swipe-overflow without breaking
+       position: sticky on children (which overflow: hidden would). */
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
   /* Screen system */
@@ -1593,7 +1596,14 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 20px;
+    margin: -32px -24px 20px;   /* bleed into screen padding so bg goes edge-to-edge */
+    padding: 20px 24px 14px;    /* restore content spacing inside the sticky bar */
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--cream);
+    /* Soft fade below the bar so it visually detaches from content behind it */
+    box-shadow: 0 6px 12px -8px rgba(10, 37, 64, 0.10);
   }
   .view-header h1 {
     font-family: "Fraunces", serif;
@@ -1704,8 +1714,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 16px;
-    padding: 4px 0;
+    margin: -32px -24px 16px;
+    padding: 16px 24px 10px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--cream);
+    box-shadow: 0 6px 12px -8px rgba(10, 37, 64, 0.10);
   }
   .view-header .edit-btn {
     background: var(--white);
@@ -2051,7 +2066,13 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 18px;
+    margin: -32px -24px 18px;
+    padding: 20px 24px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--cream);
+    box-shadow: 0 6px 12px -8px rgba(10, 37, 64, 0.10);
   }
   .tx-screen-head h1 {
     font-family: "Fraunces", serif;
@@ -4310,6 +4331,11 @@
     gap: 10px;
     box-shadow: 0 3px 12px rgba(242, 101, 34, 0.25);
   }
+  /* When the preview banner is visible, push sticky headers down so they
+     don't compete for top: 0 with the banner. */
+  body.has-preview-banner .view-header,
+  body.has-preview-banner .tx-screen-head,
+  body.has-preview-banner .screen-nav-bar { top: 44px; }
   .preview-banner .pb-text {
     font-family: 'Inter', sans-serif;
     font-size: 12px;
@@ -15714,8 +15740,10 @@
   function showMonthlyReview(user) {
     userCache = user;
     refreshDrawerUser(user);
-    // Default to the last completed month so users see a full picture
-    if (!reviewMonthKey) reviewMonthKey = lastCompletedMonthKey();
+    // Default to the CURRENT month. Previously we opened on the last completed
+    // month, but for brand-new accounts with no prior history that dumps the
+    // user into an empty prior-month report — misleading UX.
+    if (!reviewMonthKey) reviewMonthKey = currentMonthKey();
     renderReview(user);
     goto('review');
   }
@@ -15724,10 +15752,15 @@
     const review = computeMonthlyReview(user, reviewMonthKey);
     document.getElementById('reviewMonthLabel').textContent = review.monthLabel;
 
-    // Enable/disable nav based on data boundaries
-    const earliest = earliestMonthWithData(user);
+    // Enable/disable nav based on data boundaries.
+    // Floor: earliest month with any transaction, OR fall back to the month
+    // the user's account was created (so a brand-new user can't scroll into
+    // months before their account even existed).
+    const dataFloor = earliestMonthWithData(user);
+    const createdFloor = user.created_at ? user.created_at.slice(0, 7) : null;
+    const earliest = dataFloor || createdFloor || currentMonthKey();
     const current  = currentMonthKey();
-    document.getElementById('reviewPrevBtn').disabled = !!earliest && reviewMonthKey <= earliest;
+    document.getElementById('reviewPrevBtn').disabled = reviewMonthKey <= earliest;
     document.getElementById('reviewNextBtn').disabled = reviewMonthKey >= current;
 
     // Empty-state short-circuit
@@ -16348,8 +16381,14 @@
     toast('Ready for the real thing ✦', 'success');
   }
 
-  function showPreviewBanner() { document.getElementById('previewBanner').style.display = 'flex'; }
-  function hidePreviewBanner() { document.getElementById('previewBanner').style.display = 'none'; }
+  function showPreviewBanner() {
+    document.getElementById('previewBanner').style.display = 'flex';
+    document.body.classList.add('has-preview-banner');
+  }
+  function hidePreviewBanner() {
+    document.getElementById('previewBanner').style.display = 'none';
+    document.body.classList.remove('has-preview-banner');
+  }
 
   document.getElementById('exitPreviewBtn').addEventListener('click', exitPreviewMode);
 
