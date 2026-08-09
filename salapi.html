@@ -558,6 +558,58 @@
     background: var(--cream);
     box-shadow: 0 6px 12px -8px rgba(10, 37, 64, 0.10);
   }
+  .home-refresh-btn {
+    background: var(--cream-2);
+    border: 1.5px solid var(--sand);
+    color: var(--navy);
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+    flex-shrink: 0;
+  }
+  .home-refresh-btn:hover { background: var(--white); }
+  .home-refresh-btn:active { transform: scale(0.94); }
+  .home-refresh-btn.spinning svg { animation: refresh-spin 0.9s linear; }
+  @keyframes refresh-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* Update-available banner sits below the sticky home header when a new
+     app version is detected. Cream-tinted teal accent so it's noticeable
+     without being alarming. */
+  .update-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--teal), #1DA69B);
+    color: var(--white);
+    padding: 10px 14px;
+    border-radius: 12px;
+    margin: -16px 0 22px;
+    box-shadow: 0 6px 16px rgba(44, 188, 177, 0.28);
+  }
+  .update-banner .ub-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .update-banner .ub-btn {
+    background: rgba(255, 255, 255, 0.22);
+    border: 0;
+    color: var(--white);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .update-banner .ub-btn:hover { background: rgba(255, 255, 255, 0.32); }
   .home-greeting .hi {
     font-size: 13px;
     color: var(--muted);
@@ -5713,17 +5765,32 @@
   .wallet-goal-icon .svg-inline-icon { width: 11px; height: 11px; }
 
   /* Sticky headline banners — pin below the sticky header on the view screens
-     (Sahod at Kita, Budget, Ipon, Net worth, Utang at Pautang). The `top` value
-     matches the sticky header's rendered height so they sit flush underneath.
-     We only add position/top/z-index — each banner keeps its own padding, colors,
-     and margins so the visual design stays untouched. */
+     (Sahod at Kita, Budget, Ipon, Net worth, Utang at Pautang). The `top`
+     value is intentionally slightly less than the header's rendered height
+     so the banner overlaps the bottom of the header by a few pixels; the
+     header's higher z-index covers the overlap, and this eliminates any gap
+     where content behind could bleed through during scroll. */
   .sticky-banner {
     position: sticky;
-    top: 68px;
+    top: 58px;
     z-index: 25;
   }
+  /* Solid cream extension above the banner to catch content passing through
+     the small gap between the banner's top edge and the visible cutoff (below
+     the header). Rendered as a pseudo-element so we don't have to add DOM. */
+  .sticky-banner::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    right: -24px;
+    top: -14px;
+    height: 14px;
+    background: var(--cream);
+    z-index: -1;
+    pointer-events: none;
+  }
   /* When preview/test banner is at the top, push sticky banners down further */
-  body.has-preview-banner .sticky-banner { top: 112px; }
+  body.has-preview-banner .sticky-banner { top: 102px; }
 
   /* Group headers for Pitaka (grouped by wallet type) and Budget (grouped by
      category). Small uppercase label sits above each group so users can scan
@@ -5876,6 +5943,53 @@
     letter-spacing: 0.2px;
   }
   .sinking-fund-suggest:active { transform: scale(0.98); }
+
+  /* "+ Custom" link next to Category label in expense form */
+  .add-cat-link {
+    background: transparent;
+    border: none;
+    color: var(--teal);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 8px;
+  }
+  .add-cat-link:hover { color: var(--navy); text-decoration: underline; }
+
+  /* Icon grid in custom-category modal */
+  .cat-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    padding: 4px;
+  }
+  .cat-icon-choice {
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 10px;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0;
+    transition: all 0.12s ease;
+  }
+  .cat-icon-choice:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+  }
+  .cat-icon-choice.active {
+    background: rgba(44, 188, 177, 0.14);
+    border-color: var(--teal);
+    color: var(--teal);
+    transform: scale(1.05);
+  }
+  .cat-icon-choice .svg-inline-icon { width: 22px; height: 22px; }
   .wallet-info h3 {
     font-family: 'Inter', sans-serif;
     font-size: 15px;
@@ -5989,6 +6103,26 @@
       <div class="confirm-modal-actions">
         <button type="button" class="btn btn-ghost" id="confirmModalCancel" data-confirm-cancel>Cancel</button>
         <button type="button" class="btn btn-primary" id="confirmModalOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom-category modal — name + icon picker for adding/editing a
+       user-defined budget category. Used by the "+ Custom" link on the
+       expense form and by the Manage Categories screen. -->
+  <div class="confirm-modal" id="customCategoryModal" aria-hidden="true">
+    <div class="confirm-modal-backdrop" data-catmodal-cancel></div>
+    <div class="confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="customCategoryTitle" style="max-width: 380px;">
+      <h3 class="confirm-modal-title" id="customCategoryTitle">Add custom category</h3>
+      <div class="confirm-modal-body">
+        <label class="paycheck-label" style="display:block; margin-bottom:6px;">Category name</label>
+        <input type="text" class="input" id="customCategoryName" maxlength="30" placeholder="e.g. Kids, Investments" style="margin-bottom:14px;" />
+        <label class="paycheck-label" style="display:block; margin-bottom:6px;">Pick an icon</label>
+        <div class="cat-icon-grid" id="customCategoryIconGrid"></div>
+      </div>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn btn-ghost" data-catmodal-cancel>Cancel</button>
+        <button type="button" class="btn btn-primary" id="customCategorySaveBtn">Save category</button>
       </div>
     </div>
   </div>
@@ -6481,6 +6615,17 @@
         <h2 class="name" id="home-name">friend</h2>
         <p class="home-date" id="home-date">—</p>
       </div>
+      <button class="home-refresh-btn" id="homeRefreshBtn" type="button" aria-label="Check for updates" title="Check for updates">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><polyline points="21 3 21 8 16 8"/></svg>
+      </button>
+    </div>
+
+    <!-- Update-available banner — shown when a newer HTML has been deployed
+         and the user is still on an older version. Tap → reload with cache
+         bypass so the new HTML loads. -->
+    <div class="update-banner" id="updateBanner" style="display:none;">
+      <span class="ub-text">✨ New update available</span>
+      <button type="button" id="updateReloadBtn" class="ub-btn">Refresh now</button>
     </div>
 
     <!-- Financial Health Score — dashboard's focal point -->
@@ -6791,10 +6936,6 @@
     </div>
 
     <div id="walletsList"></div>
-
-    <button class="add-expense-btn" id="addWalletBtn" type="button" style="margin-top: 12px;">
-      + Add wallet
-    </button>
   </section>
 
   <!-- ============ WALLET EDIT ============ -->
@@ -7400,6 +7541,18 @@
       <span class="pa-chev">›</span>
     </button>
 
+    <!-- Manage custom categories — edit or delete anything the user added -->
+    <button type="button" class="profile-action-card" id="manageCategoriesCard">
+      <div class="pa-icon" style="background: rgba(44, 188, 177, 0.14); color: var(--teal);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title">Manage categories</div>
+        <div class="pa-sub" id="manageCategoriesSub">Edit or remove custom budget categories.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
     <!-- Recovery — restore from an auto-backup snapshot. Every save writes to
          a rolling ring of 5 backups, so accidental wipes can be undone. -->
     <button type="button" class="profile-action-card" id="recoveryCard">
@@ -7611,6 +7764,11 @@
   // -------------------------------------------------------------------------
   const DEV_OFFLINE_MODE = true;
   const DEV_LOCAL_KEY    = 'silak-salapi-local-user';
+
+  // Bumped on every deploy — used by the update-checker to detect when a
+  // newer HTML has landed on GitHub Pages so users can refresh without
+  // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
+  const APP_VERSION = '2026-08-10.01';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -8307,6 +8465,14 @@
   // this item — respecting a manual override if set, otherwise auto.
   // Accepts either an expense (dueDay) or a goal (contribDay).
   function assignPaycheck(item, user) {
+    const dueDay = Number(item.dueDay ?? item.contribDay) || null;
+    return assignPaycheckForDay(item, user, dueDay);
+  }
+
+  // Same as assignPaycheck but with an explicit dueDay override. Used by
+  // semi-monthly logic that needs to assign each of the two due days
+  // independently (each half of the amount lands on its covering paycheck).
+  function assignPaycheckForDay(item, user, dueDay) {
     const incomes = Array.isArray(user?.incomes) ? user.incomes : [];
     if (!incomes.length) return null;
 
@@ -8323,17 +8489,11 @@
       // Fall through to auto if the manual assignment is stale
     }
 
-    // Goals use contribDay; expenses use dueDay
-    const dueDay = Number(item.dueDay ?? item.contribDay) || null;
-
     // Auto — try primary first, then fall through to secondary incomes if the
-    // primary has no paydays that fit (e.g. primary is weekly, item is monthly).
+    // primary has no paydays that fit.
     for (const inc of incomes) {
       const days = getIncomePaydays(inc);
       if (!days.length) continue;
-      // For items with no due day (like weekly groceries), assign to the
-      // primary income's LAST payday of the cycle so it feels "covered by the
-      // most recent paycheck".
       const day = dueDay ? paydayCoveringDay(days, dueDay) : Math.max(...days);
       if (day) return { incomeId: inc.id, incomeName: (inc.label || 'Income'), payday: day };
     }
@@ -8350,6 +8510,36 @@
       });
     });
     return opts;
+  }
+
+  // Return the "From <income> · <days>" line HTML for a budget tile. Handles
+  // semi-monthly items (both due days shown, e.g. "15th & 31st"), and marks
+  // manual overrides with an orange •manual pin.
+  function paycheckLineHtml(item, user) {
+    const isSemi = item.frequency === 'semi-monthly';
+    const dueDay1 = Number(item.dueDay ?? item.contribDay) || null;
+    const dueDay2 = Number(item.dueDay2 ?? item.contribDay2) || null;
+    const isManual = !!item.manualPayFrom;
+    if (isSemi && dueDay1 && dueDay2) {
+      const pay1 = assignPaycheckForDay(item, user, dueDay1);
+      const pay2 = assignPaycheckForDay(item, user, dueDay2);
+      if (!pay1 && !pay2) return '';
+      // If both paydays resolve to the SAME income (common case: single semi
+      // income covers both), collapse to "From X · 15th & 31st".
+      if (pay1 && pay2 && pay1.incomeId === pay2.incomeId) {
+        const days = pay1.payday === pay2.payday
+          ? ordinal(pay1.payday)
+          : `${ordinal(pay1.payday)} & ${ordinal(pay2.payday)}`;
+        return `<p class="paycheck-line ${isManual ? 'manual' : ''}">From ${escapeAttr(pay1.incomeName)} · ${days}${isManual ? ' <span class="pin">•manual</span>' : ''}</p>`;
+      }
+      // Two different incomes covering each due day — show them stacked
+      const line1 = pay1 ? `From ${escapeAttr(pay1.incomeName)} · ${ordinal(pay1.payday)}` : '';
+      const line2 = pay2 ? `From ${escapeAttr(pay2.incomeName)} · ${ordinal(pay2.payday)}` : '';
+      return `<p class="paycheck-line ${isManual ? 'manual' : ''}">${line1}${line1 && line2 ? '<br>' : ''}${line2}${isManual ? ' <span class="pin">•manual</span>' : ''}</p>`;
+    }
+    const pay = assignPaycheck(item, user);
+    if (!pay) return '';
+    return `<p class="paycheck-line ${isManual ? 'manual' : ''}">From ${escapeAttr(pay.incomeName)} · ${ordinal(pay.payday)}${isManual ? ' <span class="pin">•manual</span>' : ''}</p>`;
   }
 
   function newIncomeSource(isPrimary = false) {
@@ -8731,6 +8921,38 @@
     { v: 'other',        label: '📦 Other' },
   ];
 
+  // Icon keys the user can pick from when creating a custom category. Any
+  // key here maps to an SVG via svgIcon(). Kept short so the picker isn't
+  // overwhelming; adding more is a one-line change.
+  const CUSTOM_CATEGORY_ICONS = [
+    'box', 'house', 'bulb', 'cart', 'bus', 'pill', 'phone', 'heart',
+    'palette', 'gift', 'plane', 'car', 'coin', 'savings', 'trophy',
+    'graduation', 'star', 'shield', 'building', 'document', 'ring',
+  ];
+
+  // Return the full category list including any user-defined custom
+  // categories. Custom ones have {v, label, icon} where icon is an SVG key
+  // (used by CATEGORY_ICONS via getCategoryIcon).
+  function getAllCategories(user) {
+    const custom = Array.isArray(user?.customCategories) ? user.customCategories : [];
+    return [...CATEGORIES, ...custom.map(c => ({ v: c.v, label: c.label, isCustom: true, icon: c.icon }))];
+  }
+  // Icon lookup for a category value — checks built-in first, then custom.
+  function getCategoryIcon(user, categoryValue) {
+    if (CATEGORY_ICONS[categoryValue]) return CATEGORY_ICONS[categoryValue];
+    const custom = (user?.customCategories || []).find(c => c.v === categoryValue);
+    if (custom && custom.icon) return svgIcon(custom.icon);
+    return svgIcon('box');
+  }
+  // Human-readable label for any category value (including custom).
+  function getCategoryLabel(user, categoryValue) {
+    const all = getAllCategories(user);
+    const found = all.find(c => c.v === categoryValue);
+    if (!found) return categoryValue || 'Other';
+    // Strip emoji prefix for consistent display in tiles/headers
+    return found.label.replace(/^[^\w\d]+\s*/, '');
+  }
+
   // Starter chips: name, category, sensible default frequency
   const STARTERS = [
     { key: 'rent',      icon: '🏠', name: 'Rent',          category: 'housing',       frequency: 'monthly' },
@@ -8884,11 +9106,11 @@
         </div>
 
         <div class="field">
-          <label>Category</label>
+          <label>Category <button type="button" class="add-cat-link" data-action="add-category">+ Custom</button></label>
           <div class="select-wrap">
             <select class="input select" data-field="category">
               <option value="">Choose…</option>
-              ${CATEGORIES.map(c => `<option value="${c.v}" ${exp.category === c.v ? 'selected' : ''}>${c.label}</option>`).join('')}
+              ${getAllCategories(userCache).map(c => `<option value="${c.v}" ${exp.category === c.v ? 'selected' : ''}>${c.label}</option>`).join('')}
             </select>
             <span class="select-caret">▾</span>
           </div>
@@ -8927,40 +9149,57 @@
     return card;
   }
 
-  // Timing picker — only rendered for quarterly/annual expenses. Controls
-  // whether the amount smooths into every month, only counts in the due
-  // month, or is offset by a paired sinking-fund Ipon goal.
+  // Timing picker — only meaningful for quarterly/annual expenses. Always
+  // wrapped in [data-timing-block] so the frequency-change handler can find
+  // and re-render it (returns empty div for other frequencies).
   function renderTimingPicker(exp) {
-    if (exp.frequency !== 'quarterly' && exp.frequency !== 'annually') return '';
-    const timing = exp.timing || 'smooth';
+    if (exp.frequency !== 'quarterly' && exp.frequency !== 'annually') {
+      return '<div data-timing-block></div>';
+    }
+    const timing = exp.timing || 'due-month';
     const hasSinkingFund = !!exp.sinkingFundGoalId;
     const noun = exp.frequency === 'annually' ? 'annual' : 'quarterly';
+    const amount = Number(exp.amount) || 0;
+    const smoothMonthly = amount * (BUDGET_TO_MONTHLY[exp.frequency] || 1);
     return `
       <div class="timing-picker" data-timing-block>
         <label class="paycheck-label">When to count this ${noun} amount</label>
         <div class="select-wrap">
           <select class="input select" data-field="timing">
-            <option value="due-month"    ${timing === 'due-month'    ? 'selected' : ''}>Only in due month (₱${(Number(exp.amount)||0).toLocaleString()} shows in ${exp.frequency === 'annually' ? MONTH_NAMES_SHORT[(Number(exp.dueMonth) || 1) - 1] : 'due months'} only)</option>
-            <option value="smooth"       ${timing === 'smooth'       ? 'selected' : ''}>Smooth monthly (₱${peso(exp.amount * (BUDGET_TO_MONTHLY[exp.frequency]||1)).replace('₱','')} in every month)</option>
-            <option value="sinking-fund" ${timing === 'sinking-fund' ? 'selected' : ''}>Sinking fund (save monthly toward this)</option>
+            <option value="due-month"    ${timing === 'due-month'    ? 'selected' : ''}>Only in due month</option>
+            <option value="smooth"       ${timing === 'smooth'       ? 'selected' : ''}>Spread evenly (accrual)</option>
+            <option value="sinking-fund" ${timing === 'sinking-fund' ? 'selected' : ''}>Sinking fund (save monthly)</option>
           </select>
           <span class="select-caret">▾</span>
         </div>
         ${timing === 'sinking-fund' && !hasSinkingFund
           ? `<button type="button" class="sinking-fund-suggest" data-action="create-sinking">
-              ✨ Create matching Ipon goal for ${peso((Number(exp.amount)||0) * (BUDGET_TO_MONTHLY[exp.frequency]||1))}/month
+              ✨ Create matching Ipon goal for ${peso(smoothMonthly)}/month
             </button>`
           : ''}
         ${timing === 'sinking-fund' && hasSinkingFund
           ? `<div class="payday-hint" style="color:var(--teal); font-weight:600;">✓ Linked to Ipon goal</div>`
           : ''}
-        <div class="payday-hint">
-          ${timing === 'due-month' ? 'Your monthly budget only reflects this expense in months it\'s actually due.'
-            : timing === 'smooth' ? 'The amount is divided evenly across all months so your budget stays consistent.'
-            : 'Pair with an Ipon goal to save toward this expense each month. The Ipon takes the monthly hit, not this budget line.'}
-        </div>
+        <div class="payday-hint" data-timing-explainer>${timingExplainer(exp, timing, smoothMonthly)}</div>
       </div>
     `;
+  }
+
+  // Plain-language explainer text for each timing choice. Written to demystify
+  // the difference between accrual and sinking fund — the two look identical
+  // on the budget total but behave very differently in practice.
+  function timingExplainer(exp, timing, smoothMonthly) {
+    const amount = Number(exp.amount) || 0;
+    const monthName = exp.dueMonth ? MONTH_NAMES_SHORT[Number(exp.dueMonth) - 1] : 'the due month';
+    const isAnnual = exp.frequency === 'annually';
+    if (timing === 'due-month') {
+      return `<strong>${peso(amount)}</strong> appears in your budget only during <strong>${isAnnual ? monthName : 'due months'}</strong>. Other months show ₱0 for this item. Matches actual cash flow — expect a spike when the bill hits.`;
+    }
+    if (timing === 'smooth') {
+      return `<strong>${peso(smoothMonthly)}</strong> is added to your monthly budget every month, so it stays consistent — but this is only an accounting note. You still need to have the full <strong>${peso(amount)}</strong> ready when the bill actually comes.`;
+    }
+    // sinking-fund
+    return `Creates a paired Ipon goal that saves <strong>${peso(smoothMonthly)}/month</strong>. Contribute monthly and the money is <strong>actually there</strong> when the bill hits. This expense line shows ₱0 (the Ipon takes the monthly load instead). Different from "Spread evenly" — that one only reminds you, this one makes you save.`;
   }
 
   // "Paid from paycheck" picker — only rendered when the user has at least
@@ -9058,6 +9297,24 @@
     const catSel = card.querySelector('[data-field="category"]');
     catSel.addEventListener('change', () => { exp.category = catSel.value; });
 
+    // "+ Custom" — open the add-custom-category flow, then auto-select the
+    // new category on the current expense card.
+    const addCatBtn = card.querySelector('[data-action="add-category"]');
+    if (addCatBtn) {
+      addCatBtn.addEventListener('click', async ev => {
+        ev.preventDefault();
+        const newCat = await openCustomCategoryModal();
+        if (!newCat) return;
+        exp.category = newCat.v;
+        // Repopulate the select with the new full list including our just-added one
+        const currentVal = exp.category;
+        catSel.innerHTML = `<option value="">Choose…</option>` +
+          getAllCategories(userCache).map(c => `<option value="${c.v}" ${currentVal === c.v ? 'selected' : ''}>${c.label}</option>`).join('');
+        catSel.value = currentVal;
+        toast(`Category "${newCat.label.replace(/^[^\w]+\s*/, '')}" added`, 'success');
+      });
+    }
+
     // Frequency
     const freqSel = card.querySelector('[data-field="frequency"]');
     freqSel.addEventListener('change', () => {
@@ -9067,17 +9324,53 @@
       exp.dueDay = null;
       exp.dueDay2 = null;
       exp.dueMonth = null;
+      // Reset timing to the default for the new frequency (quarterly/annual
+      // pick up due-month by default; other frequencies get 'smooth' which
+      // is a no-op for them).
+      if (newFreq === 'quarterly' || newFreq === 'annually') {
+        exp.timing = 'due-month';
+      } else {
+        exp.timing = 'smooth';
+        exp.sinkingFundGoalId = null;   // no timing UI on this frequency
+      }
       const db = card.querySelector('[data-due-block]');
       db.innerHTML = renderDueFor(exp);
       wireDueBlock(card, exp);
+      // Re-render the timing block — this is where the previous version
+      // silently failed: switching monthly→annual didn't insert the timing
+      // dropdown. Replacing the wrapper by outerHTML keeps the data attribute.
+      const tb = card.querySelector('[data-timing-block]');
+      if (tb) tb.outerHTML = renderTimingPicker(exp);
+      wireTimingSection(card, exp);
       updateExpenseEq(card, exp);
       updateBudgetBanner();
     });
 
     wireDueBlock(card, exp);
 
-    // Delete
-    card.querySelector('[data-action="delete"]').addEventListener('click', () => {
+    // Delete — if this expense has a linked sinking-fund goal, ask the user
+    // whether the paired Ipon should also be removed.
+    card.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+      if (exp.sinkingFundGoalId) {
+        const choice = await showConfirm({
+          icon: '⚠',
+          title: 'Delete linked Ipon too?',
+          bodyHtml: 'This expense has a matching sinking-fund goal on your Ipon page. Do you want to delete that goal as well, or keep it (just unlink)?',
+          okText: 'Delete both',
+          cancelText: 'Keep the Ipon',
+        });
+        if (choice) {
+          // Delete the paired goal on next save (mark it here; save handler
+          // will pick it up). Simplest way: do it now via updateUser.
+          const { data: sess } = await auth.getSession();
+          if (sess?.session) {
+            const u = sess.session.user;
+            const newGoals = (u.goals || []).filter(g => g.id !== exp.sinkingFundGoalId);
+            await auth.updateUser({ data: { goals: newGoals } });
+            toast('Sinking-fund goal removed', 'success');
+          }
+        }
+      }
       expenseDraft = expenseDraft.filter(x => x.id !== exp.id);
       renderStarters();
       renderExpenseList();
@@ -9122,29 +9415,34 @@
       });
     }
 
-    // Timing picker (quarterly/annually only) — re-renders the whole timing
-    // block on change so hint text + sinking-fund button reflect the new pick.
+    // Timing dropdown + sinking-fund button are both wired inside
+    // wireTimingSection because the whole block gets replaced on frequency /
+    // timing changes and both need re-wiring together.
+    wireTimingSection(card, exp);
+  }
+
+  // Wire everything inside the timing block — the timing dropdown itself and
+  // (when visible) the sinking-fund suggestion button. Called on initial
+  // render AND after every outerHTML replacement of the block.
+  function wireTimingSection(card, exp) {
     const timingSel = card.querySelector('[data-field="timing"]');
     if (timingSel) {
       timingSel.addEventListener('change', () => {
         exp.timing = timingSel.value;
-        // If user switched AWAY from sinking-fund, clear any paired goal
-        if (exp.timing !== 'sinking-fund') exp.sinkingFundGoalId = null;
-        // Re-render just the timing block to update hints/button
+        // If switching AWAY from sinking-fund, unlink the paired Ipon goal
+        // but leave the goal itself on the Ipon page (user can delete
+        // manually if they want). Warn them of the unlink.
+        if (exp.timing !== 'sinking-fund' && exp.sinkingFundGoalId) {
+          exp.sinkingFundGoalId = null;
+          toast('Sinking-fund goal is unlinked but still on your Ipon page', 'success');
+        }
         const block = card.querySelector('[data-timing-block]');
         if (block) block.outerHTML = renderTimingPicker(exp);
-        // Re-wire because we just replaced the element
         wireTimingSection(card, exp);
         updateExpenseEq(card, exp);
         updateBudgetBanner();
       });
     }
-    wireTimingSection(card, exp);
-  }
-
-  // Wire the sinking-fund suggestion button inside the timing block. Split
-  // out because the block gets re-rendered on timing changes and needs re-wiring.
-  function wireTimingSection(card, exp) {
     const btn = card.querySelector('[data-action="create-sinking"]');
     if (!btn) return;
     btn.addEventListener('click', async ev => {
@@ -11049,19 +11347,6 @@
           });
         }
       });
-
-      // "+ Add income source" button below the list
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'add-below-btn';
-      addBtn.textContent = '+ Add income source';
-      addBtn.addEventListener('click', async () => {
-        const { data } = await auth.getSession();
-        if (!data.session) return;
-        singleEditMode = { type: 'income', id: null };
-        openIncomeScreen(data.session.user);
-      });
-      list.appendChild(addBtn);
     }
     goto('income-view');
   }
@@ -11109,20 +11394,39 @@
     const c = user.expenses.length;
 
     // -------- Per-paycheck breakdown (includes goals too) --------
+    // Semi-monthly items fire TWICE per month — each firing needs to be
+    // assigned to the paycheck covering its respective due day. Splitting
+    // ensures the two paychecks aren't unbalanced (previously a semi-monthly
+    // ₱4,000 item put its full ₱8,000/month into whichever cutoff the FIRST
+    // due day happened to fall on).
     const cutoffTotals = {};
     let unassigned = 0;
-    const bumpCutoff = (item, monthlyAmt) => {
+    const bumpForItem = (item, fullMonthly) => {
+      const isSemi = item.frequency === 'semi-monthly';
+      const dueDay1 = Number(item.dueDay ?? item.contribDay) || null;
+      const dueDay2 = Number(item.dueDay2 ?? item.contribDay2) || null;
+      if (isSemi && dueDay1 && dueDay2) {
+        // Split evenly — half assigned to each due day's covering paycheck
+        const half = fullMonthly / 2;
+        const pay1 = assignPaycheckForDay(item, user, dueDay1);
+        const pay2 = assignPaycheckForDay(item, user, dueDay2);
+        if (pay1) cutoffTotals[pay1.payday] = (cutoffTotals[pay1.payday] || 0) + half;
+        else unassigned += half;
+        if (pay2) cutoffTotals[pay2.payday] = (cutoffTotals[pay2.payday] || 0) + half;
+        else unassigned += half;
+        return;
+      }
       const pay = assignPaycheck(item, user);
-      if (pay) cutoffTotals[pay.payday] = (cutoffTotals[pay.payday] || 0) + monthlyAmt;
-      else unassigned += monthlyAmt;
+      if (pay) cutoffTotals[pay.payday] = (cutoffTotals[pay.payday] || 0) + fullMonthly;
+      else unassigned += fullMonthly;
     };
     (user.expenses || []).forEach(e => {
       const monthly = (Number(e.amount) || 0) * (BUDGET_TO_MONTHLY[e.frequency] || 1);
-      bumpCutoff(e, monthly);
+      bumpForItem(e, monthly);
     });
     contributingGoals.forEach(g => {
       const monthly = (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1);
-      bumpCutoff(g, monthly);
+      bumpForItem(g, monthly);
     });
 
     // Side text — per-paycheck if 2+ paydays, else "monthly obligations" split
@@ -11199,12 +11503,7 @@
             <div class="view-item-info">
               <p class="name">${escapeAttr(exp.name || 'Unnamed')}</p>
               <p class="meta">${peso(planned)}${FREQ_LABEL[exp.frequency] ? ' ' + FREQ_LABEL[exp.frequency].toLowerCase() : ''}${due ? ' · ' + due : ''}</p>
-              ${(() => {
-                const pay = assignPaycheck(exp, user);
-                if (!pay) return '';
-                const isManual = !!exp.manualPayFrom;
-                return `<p class="paycheck-line ${isManual ? 'manual' : ''}">From ${escapeAttr(pay.incomeName)} · ${ordinal(pay.payday)}${isManual ? ' <span class="pin">•manual</span>' : ''}</p>`;
-              })()}
+              ${paycheckLineHtml(exp, user)}
             </div>
             <div class="view-item-amount">${Math.round(pctRaw)}%</div>
           </div>
@@ -11311,19 +11610,6 @@
         `;
         list.appendChild(card);
       }
-
-      // "+ Add expense" button below the list
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'add-below-btn';
-      addBtn.textContent = '+ Add expense';
-      addBtn.addEventListener('click', async () => {
-        const { data } = await auth.getSession();
-        if (!data.session) return;
-        singleEditMode = { type: 'budget', id: null };
-        openBudgetScreen(data.session.user);
-      });
-      list.appendChild(addBtn);
     goto('budget-view');
   }
 
@@ -11346,12 +11632,7 @@
         <div class="view-item-info">
           <p class="name">${escapeAttr(g.name || 'Ipon')} ${linkedTag}</p>
           <p class="meta">${contribText}${dueLine}</p>
-          ${(() => {
-            const pay = assignPaycheck(g, user);
-            if (!pay) return '';
-            const isManual = !!g.manualPayFrom;
-            return `<p class="paycheck-line ${isManual ? 'manual' : ''}">From ${escapeAttr(pay.incomeName)} · ${ordinal(pay.payday)}${isManual ? ' <span class="pin">•manual</span>' : ''}</p>`;
-          })()}
+          ${paycheckLineHtml(g, user)}
         </div>
         <div class="view-item-amount ipon">${peso(monthly)}</div>
       </div>
@@ -11471,19 +11752,6 @@
           });
         }
       });
-
-      // "+ Add savings goal" button below the list
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'add-below-btn';
-      addBtn.textContent = '+ Add savings goal';
-      addBtn.addEventListener('click', async () => {
-        const { data } = await auth.getSession();
-        if (!data.session) return;
-        singleEditMode = { type: 'savings', id: null };
-        openSavingsScreen(data.session.user);
-      });
-      list.appendChild(addBtn);
     }
     goto('savings-view');
   }
@@ -11561,6 +11829,96 @@
         else if (e.key === 'Enter') cleanup(true);
       };
       okBtn.addEventListener('click', onOk);
+      cancels.forEach(el => el.addEventListener('click', onCancel));
+      document.addEventListener('keydown', onKey);
+    });
+  }
+
+  // Open the custom-category modal. Optionally pass an existing category
+  // ({v, label, icon}) to pre-fill for edit mode. Resolves with the saved
+  // category ({v, label, icon}) on save, or null on cancel/backdrop.
+  function openCustomCategoryModal(existing = null) {
+    const modal   = document.getElementById('customCategoryModal');
+    const titleEl = document.getElementById('customCategoryTitle');
+    const nameInp = document.getElementById('customCategoryName');
+    const gridEl  = document.getElementById('customCategoryIconGrid');
+    const saveBtn = document.getElementById('customCategorySaveBtn');
+    const cancels = modal.querySelectorAll('[data-catmodal-cancel]');
+
+    // State
+    let selectedIcon = existing?.icon || 'box';
+    titleEl.textContent = existing ? 'Edit category' : 'Add custom category';
+    nameInp.value = existing?.label?.replace(/^[^\w]+\s*/, '') || '';
+
+    // Render icon grid
+    const renderGrid = () => {
+      gridEl.innerHTML = CUSTOM_CATEGORY_ICONS.map(key => `
+        <button type="button" class="cat-icon-choice ${selectedIcon === key ? 'active' : ''}" data-icon-key="${key}" title="${key}">
+          ${svgIcon(key)}
+        </button>
+      `).join('');
+      gridEl.querySelectorAll('[data-icon-key]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedIcon = btn.dataset.iconKey;
+          renderGrid();
+        });
+      });
+    };
+    renderGrid();
+
+    // Show
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => nameInp.focus(), 100);
+
+    return new Promise(resolve => {
+      const cleanup = async (result) => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        saveBtn.removeEventListener('click', onSave);
+        cancels.forEach(el => el.removeEventListener('click', onCancel));
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      const onSave = async () => {
+        const name = nameInp.value.trim();
+        if (!name) { toast('Please enter a category name.', 'error'); return; }
+        // Persist to user record — generate a slug-like value from the name,
+        // ensure uniqueness by appending a short suffix if it collides.
+        const { data: sess } = await auth.getSession();
+        if (!sess?.session) { cleanup(null); return; }
+        const u = sess.session.user;
+        const current = Array.isArray(u.customCategories) ? u.customCategories : [];
+        const built = CATEGORIES.map(c => c.v);
+        let slug = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/^_+|_+$/g, '').slice(0, 20);
+        if (existing) slug = existing.v;   // preserve on edit
+        else {
+          let i = 1;
+          const taken = new Set([...built, ...current.map(c => c.v)]);
+          let candidate = slug;
+          while (taken.has(candidate)) { candidate = `${slug}_${i++}`; }
+          slug = candidate;
+        }
+        const icon = svgIcon(selectedIcon);
+        // Extract the emoji-equivalent from the SVG? No — use a small visual
+        // prefix in the label so select options remain readable.
+        const label = `✨ ${name}`;   // ✨ marker for custom cats in dropdowns
+        const record = { v: slug, label, icon: selectedIcon };
+        const next = existing
+          ? current.map(c => c.v === existing.v ? record : c)
+          : [...current, record];
+        const { data } = await auth.updateUser({ data: { customCategories: next } });
+        // Keep userCache fresh so subsequent renders (like the parent dropdown
+        // refresh) see the newly-added category.
+        if (data?.user) userCache = data.user;
+        cleanup(record);
+      };
+      const onCancel = () => cleanup(null);
+      const onKey    = (e) => {
+        if (e.key === 'Escape') cleanup(null);
+        else if (e.key === 'Enter' && document.activeElement === nameInp) onSave();
+      };
+      saveBtn.addEventListener('click', onSave);
       cancels.forEach(el => el.addEventListener('click', onCancel));
       document.addEventListener('keydown', onKey);
     });
@@ -12513,7 +12871,7 @@
               <div class="select-wrap">
                 <select class="input select" id="txNewCategory">
                   <option value="">Choose…</option>
-                  ${CATEGORIES.map(c => `<option value="${c.v}" ${txDraft.category === c.v ? 'selected' : ''}>${c.label}</option>`).join('')}
+                  ${getAllCategories(userCache).map(c => `<option value="${c.v}" ${txDraft.category === c.v ? 'selected' : ''}>${c.label}</option>`).join('')}
                 </select>
                 <span class="select-caret">▾</span>
               </div>
@@ -12534,7 +12892,7 @@
             <div class="select-wrap">
               <select class="input select" id="txCategory">
                 <option value="">Choose…</option>
-                ${CATEGORIES.map(c => `<option value="${c.v}" ${txDraft.category === c.v ? 'selected' : ''}>${c.label}</option>`).join('')}
+                ${getAllCategories(userCache).map(c => `<option value="${c.v}" ${txDraft.category === c.v ? 'selected' : ''}>${c.label}</option>`).join('')}
               </select>
               <span class="select-caret">▾</span>
             </div>
@@ -14796,9 +15154,7 @@
     goto('wallet-edit');
   }
 
-  document.getElementById('addWalletBtn').addEventListener('click', () => {
-    openWalletEdit(userCache, null);
-  });
+  // Header + button is the only add-wallet entry point now (bottom button removed)
   document.getElementById('walletsHeaderAddBtn').addEventListener('click', () => {
     openWalletEdit(userCache, null);
   });
@@ -17207,6 +17563,77 @@
 
   document.getElementById('exitPreviewBtn').addEventListener('click', exitPreviewMode);
 
+  // Manage Categories — lets user edit or delete custom budget categories.
+  // Built-in categories aren't editable (they're always available). If the
+  // user has none custom, we prompt them to add one.
+  document.getElementById('manageCategoriesCard').addEventListener('click', async () => {
+    const { data: sess } = await auth.getSession();
+    if (!sess?.session) return;
+    const u = sess.session.user;
+    const custom = Array.isArray(u.customCategories) ? u.customCategories : [];
+    if (custom.length === 0) {
+      // No customs yet — jump straight to add flow
+      const created = await openCustomCategoryModal();
+      if (created) toast(`Category "${created.label.replace(/^[^\w]+\s*/, '')}" added`, 'success');
+      return;
+    }
+    // Build picker: show each custom category + an "Add new" entry at bottom
+    const options = custom.map(c => ({
+      key: c.v,
+      label: c.label.replace(/^[^\w]+\s*/, ''),
+      sub: 'Tap to edit or delete',
+      icon: '✨',
+    }));
+    options.push({ key: '__add__', label: '+ Add new category', sub: '', icon: '✨' });
+    const picked = await showPicker({
+      icon: '📂',
+      title: 'Manage categories',
+      options,
+    });
+    if (!picked) return;
+    if (picked === '__add__') {
+      const created = await openCustomCategoryModal();
+      if (created) toast(`Category "${created.label.replace(/^[^\w]+\s*/, '')}" added`, 'success');
+      return;
+    }
+    // Edit-or-delete flow for the picked category
+    const target = custom.find(c => c.v === picked);
+    if (!target) return;
+    // Check how many expenses reference this category — a warning if any
+    const users = await auth.getSession();
+    const usingCount = (users.data.session.user.expenses || []).filter(e => e.category === target.v).length;
+    const action = await showPicker({
+      icon: '📂',
+      title: target.label.replace(/^[^\w]+\s*/, ''),
+      options: [
+        { key: 'edit',   label: 'Edit name or icon', sub: '', icon: '✎' },
+        { key: 'delete', label: 'Delete category',
+          sub: usingCount > 0 ? `${usingCount} expense${usingCount !== 1 ? 's' : ''} will move to "Other"` : 'No expenses use this',
+          icon: '⚠' },
+      ],
+    });
+    if (action === 'edit') {
+      await openCustomCategoryModal(target);
+    } else if (action === 'delete') {
+      const ok = await showConfirm({
+        icon: '⚠',
+        title: `Delete "${target.label.replace(/^[^\w]+\s*/, '')}"?`,
+        bodyHtml: usingCount > 0
+          ? `<strong>${usingCount} expense${usingCount !== 1 ? 's' : ''}</strong> currently use this category. They'll be reassigned to "Other".`
+          : 'This category will be removed from your list.',
+        okText: 'Delete',
+        cancelText: 'Cancel',
+      });
+      if (!ok) return;
+      const nextCustom = custom.filter(c => c.v !== target.v);
+      const nextExpenses = (u.expenses || []).map(e =>
+        e.category === target.v ? { ...e, category: 'other' } : e
+      );
+      await auth.updateUser({ data: { customCategories: nextCustom, expenses: nextExpenses } });
+      toast('Category deleted', 'success');
+    }
+  });
+
   // Recovery card in Profile — lists auto-backup snapshots and lets user
   // restore any of them if their current data got wiped or corrupted.
   document.getElementById('recoveryCard').addEventListener('click', async () => {
@@ -17283,6 +17710,59 @@
       if (ok) enterTestMode();
     }
   });
+
+  // ---- Update-availability check ----
+  // Every 5 minutes (and once on load), fetch the deployed HTML with a
+  // cache-buster and look for the APP_VERSION token. If it differs from the
+  // running instance's version, show the "New update available" banner.
+  // Manual refresh button on Home also triggers this check immediately.
+  async function checkForAppUpdate() {
+    const btn = document.getElementById('homeRefreshBtn');
+    if (btn) btn.classList.add('spinning');
+    try {
+      const url = location.pathname + '?_check=' + Date.now();
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) return;
+      const text = await res.text();
+      const match = text.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+      const remote = match && match[1];
+      if (remote && remote !== APP_VERSION) {
+        document.getElementById('updateBanner').style.display = 'flex';
+      } else if (remote === APP_VERSION) {
+        document.getElementById('updateBanner').style.display = 'none';
+      }
+    } catch (err) {
+      // Network failure — silent (offline PWA is normal)
+      console.debug('[Silak] Update check skipped:', err.message);
+    } finally {
+      if (btn) setTimeout(() => btn.classList.remove('spinning'), 900);
+    }
+  }
+  // Manual refresh button — checks for update AND does a hard reload if the
+  // user taps again after the banner appears. Single tap = check only.
+  document.getElementById('homeRefreshBtn').addEventListener('click', async () => {
+    const banner = document.getElementById('updateBanner');
+    if (banner && banner.style.display !== 'none') {
+      // Banner is already showing → user wants to reload NOW
+      hardReload();
+      return;
+    }
+    await checkForAppUpdate();
+    // Nothing new — quick toast so user knows we actually checked
+    if (document.getElementById('updateBanner').style.display === 'none') {
+      toast('You\'re on the latest version ✦', 'success');
+    }
+  });
+  // Reload button in the update banner
+  document.getElementById('updateReloadBtn').addEventListener('click', hardReload);
+  function hardReload() {
+    // Cache-bust the URL so the PWA fetches the newest HTML on reload
+    const url = location.pathname + '?v=' + Date.now();
+    location.replace(url);
+  }
+  // Check on load + every 5 minutes while the app is open
+  setTimeout(checkForAppUpdate, 3000);   // small delay to avoid slowing initial paint
+  setInterval(checkForAppUpdate, 5 * 60 * 1000);
 
   // =========================================================================
   // INIT — check for existing session on load; wire OAuth redirect handling
