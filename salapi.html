@@ -7850,7 +7850,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.09';
+  const APP_VERSION = '2026-08-10.10';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9588,12 +9588,14 @@
       };
       const newExpenses = mergeSingle(u.expenses, cleanedExpense, isNewExpense);
       const newGoals = [...(u.goals || []), goal];
-      await auth.updateUser({ data: { goals: newGoals, expenses: newExpenses } });
+      const { data: updated } = await auth.updateUser({ data: { goals: newGoals, expenses: newExpenses } });
       toast(`Sinking fund created and expense saved ✦`, 'success');
-      // Re-render timing block to show the linked state
-      const block = card.querySelector('[data-timing-block]');
-      if (block) block.outerHTML = renderTimingPicker(exp);
-      wireTimingSection(card, exp);
+      // Close the form and jump to the Budget view so the user can SEE the
+      // new expense tile and paired Ipon goal immediately. Previously the
+      // form stayed open with an "Add expense" button, making users think
+      // the save didn't complete.
+      singleEditMode = null;
+      if (updated?.user) showBudgetView(updated.user);
     });
   }
 
@@ -11720,9 +11722,25 @@
         });
       }
 
-      const singleGroup = Object.keys(byCategory).length === 1;
-      CATEGORIES.forEach(cat => {
-        const items = byCategory[cat.v];
+      // Iterate categories in a stable order: built-in first (canonical
+       // order), then user's custom categories (in the order they were added),
+       // then any orphan category values that don't match either (e.g., a
+       // custom category that was deleted but expenses still reference it —
+       // those fall back to still being visible under their raw category key).
+      const orderedCatKeys = [];
+      const builtInSet = new Set(CATEGORIES.map(c => c.v));
+      const customList = Array.isArray(user.customCategories) ? user.customCategories : [];
+      const customSet  = new Set(customList.map(c => c.v));
+      CATEGORIES.forEach(c => orderedCatKeys.push(c.v));
+      customList.forEach(c => orderedCatKeys.push(c.v));
+      Object.keys(byCategory).forEach(k => {
+        if (!builtInSet.has(k) && !customSet.has(k)) orderedCatKeys.push(k);
+      });
+
+      const totalCategoriesWithItems = orderedCatKeys.filter(k => byCategory[k] && byCategory[k].length).length;
+      const singleGroup = totalCategoriesWithItems === 1;
+      orderedCatKeys.forEach(catV => {
+        const items = byCategory[catV];
         if (!items || items.length === 0) return;
         // Always show a header when Savings section is above (needs the
         // "Expenses" separator too, unless the user has zero savings goals).
@@ -11730,7 +11748,7 @@
         if (showHead) {
           const head = document.createElement('div');
           head.className = 'budget-group-head';
-          head.textContent = cat.label.replace(/^[^\s]+\s/, '');   // strip emoji prefix
+          head.textContent = getCategoryLabel(user, catV);
           list.appendChild(head);
         }
         items.forEach(exp => list.appendChild(renderBudgetItem(exp)));
