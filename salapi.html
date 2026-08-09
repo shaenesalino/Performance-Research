@@ -5766,31 +5766,16 @@
 
   /* Sticky headline banners — pin below the sticky header on the view screens
      (Sahod at Kita, Budget, Ipon, Net worth, Utang at Pautang). The `top`
-     value is intentionally slightly less than the header's rendered height
-     so the banner overlaps the bottom of the header by a few pixels; the
-     header's higher z-index covers the overlap, and this eliminates any gap
-     where content behind could bleed through during scroll. */
+     value equals the rendered header height (40px button + 20+14 padding = 74px),
+     so the banner sits flush below the header with no overlap and no gap. */
   .sticky-banner {
     position: sticky;
-    top: 58px;
+    top: 74px;
     z-index: 25;
   }
-  /* Solid cream extension above the banner to catch content passing through
-     the small gap between the banner's top edge and the visible cutoff (below
-     the header). Rendered as a pseudo-element so we don't have to add DOM. */
-  .sticky-banner::before {
-    content: '';
-    position: absolute;
-    left: -24px;
-    right: -24px;
-    top: -14px;
-    height: 14px;
-    background: var(--cream);
-    z-index: -1;
-    pointer-events: none;
-  }
-  /* When preview/test banner is at the top, push sticky banners down further */
-  body.has-preview-banner .sticky-banner { top: 102px; }
+  /* When preview/test banner is at the top (44px), push sticky banners
+     further down: 44 (banner) + 74 (header) = 118px. */
+  body.has-preview-banner .sticky-banner { top: 118px; }
 
   /* Group headers for Pitaka (grouped by wallet type) and Budget (grouped by
      category). Small uppercase label sits above each group so users can scan
@@ -7490,6 +7475,33 @@
       <div class="val" id="profileJoined" style="font-size:14px; font-weight:500;">—</div>
     </div>
 
+    <div class="profile-section-head">Explore</div>
+
+    <!-- Test-data toggle — safely swap into sample data to try any feature,
+         then swap back to real data. Real data is snapshotted, not lost. -->
+    <button type="button" class="profile-action-card" id="testDataCard">
+      <div class="pa-icon" style="background: rgba(26, 71, 214, 0.12); color: var(--blue);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title" id="testDataTitle">View sample data</div>
+        <div class="pa-sub" id="testDataSub">Explore all features with realistic sample data. Your real data will be saved and restored when you exit.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
+    <!-- Manage custom categories — edit or delete anything the user added -->
+    <button type="button" class="profile-action-card" id="manageCategoriesCard">
+      <div class="pa-icon" style="background: rgba(44, 188, 177, 0.14); color: var(--teal);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title">Manage categories</div>
+        <div class="pa-sub" id="manageCategoriesSub">Edit or remove custom budget categories.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
     <div class="profile-section-head">Backup &amp; restore</div>
 
     <button type="button" class="profile-action-card" id="exportJsonCard">
@@ -7522,33 +7534,6 @@
       <div class="pa-info">
         <div class="pa-title">Transactions as CSV</div>
         <div class="pa-sub">For spreadsheets — transactions only</div>
-      </div>
-      <span class="pa-chev">›</span>
-    </button>
-
-    <div class="profile-section-head">Explore</div>
-
-    <!-- Test-data toggle — safely swap into sample data to try any feature,
-         then swap back to real data. Real data is snapshotted, not lost. -->
-    <button type="button" class="profile-action-card" id="testDataCard">
-      <div class="pa-icon" style="background: rgba(26, 71, 214, 0.12); color: var(--blue);">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-      </div>
-      <div class="pa-info">
-        <div class="pa-title" id="testDataTitle">View sample data</div>
-        <div class="pa-sub" id="testDataSub">Explore all features with realistic sample data. Your real data will be saved and restored when you exit.</div>
-      </div>
-      <span class="pa-chev">›</span>
-    </button>
-
-    <!-- Manage custom categories — edit or delete anything the user added -->
-    <button type="button" class="profile-action-card" id="manageCategoriesCard">
-      <div class="pa-icon" style="background: rgba(44, 188, 177, 0.14); color: var(--teal);">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
-      </div>
-      <div class="pa-info">
-        <div class="pa-title">Manage categories</div>
-        <div class="pa-sub" id="manageCategoriesSub">Edit or remove custom budget categories.</div>
       </div>
       <span class="pa-chev">›</span>
     </button>
@@ -7768,7 +7753,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.01';
+  const APP_VERSION = '2026-08-10.02';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
