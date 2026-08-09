@@ -550,7 +550,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 32px;
+    margin: -32px -24px 32px;
+    padding: 20px 24px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--cream);
+    box-shadow: 0 6px 12px -8px rgba(10, 37, 64, 0.10);
   }
   .home-greeting .hi {
     font-size: 13px;
@@ -714,6 +720,26 @@
     border-color: var(--error);
     color: var(--error);
     background: #FDF2F2;
+  }
+  .income-card-promote {
+    background: transparent;
+    border: 1px solid var(--sand);
+    color: var(--navy);
+    padding: 4px 10px;
+    height: 30px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+  }
+  .income-card-promote:hover {
+    border-color: var(--orange);
+    color: var(--orange);
+    background: #FFF4EE;
   }
 
   .field-row {
@@ -5698,6 +5724,158 @@
   }
   /* When preview/test banner is at the top, push sticky banners down further */
   body.has-preview-banner .sticky-banner { top: 112px; }
+
+  /* Group headers for Pitaka (grouped by wallet type) and Budget (grouped by
+     category). Small uppercase label sits above each group so users can scan
+     by type quickly. */
+  .wallet-group-head,
+  .budget-group-head {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: var(--muted);
+    font-weight: 700;
+    padding: 14px 4px 8px;
+    margin-top: 4px;
+  }
+  .wallet-group-head:first-child,
+  .budget-group-head:first-child { padding-top: 4px; margin-top: 0; }
+
+  /* Paycheck picker in expense form */
+  .paycheck-picker {
+    background: var(--cream-2);
+    border: 1.5px solid var(--sand);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-top: 8px;
+    margin-bottom: 14px;
+  }
+  .paycheck-picker .paycheck-label {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--navy);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .paycheck-picker .payday-hint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+
+  /* Small line under budget-tile meta showing which paycheck covers it */
+  .paycheck-line {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--blue);
+    font-weight: 600;
+    margin: 4px 0 0;
+    line-height: 1.3;
+  }
+  .paycheck-line.manual { color: var(--orange); }
+  .paycheck-line .pin {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: var(--orange);
+    color: var(--white);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+
+  /* Ipon goal shown on Budget page as a read-only line item */
+  .ipon-budget-tile {
+    border: 1.5px solid rgba(44, 188, 177, 0.20);
+    background: linear-gradient(to bottom, rgba(44, 188, 177, 0.04), var(--white));
+    cursor: pointer;
+    transition: transform 0.1s ease, border-color 0.15s ease;
+  }
+  .ipon-budget-tile:active { transform: scale(0.99); }
+  .ipon-budget-tile:hover { border-color: rgba(44, 188, 177, 0.4); }
+  .ipon-budget-tile .view-item-icon.savings {
+    background: rgba(44, 188, 177, 0.14);
+    color: var(--teal);
+  }
+  .ipon-budget-tile .view-item-amount.ipon {
+    color: var(--teal);
+    font-weight: 700;
+  }
+  .ipon-linked-pin {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    background: rgba(44, 188, 177, 0.14);
+    color: var(--teal);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .ipon-budget-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(44, 188, 177, 0.22);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+  }
+  .ipon-budget-footer .lbl { color: var(--muted); }
+  .ipon-budget-footer .link { color: var(--teal); font-weight: 700; }
+
+  /* Savings section header on Budget page — teal accent + hint text */
+  .budget-group-head.savings {
+    color: var(--teal);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .budget-group-head .tag-hint {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    color: var(--muted);
+    text-transform: none;
+  }
+
+  /* Timing picker in expense form */
+  .timing-picker {
+    background: rgba(249, 180, 0, 0.06);
+    border: 1.5px solid rgba(249, 180, 0, 0.20);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-top: -6px;
+    margin-bottom: 14px;
+  }
+  .timing-picker .paycheck-label { color: var(--navy); }
+  .timing-picker .payday-hint { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.35; }
+  .sinking-fund-suggest {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--teal);
+    color: var(--white);
+    border: none;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.2px;
+  }
+  .sinking-fund-suggest:active { transform: scale(0.98); }
   .wallet-info h3 {
     font-family: 'Inter', sans-serif;
     font-size: 15px;
@@ -6602,7 +6780,7 @@
       Track how much you have where. Balances update automatically from your transactions.
     </div>
 
-    <div class="wallets-total" id="walletsTotalBanner" style="display:none;">
+    <div class="wallets-total sticky-banner" id="walletsTotalBanner" style="display:none;">
       <div class="lbl">Total across wallets</div>
       <div class="val" id="walletsTotalVal">₱0</div>
     </div>
@@ -8089,6 +8267,91 @@
   // Draft state — not saved until user taps Save
   let incomeDraft = [];
 
+  // -------- Paycheck assignment (which paycheck covers which expense) --------
+  // Users can either let the app auto-assign each expense to a paycheck based
+  // on due day + income schedule, OR manually pick a specific paycheck via
+  // expense.manualPayFrom = {incomeId, payday}.
+
+  // Return all paydays this income source pays on (as day-of-month integers).
+  // Semi-monthly returns two days; monthly/quarterly/annually one.
+  function getIncomePaydays(income) {
+    if (!income) return [];
+    const p1 = Number(income.payday);
+    const p2 = Number(income.payday2);
+    if (income.frequency === 'semi-monthly') {
+      const days = [];
+      if (p1 >= 1 && p1 <= 31) days.push(p1);
+      if (p2 >= 1 && p2 <= 31 && p2 !== p1) days.push(p2);
+      return days.sort((a, b) => a - b);
+    }
+    if (['monthly', 'quarterly', 'annually'].includes(income.frequency) && p1 >= 1 && p1 <= 31) {
+      return [p1];
+    }
+    // Weekly income doesn't have day-of-month paydays — we skip it for now
+    // (weekly-paid users typically don't budget by paycheck cycle).
+    return [];
+  }
+
+  // Given an expense due on day D and an income's paydays [p1, p2, ...],
+  // return the payday that most naturally "covers" that expense — i.e., the
+  // latest payday at or before D (falling back to the last payday overall
+  // if D is before all paydays, since that money came from previous month).
+  function paydayCoveringDay(paydays, dueDay) {
+    if (!paydays.length || !dueDay) return null;
+    const before = paydays.filter(p => p <= dueDay);
+    if (before.length) return Math.max(...before);
+    return Math.max(...paydays);   // wraps to previous month's last payday
+  }
+
+  // Return {incomeId, payday, incomeName} describing which paycheck covers
+  // this item — respecting a manual override if set, otherwise auto.
+  // Accepts either an expense (dueDay) or a goal (contribDay).
+  function assignPaycheck(item, user) {
+    const incomes = Array.isArray(user?.incomes) ? user.incomes : [];
+    if (!incomes.length) return null;
+
+    // Manual override — validate the pick is still valid (income + payday exist)
+    const manual = item.manualPayFrom;
+    if (manual && manual.incomeId) {
+      const inc = incomes.find(i => i.id === manual.incomeId);
+      if (inc) {
+        const days = getIncomePaydays(inc);
+        if (days.includes(Number(manual.payday))) {
+          return { incomeId: inc.id, incomeName: (inc.label || 'Income'), payday: Number(manual.payday) };
+        }
+      }
+      // Fall through to auto if the manual assignment is stale
+    }
+
+    // Goals use contribDay; expenses use dueDay
+    const dueDay = Number(item.dueDay ?? item.contribDay) || null;
+
+    // Auto — try primary first, then fall through to secondary incomes if the
+    // primary has no paydays that fit (e.g. primary is weekly, item is monthly).
+    for (const inc of incomes) {
+      const days = getIncomePaydays(inc);
+      if (!days.length) continue;
+      // For items with no due day (like weekly groceries), assign to the
+      // primary income's LAST payday of the cycle so it feels "covered by the
+      // most recent paycheck".
+      const day = dueDay ? paydayCoveringDay(days, dueDay) : Math.max(...days);
+      if (day) return { incomeId: inc.id, incomeName: (inc.label || 'Income'), payday: day };
+    }
+    return null;
+  }
+
+  // All paycheck options across every income — used to populate the
+  // "Paid from paycheck" dropdown on the expense form.
+  function paycheckOptions(user) {
+    const opts = [];
+    (user?.incomes || []).forEach(inc => {
+      getIncomePaydays(inc).forEach(day => {
+        opts.push({ incomeId: inc.id, incomeName: inc.label || 'Income', payday: day });
+      });
+    });
+    return opts;
+  }
+
   function newIncomeSource(isPrimary = false) {
     return {
       id: 'inc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -8159,18 +8422,29 @@
     card.className = 'income-card' + (src._isPrimary ? ' primary' : '');
     card.dataset.id = src.id;
 
-    const tagLabel = src._isPrimary ? '☀️ Primary income' : '✦ Extra source';
+    // Show priority position — Main / 2nd / 3rd / etc. In single-edit mode
+    // (only one card shown) we don't show ordinal since it's meaningless.
+    const isSingle = incomeDraft.length === 1;
+    const ordinal = (n) => n === 0 ? 'Main' : n === 1 ? '2nd' : n === 2 ? '3rd' : `${n + 1}th`;
+    const tagLabel = src._isPrimary
+      ? '☀️ Main income'
+      : `✦ ${ordinal(idx)} income`;
     const tagClass = src._isPrimary ? '' : 'extra';
 
     card.innerHTML = `
       <div class="income-card-head">
         <span class="income-card-tag ${tagClass}">${tagLabel}</span>
-        ${!src._isPrimary
-          ? `<button class="income-card-delete" type="button" data-action="delete" title="Remove">✕</button>`
-          : ''
-        }
+        <div style="display:flex; gap:6px;">
+          ${!src._isPrimary && !isSingle
+            ? `<button class="income-card-promote" type="button" data-action="promote" title="Make this the main income">↑ Make main</button>`
+            : ''
+          }
+          ${!src._isPrimary
+            ? `<button class="income-card-delete" type="button" data-action="delete" title="Remove">✕</button>`
+            : ''
+          }
+        </div>
       </div>
-
       <div class="field-row">
         <div class="field wide">
           <label>Label <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
@@ -8301,6 +8575,22 @@
       del.addEventListener('click', () => {
         incomeDraft = incomeDraft.filter(x => x.id !== src.id);
         renderIncomeSources();
+      });
+    }
+
+    // Promote to main — swap this source to the front of the array so it
+    // becomes the primary income. Auto-assignment uses primary by default.
+    const promote = card.querySelector('[data-action="promote"]');
+    if (promote) {
+      promote.addEventListener('click', () => {
+        const currentIdx = incomeDraft.findIndex(x => x.id === src.id);
+        if (currentIdx <= 0) return;
+        const [moved] = incomeDraft.splice(currentIdx, 1);
+        incomeDraft.unshift(moved);
+        // Update the _isPrimary flags to match new positions
+        incomeDraft.forEach((s, i) => { s._isPrimary = (i === 0); });
+        renderIncomeSources();
+        toast(`${moved.label || 'Income'} is now your main income ✦`, 'success');
       });
     }
   }
@@ -8468,6 +8758,17 @@
       dueDay: null,
       dueDay2: null,   // semi-monthly only
       dueMonth: null,  // annually only (1-12)
+      manualPayFrom: null,   // {incomeId, payday} or null = auto-assign
+      // When frequency is 'quarterly' or 'annually', timing controls how the
+      // amount hits the monthly budget:
+      //   'smooth'       — divide by 12 (or 3), add smoothed amount every month
+      //   'due-month'    — full amount only in the due month, ₱0 otherwise
+      //   'sinking-fund' — ₱0 (a paired Ipon goal absorbs the smoothed amount)
+      // Default for new items is 'due-month' — matches actual cash flow more
+      // honestly than smoothing does. Existing items without this field fall
+      // back to 'smooth' for backward compat.
+      timing: 'due-month',
+      sinkingFundGoalId: null,   // when timing='sinking-fund', the paired goal
       ...overrides,
     };
   }
@@ -8612,6 +8913,10 @@
         ${renderDueFor(exp)}
       </div>
 
+      ${renderPaycheckPicker(exp)}
+
+      ${renderTimingPicker(exp)}
+
       <div class="month-eq">
         <span>Monthly equivalent</span>
         <span class="val" data-eq>${peso(expenseMonthly(exp))}</span>
@@ -8620,6 +8925,72 @@
 
     wireExpenseCard(card, exp);
     return card;
+  }
+
+  // Timing picker — only rendered for quarterly/annual expenses. Controls
+  // whether the amount smooths into every month, only counts in the due
+  // month, or is offset by a paired sinking-fund Ipon goal.
+  function renderTimingPicker(exp) {
+    if (exp.frequency !== 'quarterly' && exp.frequency !== 'annually') return '';
+    const timing = exp.timing || 'smooth';
+    const hasSinkingFund = !!exp.sinkingFundGoalId;
+    const noun = exp.frequency === 'annually' ? 'annual' : 'quarterly';
+    return `
+      <div class="timing-picker" data-timing-block>
+        <label class="paycheck-label">When to count this ${noun} amount</label>
+        <div class="select-wrap">
+          <select class="input select" data-field="timing">
+            <option value="due-month"    ${timing === 'due-month'    ? 'selected' : ''}>Only in due month (₱${(Number(exp.amount)||0).toLocaleString()} shows in ${exp.frequency === 'annually' ? MONTH_NAMES_SHORT[(Number(exp.dueMonth) || 1) - 1] : 'due months'} only)</option>
+            <option value="smooth"       ${timing === 'smooth'       ? 'selected' : ''}>Smooth monthly (₱${peso(exp.amount * (BUDGET_TO_MONTHLY[exp.frequency]||1)).replace('₱','')} in every month)</option>
+            <option value="sinking-fund" ${timing === 'sinking-fund' ? 'selected' : ''}>Sinking fund (save monthly toward this)</option>
+          </select>
+          <span class="select-caret">▾</span>
+        </div>
+        ${timing === 'sinking-fund' && !hasSinkingFund
+          ? `<button type="button" class="sinking-fund-suggest" data-action="create-sinking">
+              ✨ Create matching Ipon goal for ${peso((Number(exp.amount)||0) * (BUDGET_TO_MONTHLY[exp.frequency]||1))}/month
+            </button>`
+          : ''}
+        ${timing === 'sinking-fund' && hasSinkingFund
+          ? `<div class="payday-hint" style="color:var(--teal); font-weight:600;">✓ Linked to Ipon goal</div>`
+          : ''}
+        <div class="payday-hint">
+          ${timing === 'due-month' ? 'Your monthly budget only reflects this expense in months it\'s actually due.'
+            : timing === 'smooth' ? 'The amount is divided evenly across all months so your budget stays consistent.'
+            : 'Pair with an Ipon goal to save toward this expense each month. The Ipon takes the monthly hit, not this budget line.'}
+        </div>
+      </div>
+    `;
+  }
+
+  // "Paid from paycheck" picker — only rendered when the user has at least
+  // one payday-earning income source (weekly incomes have no day-of-month
+  // paydays and skip this UI).
+  function renderPaycheckPicker(exp) {
+    const options = paycheckOptions(userCache);
+    if (!options.length) return '';    // no income with paydays configured
+    const auto = assignPaycheck(exp, userCache);
+    const autoLbl = auto
+      ? `Auto — ${escapeAttr(auto.incomeName)} · ${ordinal(auto.payday)}`
+      : 'Auto (based on due day)';
+    const manual = exp.manualPayFrom;
+    const currentVal = manual ? `${manual.incomeId}::${manual.payday}` : 'auto';
+    return `
+      <div class="paycheck-picker" data-paycheck-block>
+        <label class="paycheck-label">Paid from paycheck</label>
+        <div class="select-wrap">
+          <select class="input select" data-field="paycheck">
+            <option value="auto" ${currentVal === 'auto' ? 'selected' : ''}>${autoLbl}</option>
+            ${options.map(o => {
+              const v = `${o.incomeId}::${o.payday}`;
+              return `<option value="${v}" ${currentVal === v ? 'selected' : ''}>${escapeAttr(o.incomeName)} · ${ordinal(o.payday)}</option>`;
+            }).join('')}
+          </select>
+          <span class="select-caret">▾</span>
+        </div>
+        <div class="payday-hint">Auto picks the most recent payday before the due day. Override if you'd rather pull from a different paycheck.</div>
+      </div>
+    `;
   }
 
   function renderDueFor(exp) {
@@ -8736,11 +9107,113 @@
       const pm = card.querySelector('[data-field="dueDay-mo"]');
       pm.addEventListener('input', () => { exp.dueDay = clampDay(pm.value); });
     }
+
+    // Paycheck picker — writes to exp.manualPayFrom, or null for auto
+    const paycheckSel = card.querySelector('[data-field="paycheck"]');
+    if (paycheckSel) {
+      paycheckSel.addEventListener('change', () => {
+        const v = paycheckSel.value;
+        if (v === 'auto') {
+          exp.manualPayFrom = null;
+        } else {
+          const [incomeId, dayStr] = v.split('::');
+          exp.manualPayFrom = { incomeId, payday: Number(dayStr) };
+        }
+      });
+    }
+
+    // Timing picker (quarterly/annually only) — re-renders the whole timing
+    // block on change so hint text + sinking-fund button reflect the new pick.
+    const timingSel = card.querySelector('[data-field="timing"]');
+    if (timingSel) {
+      timingSel.addEventListener('change', () => {
+        exp.timing = timingSel.value;
+        // If user switched AWAY from sinking-fund, clear any paired goal
+        if (exp.timing !== 'sinking-fund') exp.sinkingFundGoalId = null;
+        // Re-render just the timing block to update hints/button
+        const block = card.querySelector('[data-timing-block]');
+        if (block) block.outerHTML = renderTimingPicker(exp);
+        // Re-wire because we just replaced the element
+        wireTimingSection(card, exp);
+        updateExpenseEq(card, exp);
+        updateBudgetBanner();
+      });
+    }
+    wireTimingSection(card, exp);
   }
 
-  function expenseMonthly(exp) {
-    const f = BUDGET_TO_MONTHLY[exp.frequency] || 1;
-    return (Number(exp.amount) || 0) * f;
+  // Wire the sinking-fund suggestion button inside the timing block. Split
+  // out because the block gets re-rendered on timing changes and needs re-wiring.
+  function wireTimingSection(card, exp) {
+    const btn = card.querySelector('[data-action="create-sinking"]');
+    if (!btn) return;
+    btn.addEventListener('click', async ev => {
+      ev.preventDefault();
+      const monthly = (Number(exp.amount) || 0) * (BUDGET_TO_MONTHLY[exp.frequency] || 1);
+      if (monthly <= 0) { toast('Set an amount first.', 'error'); return; }
+      const ok = await showConfirm({
+        icon: '✦',
+        title: `Create sinking-fund Ipon?`,
+        bodyHtml: `An Ipon goal will be created that saves <strong>${peso(monthly)}/month</strong> toward this ${exp.frequency === 'annually' ? 'annual' : 'quarterly'} bill. When the bill hits, log the payment from that Ipon and your budget stays clean.`,
+        okText: 'Create Ipon',
+        cancelText: 'Cancel',
+      });
+      if (!ok) return;
+      // Create a matching goal via auth.updateUser
+      const { data: sess } = await auth.getSession();
+      if (!sess?.session) return;
+      const u = sess.session.user;
+      const goal = {
+        id: 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        icon: 'shield',
+        name: `${exp.name || exp.frequency} sinking fund`,
+        target: Number(exp.amount) || 0,
+        contribution: Math.round(monthly),
+        frequency: 'monthly',
+        deadline: '',
+        saved: 0,
+        walletId: null,
+        contribDay: null,
+        contribDay2: null,
+        contribMonth: null,
+        manualPayFrom: null,
+      };
+      exp.sinkingFundGoalId = goal.id;
+      const newGoals = [...(u.goals || []), goal];
+      await auth.updateUser({ data: { goals: newGoals } });
+      toast(`Sinking fund created — save ${peso(monthly)}/month ✦`, 'success');
+      // Re-render timing block to show the linked state
+      const block = card.querySelector('[data-timing-block]');
+      if (block) block.outerHTML = renderTimingPicker(exp);
+      wireTimingSection(card, exp);
+    });
+  }
+
+  function expenseMonthly(exp, refDate) {
+    const amount = Number(exp.amount) || 0;
+    if (amount === 0) return 0;
+    const f = exp.frequency || 'monthly';
+    // Non-quarterly/annual frequencies aren't affected by the timing field
+    if (f !== 'quarterly' && f !== 'annually') {
+      return amount * (BUDGET_TO_MONTHLY[f] || 1);
+    }
+    // Existing entries without a timing field fall back to smooth (previous
+    // behavior). New entries default to 'due-month' via newExpense().
+    const timing = exp.timing || 'smooth';
+    if (timing === 'smooth')       return amount * (BUDGET_TO_MONTHLY[f] || 1);
+    if (timing === 'sinking-fund') return 0;   // paired Ipon goal absorbs the load
+    // 'due-month': full amount only in the actual due month, 0 otherwise
+    const d = refDate || new Date();
+    const currentMonth = d.getMonth() + 1;  // 1-12
+    if (f === 'annually') {
+      const setMo = Number(exp.dueMonth) || null;
+      if (!setMo) return 0;   // no month set — nothing to fire on
+      return currentMonth === setMo ? amount : 0;
+    }
+    // Quarterly: fires on dueMonth (default 1) and every 3rd month after
+    const startMo = Number(exp.dueMonth) || 1;
+    const monthsFromStart = ((currentMonth - startMo) % 3 + 3) % 3;
+    return monthsFromStart === 0 ? amount : 0;
   }
 
   function updateExpenseEq(card, exp) {
@@ -8809,6 +9282,9 @@
         dueDay: e.dueDay,
         dueDay2: e.dueDay2,
         dueMonth: e.dueMonth,
+        manualPayFrom: e.manualPayFrom || null,
+        timing: e.timing || 'smooth',
+        sinkingFundGoalId: e.sinkingFundGoalId || null,
       }));
 
     if (cleaned.length === 0 && expenseDraft.length > 0) {
@@ -8863,6 +9339,7 @@
       contribDay: null,  // day of week (weekly) OR day of month (semi/monthly/quarterly/annually)
       contribDay2: null, // semi-monthly only (second day)
       contribMonth: null,// annually only (1-12)
+      manualPayFrom: null,   // {incomeId, payday} — overrides auto paycheck assignment
       ...overrides,
     };
   }
@@ -10597,36 +11074,101 @@
     list.innerHTML = '';
 
     if (!Array.isArray(user.expenses) || user.expenses.length === 0) {
-      emptyEl.style.display = 'block';
-      banner.style.display = 'none';
-    } else {
-      emptyEl.style.display = 'none';
-      const total = sumMonthlyExpenses(user);
-      const income = sumMonthlyIncome(user);
-      document.getElementById('budgetViewTotal').textContent = peso(total);
-      const c = user.expenses.length;
-      document.getElementById('budgetViewSide').innerHTML =
-        `${c} ${c === 1 ? 'expense' : 'expenses'}<br>combined monthly`;
-      const bar = document.getElementById('budgetViewBar');
-      const cmp = document.getElementById('budgetViewCompare');
-      if (income > 0) {
-        const pct = (total / income) * 100;
-        bar.style.width = Math.min(pct, 100) + '%';
-        bar.classList.toggle('over', pct >= 100);
-        const remain = income - total;
-        let right = '';
-        if (remain < 0)      right = `<span class="over">${peso(-remain)} over income</span>`;
-        else if (pct >= 80)  right = `<span class="warn">${peso(remain)} left</span>`;
-        else                 right = `${peso(remain)} left`;
-        cmp.innerHTML = `<span>${Math.round(pct)}% of income</span> ${right}`;
-        cmp.style.display = 'flex';
-      } else {
-        bar.style.width = '0%';
-        cmp.style.display = 'none';
+      // Even with no expenses, if the user has goals with contributions we
+      // still want to show the Budget page (obligations exist).
+      const hasContributingGoals = (user.goals || []).some(g => Number(g.contribution) > 0);
+      if (!hasContributingGoals) {
+        emptyEl.style.display = 'block';
+        banner.style.display = 'none';
+        goto('budget-view');
+        return;
       }
-      banner.style.display = 'block';
+    }
+    emptyEl.style.display = 'none';
 
-      user.expenses.forEach(exp => {
+    // -------- Totals --------
+    // Expenses: monthly-equivalent, respecting each item's timing (this-month
+    // for due-month/sinking-fund entries — see expenseMonthly()).
+    const expenseTotal = sumMonthlyExpenses(user);
+    // Savings: monthly-equivalent of each Ipon goal's contribution schedule.
+    // Skip goals with 0 contribution (target-only, no ongoing commitment).
+    const contributingGoals = (user.goals || []).filter(g => Number(g.contribution) > 0);
+    const savingsTotal = contributingGoals.reduce(
+      (s, g) => s + (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1), 0
+    );
+    const obligationsTotal = expenseTotal + savingsTotal;
+    const income = sumMonthlyIncome(user);
+
+    // Banner headline shows total OBLIGATIONS (expenses + savings) —
+    // "pay yourself first" model. Expense-only total shown as a subtitle.
+    document.getElementById('budgetViewTotal').textContent = peso(obligationsTotal);
+    {
+      const bannerLbl = document.querySelector('#budgetViewBanner .lbl');
+      if (bannerLbl) bannerLbl.textContent = 'Monthly obligations';
+    }
+    const c = user.expenses.length;
+
+    // -------- Per-paycheck breakdown (includes goals too) --------
+    const cutoffTotals = {};
+    let unassigned = 0;
+    const bumpCutoff = (item, monthlyAmt) => {
+      const pay = assignPaycheck(item, user);
+      if (pay) cutoffTotals[pay.payday] = (cutoffTotals[pay.payday] || 0) + monthlyAmt;
+      else unassigned += monthlyAmt;
+    };
+    (user.expenses || []).forEach(e => {
+      const monthly = (Number(e.amount) || 0) * (BUDGET_TO_MONTHLY[e.frequency] || 1);
+      bumpCutoff(e, monthly);
+    });
+    contributingGoals.forEach(g => {
+      const monthly = (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1);
+      bumpCutoff(g, monthly);
+    });
+
+    // Side text — per-paycheck if 2+ paydays, else "monthly obligations" split
+    const primaryIncome = (user.incomes || [])[0];
+    const primaryPaydays = primaryIncome ? getIncomePaydays(primaryIncome) : [];
+    const sideEl = document.getElementById('budgetViewSide');
+    if (primaryPaydays.length >= 2) {
+      const lines = primaryPaydays
+        .map(d => `${ordinal(d)}: ${peso(cutoffTotals[d] || 0)}`)
+        .join('<br>');
+      sideEl.innerHTML = `
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--yellow); font-weight:700; margin-bottom:3px;">Per paycheck</div>
+        <div style="font-family:'Fraunces',serif; font-size:15px; font-weight:700; color:var(--cream); line-height:1.2;">
+          ${lines}
+        </div>`;
+    } else if (savingsTotal > 0) {
+      sideEl.innerHTML = `
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--yellow); font-weight:700; margin-bottom:3px;">Split</div>
+        <div style="font-family:'Fraunces',serif; font-size:14px; font-weight:700; color:var(--cream); line-height:1.25;">
+          Budget: ${peso(expenseTotal)}<br>Ipon: ${peso(savingsTotal)}
+        </div>`;
+    } else {
+      sideEl.innerHTML = `${c} ${c === 1 ? 'expense' : 'expenses'}<br>combined monthly`;
+    }
+    const bar = document.getElementById('budgetViewBar');
+    const cmp = document.getElementById('budgetViewCompare');
+    if (income > 0) {
+      const pct = (obligationsTotal / income) * 100;
+      bar.style.width = Math.min(pct, 100) + '%';
+      bar.classList.toggle('over', pct >= 100);
+      const remain = income - obligationsTotal;
+      let right = '';
+      if (remain < 0)      right = `<span class="over">${peso(-remain)} over income</span>`;
+      else if (pct >= 80)  right = `<span class="warn">${peso(remain)} left</span>`;
+      else                 right = `${peso(remain)} left`;
+      cmp.innerHTML = `<span>${Math.round(pct)}% of income</span> ${right}`;
+      cmp.style.display = 'flex';
+    } else {
+      bar.style.width = '0%';
+      cmp.style.display = 'none';
+    }
+    banner.style.display = 'block';
+
+      // Helper: render a single budget item (was inline; extracted so both
+      // groups can use it without duplicating).
+      const renderBudgetItem = (exp) => {
         const item = document.createElement('div');
         item.className = 'view-goal expense-tile';   // reuse the savings-style progress layout
         item.dataset.tapDetail = 'expense';
@@ -10637,7 +11179,6 @@
         const planned = Number(exp.amount) || 0;
         const pctRaw = planned > 0 ? (spent / planned) * 100 : 0;
         const pct = Math.min(pctRaw, 100);
-        // Bar variant + right-side text based on how close to (or over) budget
         let barVariant = '', rightText = '', rightClass = '';
         if (planned <= 0) {
           rightText = 'No budget set';
@@ -10652,13 +11193,18 @@
         } else {
           rightText = `${peso(planned - spent)} left`;
         }
-
         item.innerHTML = `
           <div class="view-goal-head">
             <div class="view-item-icon expense">${catIcon}</div>
             <div class="view-item-info">
               <p class="name">${escapeAttr(exp.name || 'Unnamed')}</p>
               <p class="meta">${peso(planned)}${FREQ_LABEL[exp.frequency] ? ' ' + FREQ_LABEL[exp.frequency].toLowerCase() : ''}${due ? ' · ' + due : ''}</p>
+              ${(() => {
+                const pay = assignPaycheck(exp, user);
+                if (!pay) return '';
+                const isManual = !!exp.manualPayFrom;
+                return `<p class="paycheck-line ${isManual ? 'manual' : ''}">From ${escapeAttr(pay.incomeName)} · ${ordinal(pay.payday)}${isManual ? ' <span class="pin">•manual</span>' : ''}</p>`;
+              })()}
             </div>
             <div class="view-item-amount">${Math.round(pctRaw)}%</div>
           </div>
@@ -10672,8 +11218,6 @@
             <button class="row-edit-btn primary" type="button" data-log-expense-item="${exp.id}">+ Spent</button>
           </div>
         `;
-        list.appendChild(item);
-
         // Direct handler for + Spent
         const spentBtn = item.querySelector('[data-log-expense-item]');
         if (spentBtn) {
@@ -10687,8 +11231,6 @@
             });
           });
         }
-
-        // Direct handler for row Edit
         const editBtn = item.querySelector('.row-edit-btn');
         if (editBtn) {
           editBtn.addEventListener('click', async ev => {
@@ -10700,6 +11242,58 @@
             openBudgetScreen(data.session.user);
           });
         }
+        return item;
+      };
+
+      // Group expenses by category, in the canonical CATEGORIES order.
+      // Within each group, sort by due day (items without a due day sink to
+      // the bottom of their group). Empty groups are skipped.
+      const byCategory = {};
+      user.expenses.forEach(e => {
+        const cat = e.category || 'other';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(e);
+      });
+      Object.values(byCategory).forEach(arr => {
+        arr.sort((a, b) => {
+          const ad = Number(a.dueDay) || 99;
+          const bd = Number(b.dueDay) || 99;
+          if (ad !== bd) return ad - bd;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+      });
+
+      // -------- Savings section (Ipon goals as line items) --------
+      // Rendered FIRST so "pay yourself first" gets visual priority. Read-only
+      // here; tapping opens the goal on the Ipon page.
+      if (contributingGoals.length > 0) {
+        const head = document.createElement('div');
+        head.className = 'budget-group-head savings';
+        head.innerHTML = 'Savings <span class="tag-hint">edit on Ipon page</span>';
+        list.appendChild(head);
+        // Sort by contribution day, then name
+        contributingGoals.slice().sort((a, b) => {
+          const ad = Number(a.contribDay) || 99;
+          const bd = Number(b.contribDay) || 99;
+          if (ad !== bd) return ad - bd;
+          return (a.name || '').localeCompare(b.name || '');
+        }).forEach(g => list.appendChild(renderIponBudgetItem(g, user)));
+      }
+
+      const singleGroup = Object.keys(byCategory).length === 1;
+      CATEGORIES.forEach(cat => {
+        const items = byCategory[cat.v];
+        if (!items || items.length === 0) return;
+        // Always show a header when Savings section is above (needs the
+        // "Expenses" separator too, unless the user has zero savings goals).
+        const showHead = !singleGroup || contributingGoals.length > 0;
+        if (showHead) {
+          const head = document.createElement('div');
+          head.className = 'budget-group-head';
+          head.textContent = cat.label.replace(/^[^\s]+\s/, '');   // strip emoji prefix
+          list.appendChild(head);
+        }
+        items.forEach(exp => list.appendChild(renderBudgetItem(exp)));
       });
 
       // Outside-budget summary for this month
@@ -10730,8 +11324,49 @@
         openBudgetScreen(data.session.user);
       });
       list.appendChild(addBtn);
-    }
     goto('budget-view');
+  }
+
+  // Render an Ipon goal as a read-only line item on the Budget page. Tapping
+  // it opens the Ipon edit page (all editing happens there, keeps a single
+  // source of truth for goal data).
+  function renderIponBudgetItem(g, user) {
+    const item = document.createElement('div');
+    item.className = 'view-goal expense-tile ipon-budget-tile';
+    item.dataset.tapDetail = 'goal';
+    item.dataset.entryId = g.id;
+    const icon = renderGoalIcon(g.icon);
+    const monthly = (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1);
+    const contribText = `${peso(g.contribution)}${FREQ_LABEL[g.frequency] ? ' ' + FREQ_LABEL[g.frequency].toLowerCase() : ''}`;
+    const dueLine = g.contribDay ? ` · ${ordinal(g.contribDay)}` : '';
+    const linkedTag = g.walletId ? '<span class="ipon-linked-pin">wallet-linked</span>' : '';
+    item.innerHTML = `
+      <div class="view-goal-head">
+        <div class="view-item-icon savings">${icon}</div>
+        <div class="view-item-info">
+          <p class="name">${escapeAttr(g.name || 'Ipon')} ${linkedTag}</p>
+          <p class="meta">${contribText}${dueLine}</p>
+          ${(() => {
+            const pay = assignPaycheck(g, user);
+            if (!pay) return '';
+            const isManual = !!g.manualPayFrom;
+            return `<p class="paycheck-line ${isManual ? 'manual' : ''}">From ${escapeAttr(pay.incomeName)} · ${ordinal(pay.payday)}${isManual ? ' <span class="pin">•manual</span>' : ''}</p>`;
+          })()}
+        </div>
+        <div class="view-item-amount ipon">${peso(monthly)}</div>
+      </div>
+      <div class="ipon-budget-footer">
+        <span class="lbl">Monthly contribution</span>
+        <span class="link">Edit on Ipon →</span>
+      </div>
+    `;
+    item.addEventListener('click', async () => {
+      const { data } = await auth.getSession();
+      if (!data.session) return;
+      singleEditMode = { type: 'savings', id: g.id };
+      openSavingsScreen(data.session.user);
+    });
+    return item;
   }
 
   function showSavingsView(user) {
@@ -11497,6 +12132,9 @@
         id: e.id, name: e.name.trim(), category: e.category || 'other',
         amount: Number(e.amount) || 0, frequency: e.frequency,
         dueDay: e.dueDay, dueDay2: e.dueDay2, dueMonth: e.dueMonth,
+        manualPayFrom: e.manualPayFrom || null,
+        timing: e.timing || 'smooth',
+        sinkingFundGoalId: e.sinkingFundGoalId || null,
       }));
     if (cleaned.length === 0 && expenseDraft.length > 0) {
       toast('Add a name and amount to each expense first.', 'error');
@@ -14048,15 +14686,30 @@
     } else {
       empty.style.display = 'none';
       let total = 0;
-      wallets.forEach(w => {
+
+      // Group wallets by payment method type. Order: Bank → E-wallet (GCash,
+      // Maya) → Cash → Card → Other so accounts (biggest balances usually)
+      // show first, then daily-use wallets, then cash, then card/other.
+      const GROUP_ORDER = [
+        { key: 'bank',    label: 'Bank accounts',   methods: ['bank']          },
+        { key: 'ewallet', label: 'E-wallets',       methods: ['gcash', 'maya'] },
+        { key: 'cash',    label: 'Cash',            methods: ['cash']          },
+        { key: 'card',    label: 'Cards',           methods: ['card']          },
+        { key: 'other',   label: 'Other',           methods: ['other']         },
+      ];
+      const grouped = GROUP_ORDER.map(g => ({
+        ...g,
+        wallets: wallets.filter(w => g.methods.includes(w.method)),
+      })).filter(g => g.wallets.length > 0);
+
+      // Helper — render a single wallet row (extracted so we don't duplicate)
+      const renderWalletRow = (w) => {
         const balance = computeWalletBalance(w, txs);
         total += balance;
         const delta = balance - (Number(w.initialBalance) || 0);
         const deltaText = delta > 0 ? `↑ ${peso(delta)}` : delta < 0 ? `↓ ${peso(Math.abs(delta))}` : 'unchanged';
         const deltaClass = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
         const name = w.label ? escapeAttr(w.label) : PAYMENT_NAME[w.method] || 'Wallet';
-        // The one ipon goal (if any) that lives in this wallet — wallets are
-        // exclusive to a single goal.
         const linkedGoal = (user.goals || []).find(g => g.walletId === w.id);
         const linkedTag = linkedGoal
           ? `<div class="wallet-linked-goals">
@@ -14085,7 +14738,6 @@
             <button class="row-edit-btn primary" type="button" data-action="log">+ Log</button>
           </div>
         `;
-        // Body click → detail; actions stop propagation
         row.addEventListener('click', ev => {
           if (ev.target.closest('.row-actions')) return;
           showEntryDetail(userCache, 'wallet', w.id);
@@ -14098,7 +14750,20 @@
           ev.stopPropagation();
           openTransactionScreen(userCache, { wallet: w.id, paymentMethod: w.method });
         });
-        list.appendChild(row);
+        return row;
+      };
+
+      // Render each group with a subtle header (only shown when there are
+      // 2+ groups — a single group doesn't need labeling).
+      const singleGroup = grouped.length === 1;
+      grouped.forEach(g => {
+        if (!singleGroup) {
+          const head = document.createElement('div');
+          head.className = 'wallet-group-head';
+          head.textContent = g.label;
+          list.appendChild(head);
+        }
+        g.wallets.forEach(w => list.appendChild(renderWalletRow(w)));
       });
       totalVal.textContent = peso(total);
       banner.style.display = 'block';
