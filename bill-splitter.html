@@ -780,25 +780,200 @@ function applyReceipt(parsed){
 
 /* --- On-device OCR -------------------------------------------------------- */
 
-function upscale(file){
-  // Tesseract reads small phone text far better at roughly double size.
+/* --- Image preparation ---------------------------------------------------
+   Screenshots are already crisp, so the wins come from scale and contrast:
+   upscale, flatten to greyscale, stretch the range, then threshold to pure
+   black on white with Otsu's method. Anti-aliased grey edges are what make
+   the engine guess between 0 and O, and this removes them. ---------------- */
+
+function loadImage(file){
   return new Promise((res, rej) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const scale = Math.min(2, 2200 / img.width) || 1;
-      const c = document.createElement('canvas');
-      c.width = img.width * scale;
-      c.height = img.height * scale;
-      const ctx = c.getContext('2d');
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      c.toBlob(b => b ? res(b) : rej(new Error('Could not prepare that image.')), 'image/png');
-    };
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not open that image.')); };
     img.src = url;
   });
+}
+
+function otsu(hist, total){
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0, wB = 0, best = -1, from = 128, to = 128;
+  for (let t = 0; t < 256; t++){
+    wB += hist[t];
+    if (!wB) continue;
+    const wF = total - wB;
+    if (!wF) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB, mF = (sum - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best){ best = between; from = to = t; }
+    else if (between === best) to = t;
+  }
+  return Math.round((from + to) / 2);
+}
+
+function binarize(data){
+  const px = data.data, n = px.length / 4;
+  const grey = new Uint8Array(n);
+  const hist = new Uint32Array(256);
+
+  for (let i = 0; i < n; i++){
+    const j = i * 4;
+    // Rec. 709 luma, then ignore alpha since screenshots are opaque.
+    const v = (px[j]*0.2126 + px[j+1]*0.7152 + px[j+2]*0.0722) | 0;
+    grey[i] = v;
+    hist[v]++;
+  }
+
+  // Stretch the middle 96% of the range so faint grey text darkens.
+  let lo = 0, hi = 255, seen = 0;
+  const cut = n * 0.02;
+  for (let v = 0; v < 256; v++){ seen += hist[v]; if (seen > cut){ lo = v; break; } }
+  seen = 0;
+  for (let v = 255; v >= 0; v--){ seen += hist[v]; if (seen > cut){ hi = v; break; } }
+  const span = Math.max(hi - lo, 1);
+
+  const hist2 = new Uint32Array(256);
+  for (let i = 0; i < n; i++){
+    const v = Math.max(0, Math.min(255, Math.round((grey[i] - lo) * 255 / span)));
+    grey[i] = v;
+    hist2[v]++;
+  }
+
+  const t = otsu(hist2, n);
+  for (let i = 0; i < n; i++){
+    const v = grey[i] <= t ? 0 : 255;
+    const j = i * 4;
+    px[j] = px[j+1] = px[j+2] = v;
+    px[j+3] = 255;
+  }
+}
+
+async function prep(file){
+  const img = await loadImage(file);
+  const scale = Math.min(2.5, Math.max(1, 2400 / img.width));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const d = g.getImageData(0, 0, c.width, c.height);
+  binarize(d);
+  g.putImageData(d, 0, 0);
+  return c;
+}
+
+function cropRight(canvas, frac){
+  const w = Math.round(canvas.width * frac);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = canvas.height;
+  c.getContext('2d').drawImage(canvas, canvas.width - w, 0, w, canvas.height, 0, 0, w, canvas.height);
+  return c;
+}
+
+/* --- Rebuilding rows from word positions ---------------------------------
+   The engine's own line grouping sometimes separates a name from the price on
+   the same visual row. Clustering words by their vertical centre is more
+   faithful to how the receipt actually reads. ----------------------------- */
+
+function wordsFromTsv(tsv){
+  const out = [];
+  for (const line of (tsv || '').split('\n')){
+    const f = line.split('\t');
+    if (f.length < 12 || f[0] !== '5') continue;
+    const text = f[11].trim();
+    if (!text) continue;
+    const conf = parseFloat(f[10]);
+    if (isFinite(conf) && conf < 30) continue;
+    const left = +f[6], top = +f[7], width = +f[8], height = +f[9];
+    out.push({ text, left, top, width, height, right: left + width, mid: top + height/2 });
+  }
+  return out;
+}
+
+function rowsFromWords(words){
+  if (!words.length) return [];
+  const heights = words.map(w => w.height).sort((a,b) => a-b);
+  const median = heights[Math.floor(heights.length/2)] || 12;
+  const tol = Math.max(median * 0.6, 6);
+
+  const sorted = words.slice().sort((a,b) => a.mid - b.mid);
+  const rows = [];
+  for (const w of sorted){
+    const row = rows[rows.length-1];
+    if (row && Math.abs(w.mid - row.mid) <= tol){
+      row.words.push(w);
+      row.mid = row.words.reduce((s,x) => s + x.mid, 0) / row.words.length;
+    } else {
+      rows.push({ mid: w.mid, words: [w] });
+    }
+  }
+
+  return rows.map(r => {
+    r.words.sort((a,b) => a.left - b.left);
+    return {
+      mid: r.mid,
+      height: median,
+      text: r.words.map(w => w.text).join(' '),
+      words: r.words
+    };
+  });
+}
+
+/* --- Digits-only second pass ---------------------------------------------
+   Reading the price column with a numeric whitelist removes the classic
+   confusions: O for 0, l or I for 1, S for 5. ----------------------------- */
+
+const AMT_TOKEN = /^-?[\u20B1P]?\d{1,3}(?:,\d{3})*[.,]\d{2}$/;
+
+function amountsFromWords(words){
+  return words
+    .filter(w => AMT_TOKEN.test(w.text.replace(/\s/g,'')))
+    .map(w => ({ mid: w.mid, text: w.text.replace(/\s/g,'') }));
+}
+
+function mergeAmounts(rows, amounts){
+  return rows.map(row => {
+    const near = amounts
+      .filter(a => Math.abs(a.mid - row.mid) <= Math.max(row.height * 0.7, 7))
+      .sort((a,b) => Math.abs(a.mid - row.mid) - Math.abs(b.mid - row.mid))[0];
+    if (!near) return row.text;
+
+    // Replace whatever the first pass thought the trailing figure was. The
+    // pattern demands a two-digit decimal ending so ordinary words survive,
+    // and allows the usual lookalike characters in place of digits.
+    const tail = row.text.match(/\s-?[\u20B1P]?[\dOolIiSs][\dOolIiSs,]*[.,][\dOolIiSs]{2}$/);
+    const stripped = tail ? row.text.slice(0, tail.index).trim() : row.text.trim();
+    return `${stripped} ${near.text}`.trim();
+  });
+}
+
+async function readImage(worker, file, note){
+  const canvas = await prep(file);
+
+  note('reading text');
+  await worker.setParameters({
+    tessedit_pageseg_mode: '4',          // one column, varying text sizes
+    preserve_interword_spaces: '1',
+    tessedit_do_invert: '0',
+    tessedit_char_whitelist: ''
+  });
+  const pass1 = await worker.recognize(canvas, {}, { text: true, tsv: true });
+  const rows = rowsFromWords(wordsFromTsv(pass1.data.tsv));
+
+  note('checking the figures');
+  await worker.setParameters({
+    tessedit_pageseg_mode: '6',          // uniform block of text
+    tessedit_char_whitelist: '0123456789.,-'
+  });
+  const pass2 = await worker.recognize(cropRight(canvas, 0.42), {}, { text: true, tsv: true });
+  const amounts = amountsFromWords(wordsFromTsv(pass2.data.tsv));
+
+  return mergeAmounts(rows, amounts).join('\n');
 }
 
 fileEl.onchange = async () => {
@@ -819,18 +994,16 @@ fileEl.onchange = async () => {
     setStatus('Starting the text reader\u2026', 'busy');
     worker = await Tesseract.createWorker('eng', 1, {
       logger: m => {
-        if (m.status === 'recognizing text')
-          setStatus(`Reading text \u2014 ${Math.round(m.progress * 100)}%`, 'busy');
+        if (m.status === 'recognizing text' && m.progress > 0 && m.progress < 1)
+          setStatus(`Reading \u2014 ${Math.round(m.progress * 100)}%`, 'busy');
       }
     });
-    await worker.setParameters({ preserve_interword_spaces: '1' });
 
     let text = '';
     for (let i = 0; i < files.length; i++){
-      setStatus(`Reading screenshot ${i+1} of ${files.length}\u2026`, 'busy');
-      const prepped = await upscale(files[i]);
-      const { data } = await worker.recognize(prepped);
-      text += '\n' + data.text;
+      const label = files.length > 1 ? `screenshot ${i+1} of ${files.length}` : 'the screenshot';
+      await readImage(worker, files[i], stage => setStatus(`${stage} on ${label}\u2026`, 'busy'))
+        .then(t => { text += '\n' + t; });
     }
 
     pasteEl.value = text.trim();
