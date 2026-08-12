@@ -25,6 +25,7 @@
     --amber:#E0A21B;
     --mint:#2F8F6B;
     --coral:#C8492F;
+    --navy:#17224A;
     --r:10px;
   }
   *{box-sizing:border-box;}
@@ -112,6 +113,24 @@
   }
   .back:hover{border-color:var(--ink);}
   #calcErr{text-align:center;}
+  .shotbar{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    margin-top:14px;
+    padding:12px 14px;
+    border:2px dashed var(--navy);
+    border-radius:11px;
+    color:var(--navy);
+    background:#E8EBF2;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13.5px;
+    font-weight:700;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+  }
+  .shotbar svg{width:19px;height:19px;flex:0 0 19px;}
   input[type=text]{font-family:'Inter',sans-serif;}
   input:focus,select:focus{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber);}
   .row{display:grid;gap:8px;margin-bottom:8px;align-items:end;}
@@ -164,10 +183,6 @@
     padding:15px 16px 13px;
   }
   .cotop{
-    display:grid;
-    grid-template-columns:1fr auto;
-    align-items:baseline;
-    column-gap:12px;
     padding-bottom:11px;
     border-bottom:1px solid var(--line);
   }
@@ -177,18 +192,27 @@
     font-weight:700;
     letter-spacing:-.01em;
   }
-  .cometa{grid-column:1/-1;font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
-  .cototal{text-align:right;white-space:nowrap;display:flex;align-items:baseline;gap:7px;}
+  .cometa{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+  .cototal{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+    margin-top:9px;
+    padding-top:9px;
+    border-top:1.5px solid var(--navy);
+    color:var(--navy);
+  }
   .colbl{
     font-family:'Space Grotesk',sans-serif;
-    font-size:9.5px;
+    font-size:11px;
+    font-weight:700;
     text-transform:uppercase;
     letter-spacing:.14em;
-    color:var(--ink-soft);
   }
   .coamt{
     font-family:'IBM Plex Mono',monospace;
-    font-size:21px;
+    font-size:23px;
     font-weight:600;
     letter-spacing:-.02em;
   }
@@ -221,8 +245,8 @@
     justify-content:space-between;
     gap:8px;
     flex-wrap:wrap;
-    margin-top:11px;
-    padding-top:10px;
+    margin-top:10px;
+    padding-top:9px;
     border-top:1px solid var(--line);
     font-family:'IBM Plex Mono',monospace;
     font-size:11.5px;
@@ -309,8 +333,36 @@
     margin-top:11px;
     min-height:1.4em;
   }
-  .status.err{color:var(--coral);}
-  .status.done{color:var(--mint);}
+  .status.err,.status.done{
+    text-align:left;
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:13.5px;
+    line-height:1.45;
+    font-weight:500;
+    padding:11px 13px 11px 12px;
+    border-radius:9px;
+    margin-top:13px;
+    display:flex;
+    gap:9px;
+    align-items:flex-start;
+  }
+  .status.err{
+    background:#FAE3DD;
+    border:1.5px solid var(--coral);
+    border-left-width:5px;
+    color:#8A2E1A;
+  }
+  .status.done{
+    background:#E2F1E9;
+    border:1px solid var(--mint);
+    border-left-width:5px;
+    color:#1D6349;
+  }
+  .status .ico{
+    flex:0 0 18px;
+    width:18px;height:18px;
+    margin-top:1px;
+  }
   .spin{
     display:inline-block;width:11px;height:11px;
     border:2px solid var(--line);border-top-color:var(--amber);
@@ -454,7 +506,14 @@
       <button class="back" id="back">&#8592; Edit the order</button>
     </div>
     <div id="out"></div>
-    <p class="hint" id="shotHint">Screenshot this to share it.</p>
+    <div class="shotbar">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="6.5" width="20" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M8.5 6.5l1.4-2.6h4.2l1.4 2.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="12" cy="13.5" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <span>Screenshot this card to share it</span>
+    </div>
   </section>
 
 </div>
@@ -594,9 +653,22 @@ pickEl.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); fileEl.click(); }
 });
 
+const WARN_ICO = `<svg class="ico" viewBox="0 0 20 20" aria-hidden="true">
+  <path fill="currentColor" d="M10 1.6 19 17.4H1L10 1.6z"/>
+  <path fill="#FAE3DD" d="M9.1 7.2h1.8l-.25 5.1H9.35L9.1 7.2zM10 13.6a1.05 1.05 0 1 1 0 2.1 1.05 1.05 0 0 1 0-2.1z"/>
+</svg>`;
+const OK_ICO = `<svg class="ico" viewBox="0 0 20 20" aria-hidden="true">
+  <circle cx="10" cy="10" r="9" fill="currentColor"/>
+  <path fill="none" stroke="#E2F1E9" stroke-width="2.2" stroke-linecap="round"
+        stroke-linejoin="round" d="M5.6 10.4l2.9 2.9 5.9-6.2"/>
+</svg>`;
+
 function setStatus(msg, cls){
   statusEl.className = 'status' + (cls ? ' ' + cls : '');
-  statusEl.innerHTML = cls === 'busy' ? `<span class="spin"></span>${msg}` : msg;
+  if (cls === 'busy') statusEl.innerHTML = `<span class="spin"></span>${msg}`;
+  else if (cls === 'err') statusEl.innerHTML = WARN_ICO + `<span>${msg}</span>`;
+  else if (cls === 'done') statusEl.innerHTML = OK_ICO + `<span>${msg}</span>`;
+  else statusEl.innerHTML = msg;
 }
 
 /* --- Parsing ---------------------------------------------------------------
@@ -701,8 +773,8 @@ function applyReceipt(parsed){
   const off = isFinite(stated) && stated > 0 && Math.abs(found - stated) > 0.005;
 
   setStatus(off
-    ? `Found ${rows.length} items totalling ${money(found)}, but the receipt says ${money(stated)}. Something was missed \u2014 check the rows below.`
-    : `Read ${rows.length} items across ${new Set(rows.map(r=>r.person)).size} people. Check the figures, then calculate.`,
+    ? `<b>These figures don't add up.</b><br>The items read come to ${money(found)}, but the receipt says ${money(stated)} \u2014 a gap of ${money(Math.abs(found - stated))}. A line was probably missed or misread. Fix the rows below before calculating, or the split will be wrong.`
+    : `Read ${rows.length} items across ${new Set(rows.map(r=>r.person)).size} people, and they match the receipt subtotal. Check the figures, then calculate.`,
     off ? 'err' : 'done');
 }
 
@@ -837,10 +909,6 @@ function renderResult(s){
     <div class="cardout">
       <div class="cotop">
         <div class="cotitle">Group order split</div>
-        <div class="cototal">
-          <span class="colbl">Total</span>
-          <span class="coamt">${money(s.total)}</span>
-        </div>
         <div class="cometa">${when} \u00B7 ${s.rows.length} ${s.rows.length>1?'people':'person'} \u00B7 ${method}</div>
       </div>`;
 
@@ -858,6 +926,10 @@ function renderResult(s){
         <span>subtotal ${money(s.subtotal)}</span>
         <span>fees ${money(s.feesTotal)}</span>
         <span>less ${money(s.discTotal)}</span>
+      </div>
+      <div class="cototal">
+        <span class="colbl">Total</span>
+        <span class="coamt">${money(s.total)}</span>
       </div>
     </div>`;
 
