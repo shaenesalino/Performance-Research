@@ -132,6 +132,12 @@
   }
   .shotbar svg{width:19px;height:19px;flex:0 0 19px;}
   input[type=text]{font-family:'Inter',sans-serif;}
+  input.low{
+    border-color:var(--amber);
+    border-width:2px;
+    background:#FDF4E2;
+    font-weight:600;
+  }
   input:focus,select:focus{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber);}
   .row{display:grid;gap:8px;margin-bottom:8px;align-items:end;}
   .row.item{grid-template-columns:1fr 104px 34px;}
@@ -521,6 +527,8 @@
 <script>
 const PESO = '\u20B1';
 let receiptSubtotal = null;   // what the receipt claimed, once one has been read
+let declaredCounts = new Map();   // person -> item count, from the headings
+const LOW_CONF = 72;              // below this, an amount gets outlined
 const itemsEl = document.getElementById('items');
 const discsEl = document.getElementById('discs');
 const out = document.getElementById('out');
@@ -529,12 +537,12 @@ function money(n){
   return PESO + n.toLocaleString('en-PH',{minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
-function itemRow(name='', amt=''){
+function itemRow(name='', amt='', low=false){
   const d = document.createElement('div');
   d.className = 'row item';
   d.innerHTML = `
     <div><input type="text" class="i-name" placeholder="Name or initials" value="${name}"></div>
-    <div><input type="number" step="0.01" class="i-amt" placeholder="0.00" value="${amt}"></div>
+    <div><input type="number" step="0.01" class="i-amt${low ? ' low' : ''}"${low ? ' title="This figure was hard to read \u2014 check it"' : ''} placeholder="0.00" value="${amt}"></div>
     <button class="del" title="Remove">&times;</button>`;
   d.querySelector('.del').onclick = () => d.remove();
   return d;
@@ -695,48 +703,126 @@ function grabAmount(line){
   return { value, negative: m[1] === '-', label: line.slice(0, m.index).trim() };
 }
 
-function parseReceipt(text){
-  const lines = text.split(/\r?\n/).map(l => l.replace(/\s+/g,' ').trim()).filter(Boolean);
-  const out = { items: [], delivery: 0, fees: 0, discounts: [], subtotal: null, total: null };
-  let person = null;
+/* Names read from two overlapping screenshots can differ by a character or two.
+   Left alone that splits one person into two, so near-identical names are
+   merged onto whichever spelling appeared most often. */
 
-  for (const line of lines){
+function normName(s){
+  return s.replace(/\s+/g,' ').replace(/[.,;:]+$/,'').trim();
+}
+
+function editDistance(a, b){
+  a = a.toUpperCase(); b = b.toUpperCase();
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  let prev = Array.from({length: b.length+1}, (_,i) => i);
+  for (let i = 1; i <= a.length; i++){
+    const row = [i];
+    for (let j = 1; j <= b.length; j++){
+      row[j] = Math.min(
+        prev[j] + 1,
+        row[j-1] + 1,
+        prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+function mergeNames(items, counts, pages){
+  const tally = new Map();
+  items.forEach(i => tally.set(i.person, (tally.get(i.person) || 0) + 1));
+  // Most-seen first, so rarer misreadings fold onto the common spelling.
+  const canon = [...tally.entries()].sort((a,b) => b[1] - a[1] || b[0].length - a[0].length).map(e => e[0]);
+
+  const sharesScreenshot = (a, b) => {
+    const pa = pages && pages.get(a), pb = pages && pages.get(b);
+    if (!pa || !pb) return false;
+    for (const x of pa) if (pb.has(x)) return true;
+    return false;
+  };
+
+  const map = new Map();
+  for (const name of tally.keys()){
+    let target = name;
+    for (const c of canon){
+      if (c === name) break;
+      const len = Math.max(c.length, name.length);
+      // Short names are left alone: Sara and Sarah are probably two people.
+      if (len < 6) continue;
+      // Two names on the same screenshot are two people, however alike.
+      if (sharesScreenshot(c, name)) continue;
+      const tol = Math.max(1, Math.round(len * 0.2));
+      if (editDistance(c, name) <= tol){ target = c; break; }
+    }
+    map.set(name, target);
+  }
+
+  items.forEach(i => { i.person = map.get(i.person) || i.person; });
+
+  // Carry the declared item counts across to the merged spelling.
+  const merged = new Map();
+  counts.forEach((n, name) => {
+    const key = map.get(name) || name;
+    merged.set(key, Math.max(merged.get(key) || 0, n));
+  });
+  return merged;
+}
+
+function parseReceipt(text, lineConf){
+  const raw = text.split(/\r?\n/);
+  const out = { items: [], delivery: 0, fees: 0, discounts: [], subtotal: null, total: null, counts: new Map() };
+  const pages = new Map();
+  let person = null, page = 0;
+
+  raw.forEach((rawLine, idx) => {
+    // A form feed marks the boundary between screenshots.
+    if (rawLine.indexOf('\f') !== -1){ page++; person = null; return; }
+    const line = rawLine.replace(/\s+/g,' ').trim();
+    if (!line) return;
+    const conf = lineConf && isFinite(lineConf[idx]) ? lineConf[idx] : 100;
+
     const head = line.match(HEADING);
     if (head && !FEE_DELIVERY.test(line) && !FEE_OTHER.test(line)){
-      person = head[1].trim();
-      continue;
+      person = normName(head[1]);
+      out.counts.set(person, parseInt(head[2], 10) || 0);
+      if (!pages.has(person)) pages.set(person, new Set());
+      pages.get(person).add(page);
+      return;
     }
 
     const amt = grabAmount(line);
-    if (!amt) continue;
+    if (!amt) return;
     const label = amt.label;
 
-    if (/^subtotal/i.test(label)){ out.subtotal = amt.value; person = null; continue; }
-    if (/^total/i.test(label)){ out.total = amt.value; person = null; continue; }
-    if (FEE_DELIVERY.test(label)){ out.delivery = amt.value; person = null; continue; }
-    if (FEE_OTHER.test(label)){ out.fees += amt.value; person = null; continue; }
+    // The summary block always follows the items, so the first line of it
+    // closes the items section. Nothing priced after that belongs to a person.
+    if (/^subtotal/i.test(label)){ out.subtotal = amt.value; person = null; return; }
+    if (/^total/i.test(label)){ out.total = amt.value; person = null; return; }
+    if (FEE_DELIVERY.test(label)){ out.delivery = amt.value; person = null; return; }
+    if (FEE_OTHER.test(label)){ out.fees += amt.value; person = null; return; }
 
-    // Discounts are the negative lines, or promo wording like "15% off" / "P80 off".
     if (amt.negative || /\boff\b|discount|promo|voucher/i.test(label)){
       out.discounts.push({ label: label.replace(/^[^A-Za-z0-9\u20B1]+/,'') || 'Discount', amount: amt.value });
       person = null;
-      continue;
+      return;
     }
 
-    if (IGNORE.test(label)) continue;
+    if (IGNORE.test(label)) return;
 
-    // Anything left with a quantity prefix, or any priced line under a heading,
-    // is one person's item.
     if (person && (QTY.test(label) || label.length)){
       out.items.push({
         person,
         item: label.replace(QTY,'').trim(),
-        amount: amt.value
+        amount: amt.value,
+        conf
       });
     }
-  }
+  });
 
-  // The same person, item and amount appearing in two screenshots is one entry.
+  out.counts = mergeNames(out.items, out.counts, pages);
+
+  // The same person, item and amount in two screenshots is one entry.
   const seen = new Set();
   out.items = out.items.filter(i => {
     const k = `${i.person}|${i.item}|${i.amount}`;
@@ -755,19 +841,47 @@ function parseReceipt(text){
   return out;
 }
 
-/* Re-checked on every edit, so fixing the rows clears the warning by itself. */
-function verify(first){
-  if (receiptSubtotal == null) return;
-  const found = [...readOrder().values()].reduce((a,b)=>a+b,0);
-  const gap = found - receiptSubtotal;
+/* --- What the receipt claimed, checked against what is in the rows ---------
+   Two independent checksums: the subtotal, and the item count each heading
+   declares. The second catches a dropped line even when two errors happen to
+   cancel out in the total. ------------------------------------------------- */
 
-  if (Math.abs(gap) > 0.005){
-    setStatus(`<b>These figures don't add up.</b><br>The items come to ${money(found)}, but the receipt says ${money(receiptSubtotal)} \u2014 ${gap > 0 ? 'over' : 'short'} by ${money(Math.abs(gap))}. Fix the rows below before calculating, or the split will be wrong.`, 'err');
+function verify(first){
+  if (receiptSubtotal == null && !declaredCounts.size) return;
+
+  const people = readOrder();
+  const found = [...people.values()].reduce((a,b)=>a+b,0);
+  const problems = [];
+
+  if (receiptSubtotal != null){
+    const gap = found - receiptSubtotal;
+    if (Math.abs(gap) > 0.005)
+      problems.push(`The items come to ${money(found)} but the receipt says ${money(receiptSubtotal)} \u2014 ${gap > 0 ? 'over' : 'short'} by ${money(Math.abs(gap))}.`);
+  }
+
+  // Count the rows belonging to each name currently in the editor.
+  const actual = new Map();
+  itemsEl.querySelectorAll('.row.item').forEach(r => {
+    const nm = normName(r.querySelector('.i-name').value);
+    if (nm) actual.set(nm, (actual.get(nm) || 0) + 1);
+  });
+  declaredCounts.forEach((want, name) => {
+    const got = actual.get(name) || 0;
+    if (want && got !== want)
+      problems.push(`${name}: the receipt says ${want} item${want>1?'s':''}, ${got} read.`);
+  });
+
+  const lows = itemsEl.querySelectorAll('.i-amt.low').length;
+
+  if (problems.length){
+    setStatus(`<b>Something doesn't line up.</b><br>${problems.slice(0,4).join('<br>')}<br>Fix the rows below before calculating, or the split will be wrong.`, 'err');
+  } else if (lows){
+    setStatus(`<b>Check the outlined amounts.</b><br>${lows} figure${lows>1?'s were':' was'} hard to read, though everything reconciles. Tap to correct, or carry on.`, 'done');
   } else if (first){
-    const people = readOrder().size;
-    setStatus(`Read ${itemsEl.querySelectorAll('.row.item').length} items across ${people} ${people>1?'people':'person'}, and they match the receipt subtotal. Check the figures, then calculate.`, 'done');
+    const n = itemsEl.querySelectorAll('.row.item').length;
+    setStatus(`Read ${n} item${n>1?'s':''} across ${people.size} ${people.size>1?'people':'person'}, and everything reconciles. Check the figures, then calculate.`, 'done');
   } else {
-    setStatus(`<b>That's it.</b><br>The items now match the receipt subtotal of ${money(receiptSubtotal)}.`, 'done');
+    setStatus(`<b>That's it.</b><br>Everything reconciles${receiptSubtotal != null ? ` against the receipt subtotal of ${money(receiptSubtotal)}` : ''}.`, 'done');
   }
 }
 
@@ -776,7 +890,7 @@ function applyReceipt(parsed){
   if (!rows.length) throw new Error('No items found. Check the text, or type the rows in by hand.');
 
   itemsEl.innerHTML = '';
-  rows.forEach(i => itemsEl.appendChild(itemRow(i.person, i.amount)));
+  rows.forEach(i => itemsEl.appendChild(itemRow(i.person, i.amount, i.conf < LOW_CONF)));
 
   document.getElementById('delivery').value = parsed.delivery > 0 ? parsed.delivery.toFixed(2) : 0;
   document.getElementById('other').value = parsed.fees > 0 ? parsed.fees.toFixed(2) : 0;
@@ -788,18 +902,22 @@ function applyReceipt(parsed){
 
   const stated = Number(parsed.subtotal);
   receiptSubtotal = isFinite(stated) && stated > 0 ? stated : null;
+  declaredCounts = parsed.counts || new Map();
 
   refresh();
 
-  if (receiptSubtotal == null){
-    const people = new Set(rows.map(r => r.person)).size;
-    setStatus(`Read ${rows.length} items across ${people} ${people>1?'people':'person'}. No subtotal was visible to check against, so confirm the figures yourself.`, 'done');
+  if (receiptSubtotal == null && !declaredCounts.size){
+    const n = new Set(rows.map(r => r.person)).size;
+    setStatus(`Read ${rows.length} items across ${n} ${n>1?'people':'person'}. Nothing on the receipt to check against, so confirm the figures yourself.`, 'done');
   } else {
     verify(true);
   }
 }
 
-/* --- On-device OCR -------------------------------------------------------- */
+/* An edited amount is no longer the reader's guess, so drop the outline. */
+itemsEl.addEventListener('input', e => {
+  if (e.target.classList.contains('i-amt')) e.target.classList.remove('low');
+});
 
 /* --- Image preparation ---------------------------------------------------
    Screenshots are already crisp, so the wins come from scale and contrast:
@@ -842,13 +960,11 @@ function binarize(data){
 
   for (let i = 0; i < n; i++){
     const j = i * 4;
-    // Rec. 709 luma, then ignore alpha since screenshots are opaque.
     const v = (px[j]*0.2126 + px[j+1]*0.7152 + px[j+2]*0.0722) | 0;
     grey[i] = v;
     hist[v]++;
   }
 
-  // Stretch the middle 96% of the range so faint grey text darkens.
   let lo = 0, hi = 255, seen = 0;
   const cut = n * 0.02;
   for (let v = 0; v < 256; v++){ seen += hist[v]; if (seen > cut){ lo = v; break; } }
@@ -872,12 +988,12 @@ function binarize(data){
   }
 }
 
-async function prep(file){
+async function prep(file, scale){
   const img = await loadImage(file);
-  const scale = Math.min(2.5, Math.max(1, 2400 / img.width));
+  const k = Math.max(0.5, Math.min(3, scale * Math.min(1, 1400 / img.width)));
   const c = document.createElement('canvas');
-  c.width = Math.round(img.width * scale);
-  c.height = Math.round(img.height * scale);
+  c.width = Math.round(img.width * k);
+  c.height = Math.round(img.height * k);
   const g = c.getContext('2d', { willReadFrequently: true });
   g.imageSmoothingQuality = 'high';
   g.drawImage(img, 0, 0, c.width, c.height);
@@ -896,10 +1012,7 @@ function cropRight(canvas, frac){
   return c;
 }
 
-/* --- Rebuilding rows from word positions ---------------------------------
-   The engine's own line grouping sometimes separates a name from the price on
-   the same visual row. Clustering words by their vertical centre is more
-   faithful to how the receipt actually reads. ----------------------------- */
+/* --- Rebuilding rows from word positions --------------------------------- */
 
 function wordsFromTsv(tsv){
   const out = [];
@@ -911,7 +1024,7 @@ function wordsFromTsv(tsv){
     const conf = parseFloat(f[10]);
     if (isFinite(conf) && conf < 30) continue;
     const left = +f[6], top = +f[7], width = +f[8], height = +f[9];
-    out.push({ text, left, top, width, height, right: left + width, mid: top + height/2 });
+    out.push({ text, conf: isFinite(conf) ? conf : 100, left, top, width, height, right: left + width, mid: top + height/2 });
   }
   return out;
 }
@@ -936,49 +1049,50 @@ function rowsFromWords(words){
 
   return rows.map(r => {
     r.words.sort((a,b) => a.left - b.left);
-    return {
-      mid: r.mid,
-      height: median,
-      text: r.words.map(w => w.text).join(' '),
-      words: r.words
-    };
+    return { mid: r.mid, height: median, text: r.words.map(w => w.text).join(' '), words: r.words };
   });
 }
 
-/* --- Digits-only second pass ---------------------------------------------
-   Reading the price column with a numeric whitelist removes the classic
-   confusions: O for 0, l or I for 1, S for 5. ----------------------------- */
+/* --- Digits-only second pass --------------------------------------------- */
 
 const AMT_TOKEN = /^-?[\u20B1P]?\d{1,3}(?:,\d{3})*[.,]\d{2}$/;
 
 function amountsFromWords(words){
   return words
     .filter(w => AMT_TOKEN.test(w.text.replace(/\s/g,'')))
-    .map(w => ({ mid: w.mid, text: w.text.replace(/\s/g,'') }));
+    .map(w => ({ mid: w.mid, text: w.text.replace(/\s/g,''), conf: w.conf }));
 }
 
 function mergeAmounts(rows, amounts){
-  return rows.map(row => {
+  const lines = [], conf = [];
+  rows.forEach(row => {
     const near = amounts
       .filter(a => Math.abs(a.mid - row.mid) <= Math.max(row.height * 0.7, 7))
       .sort((a,b) => Math.abs(a.mid - row.mid) - Math.abs(b.mid - row.mid))[0];
-    if (!near) return row.text;
 
-    // Replace whatever the first pass thought the trailing figure was. The
-    // pattern demands a two-digit decimal ending so ordinary words survive,
-    // and allows the usual lookalike characters in place of digits.
+    if (!near){
+      // No digits-pass match: fall back to the first pass, and record how
+      // confident it was about the trailing figure.
+      const last = row.words[row.words.length-1];
+      lines.push(row.text);
+      conf.push(last && AMT_TOKEN.test(last.text) ? last.conf : 100);
+      return;
+    }
+
     const tail = row.text.match(/\s-?[\u20B1P]?[\dOolIiSs][\dOolIiSs,]*[.,][\dOolIiSs]{2}$/);
     const stripped = tail ? row.text.slice(0, tail.index).trim() : row.text.trim();
-    return `${stripped} ${near.text}`.trim();
+    lines.push(`${stripped} ${near.text}`.trim());
+    conf.push(near.conf);
   });
+  return { lines, conf };
 }
 
-async function readImage(worker, file, note){
-  const canvas = await prep(file);
+async function readImage(worker, file, scale, note){
+  const canvas = await prep(file, scale);
 
   note('reading text');
   await worker.setParameters({
-    tessedit_pageseg_mode: '4',          // one column, varying text sizes
+    tessedit_pageseg_mode: '4',
     preserve_interword_spaces: '1',
     tessedit_do_invert: '0',
     tessedit_char_whitelist: ''
@@ -988,13 +1102,46 @@ async function readImage(worker, file, note){
 
   note('checking the figures');
   await worker.setParameters({
-    tessedit_pageseg_mode: '6',          // uniform block of text
+    tessedit_pageseg_mode: '6',
     tessedit_char_whitelist: '0123456789.,-'
   });
   const pass2 = await worker.recognize(cropRight(canvas, 0.42), {}, { text: true, tsv: true });
   const amounts = amountsFromWords(wordsFromTsv(pass2.data.tsv));
 
-  return mergeAmounts(rows, amounts).join('\n');
+  return mergeAmounts(rows, amounts);
+}
+
+/* --- Reading, retried at other scales if the figures don't reconcile ----- */
+
+const SCALES = [2, 1.6, 2.6];
+
+function gapOf(parsed){
+  const stated = Number(parsed.subtotal);
+  if (!isFinite(stated) || stated <= 0) return null;
+  const found = parsed.items.reduce((a,b) => a + b.amount, 0);
+  return Math.abs(found - stated);
+}
+
+function countsOff(parsed){
+  let off = 0;
+  const actual = new Map();
+  parsed.items.forEach(i => actual.set(i.person, (actual.get(i.person) || 0) + 1));
+  parsed.counts.forEach((want, name) => {
+    if (want && (actual.get(name) || 0) !== want) off++;
+  });
+  return off;
+}
+
+async function readAll(worker, files, scale, note){
+  const lines = [], conf = [];
+  for (let i = 0; i < files.length; i++){
+    const label = files.length > 1 ? `screenshot ${i+1} of ${files.length}` : 'the screenshot';
+    const r = await readImage(worker, files[i], scale, stage => note(`${stage} on ${label}`));
+    if (i > 0){ lines.push('\f'); conf.push(100); }
+    lines.push(...r.lines);
+    conf.push(...r.conf);
+  }
+  return { text: lines.join('\n'), conf };
 }
 
 fileEl.onchange = async () => {
@@ -1020,15 +1167,21 @@ fileEl.onchange = async () => {
       }
     });
 
-    let text = '';
-    for (let i = 0; i < files.length; i++){
-      const label = files.length > 1 ? `screenshot ${i+1} of ${files.length}` : 'the screenshot';
-      await readImage(worker, files[i], stage => setStatus(`${stage} on ${label}\u2026`, 'busy'))
-        .then(t => { text += '\n' + t; });
+    let best = null;
+    for (let s = 0; s < SCALES.length; s++){
+      if (s > 0) setStatus('The figures didn\u2019t reconcile \u2014 reading again at a different size\u2026', 'busy');
+      const res = await readAll(worker, files, SCALES[s],
+        stage => setStatus(`${stage}\u2026`, 'busy'));
+      const parsed = parseReceipt(res.text, res.conf);
+      const gap = gapOf(parsed);
+      const bad = (gap == null ? 0 : gap) + countsOff(parsed) * 100;
+
+      if (!best || bad < best.bad) best = { ...res, parsed, gap, bad };
+      if (gap === null || (gap < 0.005 && countsOff(parsed) === 0)) break;
     }
 
-    pasteEl.value = text.trim();
-    applyReceipt(parseReceipt(text));
+    pasteEl.value = best.text.trim();
+    applyReceipt(best.parsed);
 
   } catch (err) {
     setStatus(err.message || 'Could not read those screenshots. Paste the text instead.', 'err');
