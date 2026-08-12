@@ -196,6 +196,24 @@
   }
   .pick:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
   .pick.off{opacity:.5;pointer-events:none;}
+  .keybox{
+    display:none;
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+    text-align:left;
+  }
+  .keybox.show{display:block;}
+  .keybox summary{
+    cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    color:var(--ink-soft);
+    margin-bottom:10px;
+  }
+  .keybox summary:hover{color:var(--ink);}
   .sr{
     position:absolute;
     width:1px;height:1px;
@@ -287,6 +305,12 @@
     <label class="pick" for="file" id="pick" tabindex="0" role="button">Choose screenshots</label>
     <p class="hint" style="margin-top:10px">Add both the itemised list and the fees summary. Everything below fills in automatically, and you can correct anything before calculating.</p>
     <div class="status" id="status"></div>
+    <details class="keybox" id="keybox">
+      <summary>Set up scanning on this site</summary>
+      <label for="apikey">Anthropic API key</label>
+      <input id="apikey" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+      <p class="hint">Needed only when the page is hosted outside Claude. The key stays in this browser tab, is never uploaded anywhere except Anthropic, and is forgotten when you close the tab. Manual entry below works without it.</p>
+    </details>
   </div>
 
   <h2>Who ordered what</h2>
@@ -472,6 +496,10 @@ const fileEl = document.getElementById('file');
 const pickEl = document.getElementById('pick');
 const dropEl = document.getElementById('drop');
 const statusEl = document.getElementById('status');
+
+const keyEl = document.getElementById('apikey');
+const hosted = !/(^|\.)claude(usercontent)?\.(ai|com)$/.test(location.hostname);
+if (hosted) document.getElementById('keybox').classList.add('show');
 
 pickEl.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); fileEl.click(); }
