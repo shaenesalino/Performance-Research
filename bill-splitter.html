@@ -59,6 +59,8 @@
     border:1px solid var(--line);
   }
   .head .sub{margin:0;}
+  body.done .head .sub{display:none;}
+  body.done .head{align-items:center;margin-bottom:16px;}
   @media(max-width:400px){
     h1{font-size:22px;}
     .logo{width:44px;height:44px;flex-basis:44px;}
@@ -109,14 +111,6 @@
     cursor:pointer;
   }
   .back:hover{border-color:var(--ink);}
-  #save{flex:1;text-align:center;padding:11px 14px;}
-  #shot{margin-top:16px;}
-  #shot img{
-    width:100%;
-    border:1px solid var(--line);
-    border-radius:var(--r);
-    display:block;
-  }
   #calcErr{text-align:center;}
   input[type=text]{font-family:'Inter',sans-serif;}
   input:focus,select:focus{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber);}
@@ -163,30 +157,77 @@
     letter-spacing:.02em;
     cursor:pointer;
   }
-  .person{
+  .cardout{
     background:var(--card);
     border:1px solid var(--line);
     border-radius:var(--r);
-    padding:13px 14px;
-    margin-bottom:9px;
+    padding:15px 16px 13px;
   }
-  .ptop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
-  .pname{font-weight:600;font-size:15.5px;}
-  .powe{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:19px;letter-spacing:-.02em;}
-  .bar{display:flex;height:7px;border-radius:4px;overflow:hidden;margin:11px 0 9px;background:var(--line);}
-  .bar span{display:block;height:100%;}
-  .brk{
+  .cotop{
     display:grid;
     grid-template-columns:1fr auto;
-    gap:2px 12px;
-    font-family:'IBM Plex Mono',monospace;
-    font-size:12.5px;
+    align-items:baseline;
+    column-gap:12px;
+    padding-bottom:11px;
+    border-bottom:1px solid var(--line);
+  }
+  .cotitle{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:-.01em;
+  }
+  .cometa{grid-column:1/-1;font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+  .cototal{text-align:right;white-space:nowrap;display:flex;align-items:baseline;gap:7px;}
+  .colbl{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:9.5px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
     color:var(--ink-soft);
   }
-  .brk b{font-weight:500;text-align:right;color:var(--ink);}
-  .brk .mint,.brk .mint+b{color:var(--mint);}
-  .key{display:flex;gap:14px;font-size:11.5px;color:var(--ink-soft);margin:2px 0 14px;flex-wrap:wrap;}
-  .key i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+  .coamt{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:21px;
+    font-weight:600;
+    letter-spacing:-.02em;
+  }
+  .corow{
+    display:grid;
+    grid-template-columns:1fr auto;
+    column-gap:12px;
+    padding:8px 0 7px;
+    border-bottom:1px solid #E2E7E2;
+  }
+  .corow:last-of-type{border-bottom:0;}
+  .con{font-weight:600;font-size:14.5px;align-self:center;}
+  .cov{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:17px;
+    font-weight:600;
+    letter-spacing:-.02em;
+    align-self:center;
+  }
+  .cod{
+    grid-column:1/-1;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:1px;
+  }
+  .cod em{font-style:normal;color:var(--mint);}
+  .cofoot{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:11px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
   .recon{
     font-family:'IBM Plex Mono',monospace;
     font-size:13px;
@@ -411,10 +452,9 @@
   <section id="result" hidden>
     <div class="rbar">
       <button class="back" id="back">&#8592; Edit the order</button>
-      <button class="pick" id="save">Save as image</button>
     </div>
     <div id="out"></div>
-    <div id="shot"></div>
+    <p class="hint" id="shotHint">Screenshot this to share it.</p>
   </section>
 
 </div>
@@ -787,61 +827,47 @@ let split = null;
 
 const editorEl = document.getElementById('editor');
 const resultEl = document.getElementById('result');
-const shotEl = document.getElementById('shot');
 const errEl = document.getElementById('calcErr');
 
 function renderResult(s){
-  const maxOwe = Math.max(...s.rows.map(r => r.owe), 0.01);
+  const when = new Date().toLocaleDateString('en-PH', { day:'numeric', month:'short', year:'numeric' });
+  const method = s.mode === 'even' ? 'even split' : 'by order size';
 
   let html = `
-    <h2>What each person pays</h2>
-    <div class="key">
-      <span><i style="background:var(--ink)"></i>Their items</span>
-      <span><i style="background:var(--amber)"></i>Fee share</span>
-      <span><i style="background:var(--mint)"></i>Discount</span>
-    </div>`;
+    <div class="cardout">
+      <div class="cotop">
+        <div class="cotitle">Group order split</div>
+        <div class="cototal">
+          <span class="colbl">Total</span>
+          <span class="coamt">${money(s.total)}</span>
+        </div>
+        <div class="cometa">${when} \u00B7 ${s.rows.length} ${s.rows.length>1?'people':'person'} \u00B7 ${method}</div>
+      </div>`;
 
   s.rows.forEach(r => {
-    const scale = 100/maxOwe;
     html += `
-      <div class="person">
-        <div class="ptop">
-          <span class="pname">${r.name}</span>
-          <span class="powe">${money(r.owe)}</span>
-        </div>
-        <div class="bar">
-          <span style="background:var(--ink);width:${r.gross*scale}%"></span>
-          <span style="background:var(--amber);width:${r.fee*scale}%"></span>
-          <span style="background:var(--mint);width:${r.disc*scale}%;opacity:.45"></span>
-        </div>
-        <div class="brk">
-          <span>Items</span><b>${money(r.gross)}</b>
-          <span>Fees</span><b>${money(r.fee)}</b>
-          <span class="mint">Discount</span><b>&minus;${money(r.disc)}</b>
-          <span>Share of order</span><b>${(r.share*100).toFixed(1)}%</b>
-        </div>
+      <div class="corow">
+        <span class="con">${r.name}</span>
+        <span class="cov">${money(r.owe)}</span>
+        <span class="cod">${r.gross.toFixed(2)} items + ${r.fee.toFixed(2)} fees <em>&minus; ${r.disc.toFixed(2)}</em></span>
       </div>`;
   });
 
   html += `
-    <div class="recon">
-      <div><span>Subtotal</span><span>${money(s.subtotal)}</span></div>
-      <div><span>Fees</span><span>${money(s.feesTotal)}</span></div>
-      <div><span>Discounts</span><span>&minus;${money(s.discTotal)}</span></div>
-      <div style="border-top:1px solid var(--line);margin-top:7px;padding-top:7px">
-        <span>Sum of all shares</span><span><b>${money(s.total)}</b></span>
-      </div>
-      <div style="color:var(--ink-soft);margin-top:4px">
-        <span>${s.mode === 'even' ? 'Split evenly per person' : 'Split in proportion to order size'}</span><span></span>
+      <div class="cofoot">
+        <span>subtotal ${money(s.subtotal)}</span>
+        <span>fees ${money(s.feesTotal)}</span>
+        <span>less ${money(s.discTotal)}</span>
       </div>
     </div>`;
 
   out.innerHTML = html;
 }
 
-function showResult(){
-  editorEl.hidden = true;
-  resultEl.hidden = false;
+function showResult(on){
+  editorEl.hidden = on;
+  resultEl.hidden = !on;
+  document.body.classList.toggle('done', on);
   window.scrollTo({ top: 0 });
 }
 
@@ -853,136 +879,12 @@ document.getElementById('go').onclick = () => {
     return;
   }
   errEl.textContent = '';
-  shotEl.innerHTML = '';
   renderResult(split);
-  showResult();
+  showResult(true);
 };
 
-document.getElementById('back').onclick = () => {
-  resultEl.hidden = true;
-  editorEl.hidden = false;
-  window.scrollTo({ top: 0 });
-};
+document.getElementById('back').onclick = () => showResult(false);
 
-/* ---- Saving the result as an image ----
-   Drawn on a canvas rather than screenshotting the DOM: no extra library, and
-   the output is sized for sharing in a chat rather than matching the page. */
-
-function drawCard(s){
-  const W = 900, PAD = 56, ROW = 96, DPR = 2;
-  const H = PAD*2 + 150 + s.rows.length*ROW + 70;
-  const c = document.createElement('canvas');
-  c.width = W*DPR; c.height = H*DPR;
-  const g = c.getContext('2d');
-  g.scale(DPR, DPR);
-
-  const INK = '#1B2B26', SOFT = '#5A6B65', LINE = '#C6CEC8',
-        AMBER = '#E0A21B', MINT = '#2F8F6B';
-  const disp = "'Space Grotesk', Helvetica, sans-serif";
-  const mono = "'IBM Plex Mono', ui-monospace, monospace";
-  const body = "'Inter', system-ui, sans-serif";
-
-  g.fillStyle = '#F6F8F5';
-  g.fillRect(0, 0, W, H);
-
-  let y = PAD + 8;
-
-  g.fillStyle = INK;
-  g.font = `700 40px ${disp}`;
-  g.fillText('Group order split', PAD, y + 20);
-
-  g.fillStyle = SOFT;
-  g.font = `400 20px ${body}`;
-  const when = new Date().toLocaleDateString('en-PH', { day:'numeric', month:'long', year:'numeric' });
-  g.fillText(`${when}  \u00B7  ${s.rows.length} people  \u00B7  ${s.mode === 'even' ? 'split evenly' : 'split by order size'}`, PAD, y + 56);
-
-  y += 92;
-  g.strokeStyle = LINE; g.lineWidth = 1;
-  g.beginPath(); g.moveTo(PAD, y); g.lineTo(W-PAD, y); g.stroke();
-  y += 34;
-
-  const maxOwe = Math.max(...s.rows.map(r => r.owe), 0.01);
-  const barW = 300;
-
-  s.rows.forEach(r => {
-    g.fillStyle = INK;
-    g.font = `600 26px ${body}`;
-    g.fillText(r.name, PAD, y + 8);
-
-    g.font = `600 32px ${mono}`;
-    g.textAlign = 'right';
-    g.fillText(money(r.owe), W - PAD, y + 10);
-    g.textAlign = 'left';
-
-    g.fillStyle = SOFT;
-    g.font = `400 19px ${mono}`;
-    g.fillText(`items ${money(r.gross)}   fees ${money(r.fee)}   less ${money(r.disc)}`, PAD, y + 40);
-
-    // Proportion bar, right aligned under the amount.
-    const bx = W - PAD - barW, by = y + 28, bh = 8;
-    const bar = (x, w, fill) => {
-      g.fillStyle = fill;
-      if (g.roundRect){ g.beginPath(); g.roundRect(x, by, w, bh, 4); g.fill(); }
-      else g.fillRect(x, by, w, bh);
-    };
-    bar(bx, barW, LINE);
-    bar(bx, Math.max(barW * (r.owe / maxOwe), 6), INK);
-
-    y += ROW - 24;
-    g.strokeStyle = '#E2E7E2';
-    g.beginPath(); g.moveTo(PAD, y); g.lineTo(W-PAD, y); g.stroke();
-    y += 24;
-  });
-
-  y += 6;
-  g.fillStyle = SOFT;
-  g.font = `400 20px ${mono}`;
-  g.fillText(`subtotal ${money(s.subtotal)}`, PAD, y);
-  g.fillStyle = AMBER;
-  g.fillText(`fees ${money(s.feesTotal)}`, PAD + 250, y);
-  g.fillStyle = MINT;
-  g.fillText(`discounts \u2212${money(s.discTotal)}`, PAD + 420, y);
-
-  y += 44;
-  g.fillStyle = INK;
-  g.font = `700 26px ${disp}`;
-  g.fillText('Total', PAD, y);
-  g.font = `600 36px ${mono}`;
-  g.textAlign = 'right';
-  g.fillText(money(s.total), W - PAD, y + 3);
-  g.textAlign = 'left';
-
-  return c;
-}
-
-document.getElementById('save').onclick = async () => {
-  if (!split) return;
-  const saveBtn = document.getElementById('save');
-  saveBtn.textContent = 'Preparing\u2026';
-  try {
-    if (document.fonts && document.fonts.ready) await document.fonts.ready;
-    const canvas = drawCard(split);
-    const url = canvas.toDataURL('image/png');
-
-    // Show it so it can be long-pressed and saved on phones, where a download
-    // link often does nothing.
-    shotEl.innerHTML = `<img src="${url}" alt="The split, as an image">
-      <p class="hint" style="text-align:center">Long-press the image to save or share it.</p>`;
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `split-${new Date().toISOString().slice(0,10)}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    shotEl.scrollIntoView({ behavior:'smooth', block:'start' });
-    saveBtn.textContent = 'Save as image';
-  } catch {
-    saveBtn.textContent = 'Save as image';
-    shotEl.innerHTML = `<p class="hint" style="text-align:center;color:var(--coral)">Could not build the image. Screenshot this page instead.</p>`;
-  }
-};
 </script>
 </body>
 </html>
