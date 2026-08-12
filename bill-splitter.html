@@ -520,6 +520,7 @@
 
 <script>
 const PESO = '\u20B1';
+let receiptSubtotal = null;   // what the receipt claimed, once one has been read
 const itemsEl = document.getElementById('items');
 const discsEl = document.getElementById('discs');
 const out = document.getElementById('out');
@@ -608,6 +609,8 @@ function refresh(){
     ? `${count} item${count>1?'s':''} across ${people.size} ${people.size>1?'people':'person'}`
     : 'No items yet';
 
+  if (typeof verify === 'function') verify(false);
+
   const fees = readFees(), disc = readDiscTotal();
   document.getElementById('runTotal').textContent = money(subtotal + fees - disc);
   document.getElementById('runTotalNote').textContent =
@@ -679,7 +682,7 @@ function setStatus(msg, cls){
 
 const FEE_DELIVERY = /delivery\s*fee/i;
 const FEE_OTHER = /(applicable|service|platform|small\s*order|packaging)\s*fee/i;
-const IGNORE = /^(subtotal|total|bill\s*split|payment\s*method|less\s*details|more\s*details|chat\s*with|contact\s*grab|item)/i;
+const IGNORE = /^(subtotal|total|bill\s*split|payment\s*method|less\s*details|more\s*details|chat\s*with|contact\s*grab|item|you\s*(paid|saved|.?ve\s*earned)|amount\s*paid|grab\s*coins?|grabcoins?|tip|refund|change|order\s*(id|number))/i;
 const HEADING = /^(.{1,40}?)\s*[:;]\s*(\d+)\s*items?\b/i;
 const QTY = /^\s*[\dilI|]{1,2}\s*[x×]\s+/i;
 const AMOUNT = /(-?)\s*[P\u20B1]?\s*(\d{1,3}(?:,\d{3})+|\d+)[.,](\d{2})\s*$/;
@@ -708,14 +711,15 @@ function parseReceipt(text){
     if (!amt) continue;
     const label = amt.label;
 
-    if (/^subtotal/i.test(label)){ out.subtotal = amt.value; continue; }
-    if (/^total/i.test(label)){ out.total = amt.value; continue; }
-    if (FEE_DELIVERY.test(label)){ out.delivery = amt.value; continue; }
-    if (FEE_OTHER.test(label)){ out.fees += amt.value; continue; }
+    if (/^subtotal/i.test(label)){ out.subtotal = amt.value; person = null; continue; }
+    if (/^total/i.test(label)){ out.total = amt.value; person = null; continue; }
+    if (FEE_DELIVERY.test(label)){ out.delivery = amt.value; person = null; continue; }
+    if (FEE_OTHER.test(label)){ out.fees += amt.value; person = null; continue; }
 
     // Discounts are the negative lines, or promo wording like "15% off" / "P80 off".
     if (amt.negative || /\boff\b|discount|promo|voucher/i.test(label)){
       out.discounts.push({ label: label.replace(/^[^A-Za-z0-9\u20B1]+/,'') || 'Discount', amount: amt.value });
+      person = null;
       continue;
     }
 
@@ -751,6 +755,22 @@ function parseReceipt(text){
   return out;
 }
 
+/* Re-checked on every edit, so fixing the rows clears the warning by itself. */
+function verify(first){
+  if (receiptSubtotal == null) return;
+  const found = [...readOrder().values()].reduce((a,b)=>a+b,0);
+  const gap = found - receiptSubtotal;
+
+  if (Math.abs(gap) > 0.005){
+    setStatus(`<b>These figures don't add up.</b><br>The items come to ${money(found)}, but the receipt says ${money(receiptSubtotal)} \u2014 ${gap > 0 ? 'over' : 'short'} by ${money(Math.abs(gap))}. Fix the rows below before calculating, or the split will be wrong.`, 'err');
+  } else if (first){
+    const people = readOrder().size;
+    setStatus(`Read ${itemsEl.querySelectorAll('.row.item').length} items across ${people} ${people>1?'people':'person'}, and they match the receipt subtotal. Check the figures, then calculate.`, 'done');
+  } else {
+    setStatus(`<b>That's it.</b><br>The items now match the receipt subtotal of ${money(receiptSubtotal)}.`, 'done');
+  }
+}
+
 function applyReceipt(parsed){
   const rows = parsed.items.filter(i => i.person && i.amount > 0);
   if (!rows.length) throw new Error('No items found. Check the text, or type the rows in by hand.');
@@ -766,16 +786,17 @@ function applyReceipt(parsed){
   if (ds.length) ds.forEach(d => discsEl.appendChild(discRow(d.label, d.amount.toFixed(2))));
   else discsEl.appendChild(discRow());
 
+  const stated = Number(parsed.subtotal);
+  receiptSubtotal = isFinite(stated) && stated > 0 ? stated : null;
+
   refresh();
 
-  const found = rows.reduce((a,b) => a + b.amount, 0);
-  const stated = Number(parsed.subtotal);
-  const off = isFinite(stated) && stated > 0 && Math.abs(found - stated) > 0.005;
-
-  setStatus(off
-    ? `<b>These figures don't add up.</b><br>The items read come to ${money(found)}, but the receipt says ${money(stated)} \u2014 a gap of ${money(Math.abs(found - stated))}. A line was probably missed or misread. Fix the rows below before calculating, or the split will be wrong.`
-    : `Read ${rows.length} items across ${new Set(rows.map(r=>r.person)).size} people, and they match the receipt subtotal. Check the figures, then calculate.`,
-    off ? 'err' : 'done');
+  if (receiptSubtotal == null){
+    const people = new Set(rows.map(r => r.person)).size;
+    setStatus(`Read ${rows.length} items across ${people} ${people>1?'people':'person'}. No subtotal was visible to check against, so confirm the figures yourself.`, 'done');
+  } else {
+    verify(true);
+  }
 }
 
 /* --- On-device OCR -------------------------------------------------------- */
