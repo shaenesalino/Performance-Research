@@ -5037,61 +5037,60 @@
   .tmc-num .val.negative { color: var(--orange); }
   .tmc-num .val.positive { color: var(--teal); }
 
-  .tmc-available {
+  /* Dual-column layout: Budget left | Discretionary left. Two large numbers
+     with progress bars underneath, split by a subtle vertical divider. */
+  .tmc-dual {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 14px;
+    gap: 14px;
+    padding: 14px 0;
     border-top: 1px solid var(--sand);
-    margin-bottom: 10px;
+    border-bottom: 1px solid var(--sand);
+    margin-bottom: 14px;
   }
-  .tmc-avail-info .lbl {
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    color: var(--muted);
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-  .tmc-avail-info .val {
-    font-family: 'Fraunces', serif;
-    font-weight: 500;
-    font-size: 24px;
-    color: var(--navy);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-  }
-  .tmc-avail-info .val.negative { color: var(--error); }
-  .tmc-avail-ring {
-    position: relative;
-    width: 52px;
-    height: 52px;
-    flex-shrink: 0;
-  }
-  .tmc-avail-ring svg { width: 100%; height: 100%; display: block; }
-  #tmcAvailArc { transition: stroke-dashoffset 0.6s ease; }
-  .tmc-avail-pct {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
+  .tmc-dual-col { flex: 1; min-width: 0; }
+  .tmc-dual-col .lbl {
     font-family: 'Inter', sans-serif;
     font-size: 11px;
-    font-weight: 700;
-    color: var(--navy);
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
   }
-
-  /* Segmented composition bar */
-  .tmc-bar {
-    display: flex;
-    height: 8px;
+  .tmc-dual-col .val {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+  .tmc-dual-col .val.negative { color: var(--error); }
+  .tmc-dual-col .sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .tmc-dual-divider {
+    width: 1px;
+    background: var(--sand);
+    flex-shrink: 0;
+  }
+  .tmc-mini-bar {
+    height: 5px;
     border-radius: 999px;
     background: var(--sand);
     overflow: hidden;
   }
-  .tmc-bar-seg { height: 100%; transition: width 0.4s ease; }
-  .tmc-bar-seg.tmc-spent { background: var(--orange); }
-  .tmc-bar-seg.tmc-saved { background: var(--teal); }
-  .tmc-bar-seg.tmc-avail { background: var(--blue); }
+  .tmc-mini-bar .fill {
+    height: 100%;
+    background: var(--teal);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+  }
+  .tmc-mini-bar .fill.over { background: var(--error); }
 
   /* Goals carousel */
   .goals-carousel {
@@ -6806,12 +6805,33 @@
       <div class="hs-metrics" id="healthMetrics"></div>
     </div>
 
-    <!-- This Month card — income/spent/saved summary + available-to-spend gauge -->
+    <!-- This Month card — dual view: Budget-left (plan adherence) and
+         Discretionary-left (true "spendable" buffer after obligations).
+         Small income/spent/saved stats below for the numerical detail. -->
     <button type="button" class="this-month-card" id="thisMonthCard" data-nav="transactions">
       <div class="tmc-head">
         <span class="tmc-title" id="tmcTitle">This month</span>
         <span class="tmc-arrow">→</span>
       </div>
+
+      <!-- Two-column hybrid: Budget left | Discretionary left -->
+      <div class="tmc-dual">
+        <div class="tmc-dual-col" id="tmcBudgetCol">
+          <div class="lbl">Budget left</div>
+          <div class="val" id="tmcBudgetLeft">₱0</div>
+          <div class="sub" id="tmcBudgetSub">of ₱0 planned</div>
+          <div class="tmc-mini-bar"><div class="fill" id="tmcBudgetBar" style="width:0%"></div></div>
+        </div>
+        <div class="tmc-dual-divider"></div>
+        <div class="tmc-dual-col" id="tmcDiscretionaryCol">
+          <div class="lbl">Discretionary left</div>
+          <div class="val" id="tmcDiscretionaryLeft">₱0</div>
+          <div class="sub" id="tmcDiscretionarySub">of ₱0 buffer</div>
+          <div class="tmc-mini-bar"><div class="fill" id="tmcDiscretionaryBar" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- Supporting numbers: this month's raw totals -->
       <div class="tmc-numbers">
         <div class="tmc-num">
           <div class="lbl">Income</div>
@@ -6825,26 +6845,6 @@
           <div class="lbl">Saved</div>
           <div class="val positive" id="tmcSaved">₱0</div>
         </div>
-      </div>
-      <div class="tmc-available">
-        <div class="tmc-avail-info">
-          <div class="lbl">Available to spend</div>
-          <div class="val" id="tmcAvailable">₱0</div>
-        </div>
-        <div class="tmc-avail-ring">
-          <svg viewBox="0 0 60 60" id="tmcAvailRing">
-            <circle cx="30" cy="30" r="24" fill="none" stroke="var(--sand)" stroke-width="6" />
-            <circle cx="30" cy="30" r="24" fill="none" stroke="var(--teal)" stroke-width="6"
-                    stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"
-                    transform="rotate(-90 30 30)" id="tmcAvailArc" />
-          </svg>
-          <div class="tmc-avail-pct" id="tmcAvailPct">0%</div>
-        </div>
-      </div>
-      <div class="tmc-bar" aria-hidden="true">
-        <div class="tmc-bar-seg tmc-spent"  id="tmcBarSpent"  style="width:0%"></div>
-        <div class="tmc-bar-seg tmc-saved"  id="tmcBarSaved"  style="width:0%"></div>
-        <div class="tmc-bar-seg tmc-avail"  id="tmcBarAvail"  style="width:0%"></div>
       </div>
     </button>
 
@@ -7918,7 +7918,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.14';
+  const APP_VERSION = '2026-08-10.15';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -10661,7 +10661,35 @@
   }
   function sumMonthlyExpenses(user) {
     if (!Array.isArray(user.expenses)) return 0;
-    return user.expenses.reduce((s, e) => s + ((Number(e.amount) || 0) * (BUDGET_TO_MONTHLY[e.frequency] || 1)), 0);
+    return user.expenses.reduce((s, e) => {
+      // Respect the item's timing choice: sinking-fund expenses contribute
+      // 0 to monthly obligations (the paired Ipon goal takes the load
+      // instead, and is counted via sumMonthlySavings). Due-month expenses
+      // for quarterly/annual only count in the actual due month — outside
+      // the due month they're 0.
+      const timing = e.timing;
+      const amt = Number(e.amount) || 0;
+      const freq = e.frequency;
+      if (freq === 'quarterly' || freq === 'annually') {
+        if (timing === 'sinking-fund') return s;   // paired goal covers it
+        if (timing === 'due-month') {
+          const nowMonth = new Date().getMonth() + 1;
+          const dueMonth = Number(e.dueMonth);
+          if (freq === 'annually' && dueMonth && dueMonth !== nowMonth) return s;
+          // For quarterly with due-month timing, assume it counts every 3 months
+          // starting from the due month (or Jan if unset). Simplification: only
+          // count in months where (nowMonth - dueMonth) is divisible by 3.
+          if (freq === 'quarterly') {
+            const base = dueMonth || 1;
+            if (((nowMonth - base) % 3 + 3) % 3 !== 0) return s;
+          }
+          // In the due month, count the full amount
+          return s + amt;
+        }
+      }
+      // Everything else (smooth timing OR non-quarterly/annual): monthly-equivalent
+      return s + amt * (BUDGET_TO_MONTHLY[freq] || 1);
+    }, 0);
   }
   function sumMonthlySavings(user) {
     if (!Array.isArray(user.goals)) return 0;
@@ -10757,8 +10785,11 @@
     goto('home');
   }
 
-  // "This Month" card — income received, expense paid, saved this month,
-  // plus an "available to spend" gauge from remaining monthly budget.
+  // "This Month" card — dual view showing (1) how much of the month's
+  // planned budget remains after actual spending, and (2) how much
+  // discretionary buffer remains (income beyond planned obligations, less
+  // any budget overspend that eats into it). Small income/spent/saved stats
+  // below for the raw totals.
   function renderThisMonthCard(user) {
     const period = getCurrentPeriod('monthly');
     const txs = (user.transactions || []).filter(t => isDateInPeriod(t.date, period));
@@ -10766,39 +10797,69 @@
     const income  = txs.filter(t => t.type === 'income' && !isLoanPaymentTx(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const spent   = txs.filter(t => t.type === 'expense' && !isLoanPaymentTx(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const saved   = txs.filter(t => t.type === 'saving').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const available = income - spent - saved;
 
-    // Title with date range e.g. "This month (Aug 1 – Aug 8)"
+    // Monthly obligations (planned expenses + savings goal contributions).
+    // This is the ceiling for "Budget left" — subtracting actual spend from
+    // it gives the plan-adherence view.
+    const plannedExpenses = sumMonthlyExpenses(user);
+    const plannedSavings  = sumMonthlySavings(user);
+    const plannedBudget   = plannedExpenses + plannedSavings;
+
+    // Planned monthly income (from the incomes list, not what's been received
+    // yet this month). Used to compute the theoretical discretionary buffer.
+    const plannedIncome  = monthlyIncomeTotal(user);
+    const discretionaryBuffer = Math.max(plannedIncome - plannedBudget, 0);
+
+    // Budget left = planned obligations minus actual spending. Can go negative
+    // if the user overspends — that overage eats into the discretionary buffer.
+    const budgetLeft = plannedBudget - spent;
+    const budgetOverspend = Math.max(-budgetLeft, 0);   // how much beyond budget
+    const budgetLeftDisplay = Math.max(budgetLeft, 0);
+    const budgetUsedPct = plannedBudget > 0 ? clamp((spent / plannedBudget) * 100, 0, 100) : 0;
+
+    // Discretionary left = base buffer minus any budget overspend. Can go
+    // negative when overspending exceeds the buffer entirely.
+    const discretionaryLeft = discretionaryBuffer - budgetOverspend;
+    const discretionaryUsedPct = discretionaryBuffer > 0
+      ? clamp((budgetOverspend / discretionaryBuffer) * 100, 0, 100)
+      : 0;
+
+    // Title with date range e.g. "This month (Aug 1 – Aug 14)"
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthShort = now.toLocaleDateString('en-PH', { month: 'short' });
     document.getElementById('tmcTitle').textContent = `This month (${monthShort} ${start.getDate()} – ${monthShort} ${now.getDate()})`;
 
+    // Small supporting stats
     document.getElementById('tmcIncome').textContent = peso(income);
     document.getElementById('tmcSpent').textContent  = peso(spent);
     document.getElementById('tmcSaved').textContent  = peso(saved);
 
-    const availEl = document.getElementById('tmcAvailable');
-    availEl.textContent = peso(Math.abs(available));
-    availEl.classList.toggle('negative', available < 0);
+    // Budget-left column
+    const budgetLeftEl = document.getElementById('tmcBudgetLeft');
+    budgetLeftEl.textContent = budgetLeft < 0
+      ? `−${peso(budgetOverspend).replace('₱', '₱')}`
+      : peso(budgetLeftDisplay);
+    budgetLeftEl.classList.toggle('negative', budgetLeft < 0);
+    document.getElementById('tmcBudgetSub').textContent =
+      budgetLeft < 0
+        ? `Over by ${peso(budgetOverspend)}`
+        : `of ${peso(plannedBudget)} planned`;
+    document.getElementById('tmcBudgetBar').style.width = budgetUsedPct + '%';
+    document.getElementById('tmcBudgetBar').classList.toggle('over', budgetLeft < 0);
 
-    // Ring: available / income
-    const pct = income > 0 ? clamp((available / income) * 100, 0, 100) : 0;
-    document.getElementById('tmcAvailPct').textContent = income > 0 ? `${Math.round(pct)}%` : '—';
-    const CIRC = 2 * Math.PI * 24; // r=24
-    const arc = document.getElementById('tmcAvailArc');
-    arc.setAttribute('stroke-dasharray', CIRC.toFixed(1));
-    arc.setAttribute('stroke-dashoffset', (CIRC * (1 - pct / 100)).toFixed(1));
-    arc.setAttribute('stroke', available < 0 ? 'var(--error)' : 'var(--teal)');
-
-    // Composition bar (spent | saved | remaining) as percentages of income
-    const total = Math.max(income, spent + saved + Math.max(available, 0), 1);
-    const spentPct = (spent / total) * 100;
-    const savedPct = (saved / total) * 100;
-    const availPct = Math.max(0, (available / total) * 100);
-    document.getElementById('tmcBarSpent').style.width = spentPct.toFixed(1) + '%';
-    document.getElementById('tmcBarSaved').style.width = savedPct.toFixed(1) + '%';
-    document.getElementById('tmcBarAvail').style.width = availPct.toFixed(1) + '%';
+    // Discretionary-left column
+    const disEl = document.getElementById('tmcDiscretionaryLeft');
+    disEl.textContent = discretionaryLeft < 0
+      ? `−${peso(Math.abs(discretionaryLeft))}`
+      : peso(discretionaryLeft);
+    disEl.classList.toggle('negative', discretionaryLeft < 0);
+    document.getElementById('tmcDiscretionarySub').textContent =
+      discretionaryBuffer > 0
+        ? `of ${peso(discretionaryBuffer)} buffer`
+        : 'no buffer';
+    document.getElementById('tmcDiscretionaryBar').style.width = discretionaryUsedPct + '%';
+    document.getElementById('tmcDiscretionaryBar').classList.toggle('over', discretionaryLeft < 0);
   }
 
   // Goals Progress carousel — horizontal scroll of goal cards
