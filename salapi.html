@@ -8250,7 +8250,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.23';
+  const APP_VERSION = '2026-08-10.24';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -12331,14 +12331,22 @@
           </div>
           ${actionHtml}
         `;
-        // In select mode: whole-tile tap toggles selection (intercepts before
-        // the global data-tap-detail handler opens the detail view).
+        // In select mode: whole-tile tap toggles selection. Update in place
+        // (toggle class, checkmark, recompute subtotal bar) instead of
+        // calling showBudgetView — a full re-render resets scroll position
+        // to the top and is jarring when selecting multiple items in a row.
         if (budgetSelectMode) {
           item.addEventListener('click', (ev) => {
             ev.stopPropagation();
-            if (budgetSelectedIds.has(exp.id)) budgetSelectedIds.delete(exp.id);
-            else budgetSelectedIds.add(exp.id);
-            showBudgetView(user);
+            const nowSelected = !budgetSelectedIds.has(exp.id);
+            if (nowSelected) budgetSelectedIds.add(exp.id);
+            else budgetSelectedIds.delete(exp.id);
+            // Update this tile's visual state
+            item.classList.toggle('selected', nowSelected);
+            const check = item.querySelector('.tile-select-check');
+            if (check) check.textContent = nowSelected ? '✓' : '';
+            // Update the subtotal bar without re-rendering the list
+            updateBudgetSelectionBar(user);
           });
         }
         // Direct handler for + Spent
@@ -12480,26 +12488,42 @@
           const bar = document.createElement('div');
           bar.className = 'budget-select-bar';
           bar.id = 'budgetSelectBar';
-          const selectedItems = (user.expenses || []).filter(e => budgetSelectedIds.has(e.id));
-          const selectedTotal = selectedItems.reduce((s, e) => s + expenseMonthlyAmount(e), 0);
-          const n = selectedItems.length;
-          bar.innerHTML = `
-            <div class="bsb-info">
-              <span class="bsb-count">${n} selected</span>
-              <span class="bsb-total">${peso(selectedTotal)}<span class="per">/mo</span></span>
-            </div>
-            ${n > 0 ? `<button type="button" class="bsb-clear" id="budgetSelectClear">Clear</button>` : ''}
-          `;
           list.appendChild(bar);
-          const clearBtn = bar.querySelector('#budgetSelectClear');
-          if (clearBtn) {
-            clearBtn.addEventListener('click', () => {
-              budgetSelectedIds.clear();
-              showBudgetView(user);
-            });
-          }
+          updateBudgetSelectionBar(user);   // populates initial content + wires Clear
         }
       }
+
+      // Update the selection subtotal bar in place from budgetSelectedIds.
+      // Called after every selection toggle so we don't have to re-render
+      // the whole Budget page just to refresh the count + sum.
+      window._updateBudgetSelectionBar = function(u) {
+        const bar = document.getElementById('budgetSelectBar');
+        if (!bar) return;
+        const selectedItems = (u.expenses || []).filter(e => budgetSelectedIds.has(e.id));
+        const selectedTotal = selectedItems.reduce((s, e) => s + expenseMonthlyAmount(e), 0);
+        const n = selectedItems.length;
+        bar.innerHTML = `
+          <div class="bsb-info">
+            <span class="bsb-count">${n} selected</span>
+            <span class="bsb-total">${peso(selectedTotal)}<span class="per">/mo</span></span>
+          </div>
+          ${n > 0 ? `<button type="button" class="bsb-clear" id="budgetSelectClear">Clear</button>` : ''}
+        `;
+        const clearBtn = bar.querySelector('#budgetSelectClear');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', () => {
+            budgetSelectedIds.clear();
+            // Update all tile visuals in place instead of re-rendering
+            document.querySelectorAll('.expense-tile.selectable.selected').forEach(el => {
+              el.classList.remove('selected');
+              const check = el.querySelector('.tile-select-check');
+              if (check) check.textContent = '';
+            });
+            updateBudgetSelectionBar(u);
+          });
+        }
+      };
+      const updateBudgetSelectionBar = window._updateBudgetSelectionBar;
 
       // -------- Expenses list: grouped/sorted based on user selection --------
       const expenses = user.expenses || [];
