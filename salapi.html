@@ -2447,6 +2447,26 @@
      ============================== */
   #screen-transactions { padding: 24px; }
 
+  /* Sticky top group — freezes the header, search bar, and filter dropdown
+     when the transaction list scrolls. Edge-to-edge cream background covers
+     any content scrolling behind. Bottom of the group is at top: 0 sticky. */
+  .txh-sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--cream);
+    margin: -24px -24px 0;
+    padding: 24px 24px 4px;
+    /* Subtle bottom shadow so the seam between sticky group and scrolling
+       list is visible when scrolling. */
+    box-shadow: 0 8px 12px -8px rgba(10, 37, 64, 0.10);
+  }
+  /* The inner elements keep their existing margins but the last one
+     (filter-wrap) gets zeroed so its own margin doesn't reappear outside
+     the sticky group. */
+  .txh-sticky-top .txh-filter-wrap { margin-bottom: 0; }
+  #txhContent { padding-top: 16px; }
+
   .txh-header {
     display: flex;
     align-items: center;
@@ -5048,6 +5068,13 @@
     padding: 8px 0;
     margin-bottom: 18px;
   }
+  .budget-sort-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+  }
   .budget-sort-lbl {
     font-family: 'Inter', sans-serif;
     font-size: 11px;
@@ -5069,6 +5096,120 @@
     border-color: var(--sand);
     height: auto;
     min-height: 0;
+  }
+
+  /* Select toggle — enters multi-select mode where tapping tiles chooses
+     them and shows a running subtotal. */
+  .budget-select-btn {
+    background: var(--cream-2);
+    border: 1.5px solid var(--sand);
+    color: var(--navy);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .budget-select-btn:hover {
+    border-color: var(--muted);
+  }
+  .budget-select-btn.active {
+    background: var(--blue);
+    color: var(--white);
+    border-color: var(--blue);
+  }
+
+  /* Subtotal bar for the selected items — sticky-adjacent under the sort row,
+     bold summary of count + monthly sum. */
+  .budget-select-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: linear-gradient(135deg, rgba(26, 71, 214, 0.12), rgba(26, 71, 214, 0.04));
+    border: 1.5px solid rgba(26, 71, 214, 0.28);
+    border-radius: 14px;
+    padding: 12px 16px;
+    margin-bottom: 18px;
+  }
+  .budget-select-bar .bsb-info {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+  .budget-select-bar .bsb-count {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .budget-select-bar .bsb-total {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .budget-select-bar .bsb-total .per {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+  .budget-select-bar .bsb-clear {
+    background: transparent;
+    border: none;
+    color: var(--blue);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .budget-select-bar .bsb-clear:hover { text-decoration: underline; }
+
+  /* Selectable tiles — subtle visual cue that they're tappable to select. */
+  .expense-tile.selectable {
+    position: relative;
+    cursor: pointer;
+  }
+  .expense-tile.selectable.selected {
+    border-color: var(--blue);
+    background: linear-gradient(135deg, rgba(26, 71, 214, 0.06), rgba(26, 71, 214, 0.02));
+  }
+  .tile-select-check {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--sand);
+    background: var(--white);
+    display: grid;
+    place-items: center;
+    color: var(--white);
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+    z-index: 2;
+    transition: all 0.15s ease;
+  }
+  .expense-tile.selectable.selected .tile-select-check {
+    background: var(--blue);
+    border-color: var(--blue);
   }
 
   /* Dual-column layout: Budget left | Discretionary left. Two large numbers
@@ -5842,6 +5983,19 @@
     font-weight: 700;
     padding: 14px 4px 8px;
     margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .budget-group-head .budget-group-subtotal {
+    color: var(--navy);
+    font-family: 'Fraunces', serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
   }
   .wallet-group-head:first-child,
   .budget-group-head:first-child { padding-top: 4px; margin-top: 0; }
@@ -5947,6 +6101,88 @@
     border-radius: 4px;
     margin-left: 6px;
     vertical-align: middle;
+  }
+
+  /* Tag pills — small colored labels attached to expenses/transactions.
+     Row of pills that wraps if there are many. Colour comes from the tag's
+     stored value; background is a low-alpha tint of the same colour. */
+  .tag-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .tag-pill {
+    display: inline-block;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  /* Tag chips inside the expense form — bigger and interactive (each has a
+     ✕ button to remove). Also includes an "+ Tag" button at the end that
+     opens the picker. */
+  .tags-section {
+    margin: 14px 0;
+  }
+  .tags-section .paycheck-label {
+    display: block;
+    margin-bottom: 8px;
+  }
+  .tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 6px 4px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    line-height: 1.2;
+  }
+  .tag-chip-remove {
+    background: transparent;
+    border: none;
+    color: inherit;
+    opacity: 0.65;
+    cursor: pointer;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 50%;
+  }
+  .tag-chip-remove:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+  .tag-add-btn {
+    background: var(--cream-2);
+    border: 1.5px dashed var(--sand);
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .tag-add-btn:hover {
+    border-color: var(--teal);
+    color: var(--teal);
   }
 
   /* Read-only "Edit on Budget →" hint on the Ipon page tile in place of
@@ -6173,6 +6409,27 @@
     transform: scale(1.05);
   }
   .cat-icon-choice .svg-inline-icon { width: 22px; height: 22px; }
+
+  /* Tag color picker — swatches the user picks from when creating a tag.
+     Selected swatch grows slightly and adds a subtle ring. */
+  .tag-color-grid {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 8px;
+    padding: 4px;
+  }
+  .tag-color-swatch {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    padding: 0;
+  }
+  .tag-color-swatch.active {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px var(--cream), 0 0 0 4px currentColor;
+  }
   .wallet-info h3 {
     font-family: 'Inter', sans-serif;
     font-size: 15px;
@@ -6306,6 +6563,24 @@
       <div class="confirm-modal-actions">
         <button type="button" class="btn btn-ghost" data-catmodal-cancel>Cancel</button>
         <button type="button" class="btn btn-primary" id="customCategorySaveBtn">Save category</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tag modal — name + color picker. Used to add or edit a single tag. -->
+  <div class="confirm-modal" id="tagModal" aria-hidden="true">
+    <div class="confirm-modal-backdrop" data-tagmodal-cancel></div>
+    <div class="confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="tagModalTitle" style="max-width: 380px;">
+      <h3 class="confirm-modal-title" id="tagModalTitle">Add tag</h3>
+      <div class="confirm-modal-body">
+        <label class="paycheck-label" style="display:block; margin-bottom:6px;">Tag name</label>
+        <input type="text" class="input" id="tagNameInput" maxlength="20" placeholder="e.g. Cash, Online, Kids" style="margin-bottom:14px;" />
+        <label class="paycheck-label" style="display:block; margin-bottom:6px;">Pick a color</label>
+        <div class="tag-color-grid" id="tagColorGrid"></div>
+      </div>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn btn-ghost" data-tagmodal-cancel>Cancel</button>
+        <button type="button" class="btn btn-primary" id="tagSaveBtn">Save tag</button>
       </div>
     </div>
   </div>
@@ -7701,6 +7976,19 @@
       <span class="pa-chev">›</span>
     </button>
 
+    <!-- Manage tags — colored labels that slice budget/transactions by any
+         axis (cash vs online, personal vs family, etc). Editable anytime. -->
+    <button type="button" class="profile-action-card" id="manageTagsCard">
+      <div class="pa-icon" style="background: rgba(139, 92, 246, 0.14); color: #8B5CF6;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M20.59 13.41L13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title">Manage tags</div>
+        <div class="pa-sub" id="manageTagsSub">Colored labels for expenses — cash vs online, personal, etc.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
     <div class="profile-section-head">Backup &amp; restore</div>
 
     <button type="button" class="profile-action-card" id="exportJsonCard">
@@ -7847,6 +8135,12 @@
         <input class="input" type="text" id="txNote" placeholder="What was this for?" maxlength="80" style="padding-left: 16px;" />
       </div>
 
+      <!-- Tags — reuse the same picker used on the expense form -->
+      <div class="field" id="txTagsField">
+        <label>Tags <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+        <div class="tag-chips" id="txTagChips"></div>
+      </div>
+
       <div class="income-actions" style="margin-top: 20px;">
         <button class="btn btn-primary" id="saveTxBtn" type="button">Save transaction</button>
         <button class="btn btn-ghost" type="button" data-nav="home">Cancel</button>
@@ -7857,32 +8151,36 @@
 
   <!-- ============ TRANSACTIONS HISTORY ============ -->
   <section class="screen" id="screen-transactions">
-    <div class="txh-header">
-      <button class="hamburger" data-open-drawer type="button" aria-label="Menu" id="txhMenuBtn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-      </button>
-      <h1 id="txhTitle">Transactions</h1>
-      <button class="txh-select-btn" type="button" id="txhSelectBtn" aria-label="Select transactions">Select</button>
-      <button class="txh-add-btn" type="button" data-nav="transaction" aria-label="Add transaction" id="txhAddBtn">+</button>
-    </div>
+    <!-- Sticky top group: header + search + filter dropdown. Everything up
+         to (and including) the filter stays pinned when the list scrolls. -->
+    <div class="txh-sticky-top">
+      <div class="txh-header">
+        <button class="hamburger" data-open-drawer type="button" aria-label="Menu" id="txhMenuBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <h1 id="txhTitle">Transactions</h1>
+        <button class="txh-select-btn" type="button" id="txhSelectBtn" aria-label="Select transactions">Select</button>
+        <button class="txh-add-btn" type="button" data-nav="transaction" aria-label="Add transaction" id="txhAddBtn">+</button>
+      </div>
 
-    <!-- Search — live-filters the list as you type -->
-    <div class="txh-search-wrap" id="txhSearchWrap">
-      <span class="txh-search-icon" aria-hidden="true">🔍</span>
-      <input type="search" id="txhSearch" placeholder="Search by name, note, or amount…" autocomplete="off" spellcheck="false" />
-      <button type="button" class="txh-search-clear" id="txhSearchClear" aria-label="Clear search" style="display:none;">×</button>
-    </div>
+      <!-- Search — live-filters the list as you type -->
+      <div class="txh-search-wrap" id="txhSearchWrap">
+        <span class="txh-search-icon" aria-hidden="true">🔍</span>
+        <input type="search" id="txhSearch" placeholder="Search by name, note, or amount…" autocomplete="off" spellcheck="false" />
+        <button type="button" class="txh-search-clear" id="txhSearchClear" aria-label="Clear search" style="display:none;">×</button>
+      </div>
 
-    <div class="txh-filter-wrap">
-      <div class="select-wrap">
-        <select class="input select txh-filter-select" id="txhFilterSelect">
-          <option value="all">All transactions</option>
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-          <option value="saving">Saving</option>
-          <option value="transfer">Transfer</option>
-        </select>
-        <span class="select-caret">▾</span>
+      <div class="txh-filter-wrap">
+        <div class="select-wrap">
+          <select class="input select txh-filter-select" id="txhFilterSelect">
+            <option value="all">All transactions</option>
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+            <option value="saving">Saving</option>
+            <option value="transfer">Transfer</option>
+          </select>
+          <span class="select-caret">▾</span>
+        </div>
       </div>
     </div>
 
@@ -7952,7 +8250,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.17';
+  const APP_VERSION = '2026-08-10.22';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9140,6 +9438,41 @@
     return found.label.replace(/^[^\w\d]+\s*/, '');
   }
 
+  // ---- Tags -----------------------------------------------------------------
+  // Tags are lightweight labels the user can attach to expenses (and later
+  // transactions) to slice their budget by whatever axis matters to them —
+  // "cash vs online", "personal vs family", "recurring vs one-off", etc.
+  // Stored on the user as `tags: [{id, name, color}]`. Items reference them
+  // via `tagIds: [string]`.
+  const TAG_COLORS = [
+    '#F27231', // orange
+    '#1A47D6', // blue
+    '#2CBCB1', // teal
+    '#F9B400', // gold
+    '#E85C7B', // rose
+    '#8B5CF6', // purple
+    '#10B981', // green
+    '#0A2540', // navy
+    '#6B7280', // gray
+  ];
+  function getAllTags(user) {
+    return Array.isArray(user?.tags) ? user.tags : [];
+  }
+  function getTagById(user, id) {
+    return getAllTags(user).find(t => t.id === id) || null;
+  }
+  // Render inline tag pills for a tile. Each pill uses the tag's color at
+  // low opacity for background, full opacity for the border + text.
+  function renderTagPills(tagIds, user) {
+    if (!Array.isArray(tagIds) || !tagIds.length) return '';
+    const tags = tagIds.map(id => getTagById(user, id)).filter(Boolean);
+    if (!tags.length) return '';
+    return `<div class="tag-pills">${tags.map(t => {
+      const c = t.color || '#6B7280';
+      return `<span class="tag-pill" style="background:${c}18; color:${c}; border-color:${c}44;">${escapeAttr(t.name)}</span>`;
+    }).join('')}</div>`;
+  }
+
   // Starter chips: name, category, sensible default frequency
   const STARTERS = [
     { key: 'rent',      icon: '🏠', name: 'Rent',          category: 'housing',       frequency: 'monthly' },
@@ -9178,6 +9511,7 @@
       // back to 'smooth' for backward compat.
       timing: 'due-month',
       sinkingFundGoalId: null,   // when timing='sinking-fund', the paired goal
+      tagIds: [],                // user-picked colored tags for slicing
       ...overrides,
     };
   }
@@ -9326,6 +9660,8 @@
 
       ${renderTimingPicker(exp)}
 
+      ${renderTagsSection(exp)}
+
       <div class="month-eq">
         <span>Monthly equivalent</span>
         <span class="val" data-eq>${peso(expenseMonthly(exp))}</span>
@@ -9334,6 +9670,73 @@
 
     wireExpenseCard(card, exp);
     return card;
+  }
+
+  // Tags section for the expense form — inline chips of currently-selected
+  // tags plus an "+ Add tag" button that opens a picker (or lets the user
+  // create a new tag on the fly). Wrapped in [data-tags-section] so it can
+  // be re-rendered when the selection changes.
+  function renderTagsSection(exp) {
+    const selectedIds = Array.isArray(exp.tagIds) ? exp.tagIds : [];
+    const tags = getAllTags(userCache);
+    const selectedTags = selectedIds.map(id => tags.find(t => t.id === id)).filter(Boolean);
+    return `
+      <div class="tags-section" data-tags-section>
+        <label class="paycheck-label">Tags</label>
+        <div class="tag-chips">
+          ${selectedTags.map(t => `
+            <span class="tag-chip" style="background:${t.color}18; color:${t.color}; border-color:${t.color}44;">
+              ${escapeAttr(t.name)}
+              <button type="button" class="tag-chip-remove" data-remove-tag="${t.id}" aria-label="Remove tag">✕</button>
+            </span>
+          `).join('')}
+          <button type="button" class="tag-add-btn" data-action="add-tag">+ Tag</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireTagsSection(card, exp) {
+    const section = card.querySelector('[data-tags-section]');
+    if (!section) return;
+    // Remove-tag chips
+    section.querySelectorAll('[data-remove-tag]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const id = btn.dataset.removeTag;
+        exp.tagIds = (exp.tagIds || []).filter(x => x !== id);
+        section.outerHTML = renderTagsSection(exp);
+        wireTagsSection(card, exp);
+      });
+    });
+    // Add-tag button: opens picker of available tags + "create new"
+    const addBtn = section.querySelector('[data-action="add-tag"]');
+    if (addBtn) {
+      addBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const alreadySelected = new Set(exp.tagIds || []);
+        const available = getAllTags(userCache).filter(t => !alreadySelected.has(t.id));
+        const options = available.map(t => ({
+          key: t.id,
+          label: t.name,
+          sub: '',
+          icon: '●',
+        }));
+        options.push({ key: '__new__', label: '+ Create new tag', sub: '', icon: '＋' });
+        const picked = await showPicker({ icon: '🏷', title: 'Add tag', options });
+        if (!picked) return;
+        if (picked === '__new__') {
+          const created = await openTagModal();
+          if (!created) return;
+          exp.tagIds = [...(exp.tagIds || []), created.id];
+        } else {
+          exp.tagIds = [...(exp.tagIds || []), picked];
+        }
+        section.outerHTML = renderTagsSection(exp);
+        wireTagsSection(card, exp);
+      });
+    }
   }
 
   // Timing picker — only meaningful for quarterly/annual expenses. Always
@@ -9595,6 +9998,8 @@
     // wireTimingSection because the whole block gets replaced on frequency /
     // timing changes and both need re-wiring together.
     wireTimingSection(card, exp);
+    // Tags picker — wire the add/remove chip handlers
+    wireTagsSection(card, exp);
   }
 
   // Wire everything inside the timing block — the timing dropdown itself and
@@ -9703,6 +10108,7 @@
         manualPayFrom: exp.manualPayFrom || null,
         timing: exp.timing || 'sinking-fund',
         sinkingFundGoalId: exp.sinkingFundGoalId,
+        tagIds: Array.isArray(exp.tagIds) ? exp.tagIds : [],
       };
       const newExpenses = mergeSingle(u.expenses, cleanedExpense, isNewExpense);
       const newGoals = [...(u.goals || []), goal];
@@ -9813,6 +10219,7 @@
         manualPayFrom: e.manualPayFrom || null,
         timing: e.timing || 'smooth',
         sinkingFundGoalId: e.sinkingFundGoalId || null,
+        tagIds: Array.isArray(e.tagIds) ? e.tagIds : [],
       }));
 
     if (cleaned.length === 0 && expenseDraft.length > 0) {
@@ -10693,37 +11100,35 @@
     if (!Array.isArray(user.incomes)) return 0;
     return user.incomes.reduce((s, i) => s + ((Number(i.amount) || 0) * (TO_MONTHLY[i.frequency] || 1)), 0);
   }
+  // Return the monthly-equivalent contribution of a single expense to the
+  // budget total, respecting timing:
+  //   - sinking-fund quarterly/annual → 0 (paired Ipon goal absorbs the load)
+  //   - due-month quarterly/annual   → full amount in due month, 0 otherwise
+  //   - smooth quarterly/annual      → amount / (3 or 12) as monthly average
+  //   - weekly/semi-monthly/monthly  → standard monthly multiplier
+  function expenseMonthlyAmount(e) {
+    const timing = e.timing;
+    const amt = Number(e.amount) || 0;
+    const freq = e.frequency;
+    if (freq === 'quarterly' || freq === 'annually') {
+      if (timing === 'sinking-fund') return 0;
+      if (timing === 'due-month') {
+        const nowMonth = new Date().getMonth() + 1;
+        const dueMonth = Number(e.dueMonth);
+        if (freq === 'annually' && dueMonth && dueMonth !== nowMonth) return 0;
+        if (freq === 'quarterly') {
+          const base = dueMonth || 1;
+          if (((nowMonth - base) % 3 + 3) % 3 !== 0) return 0;
+        }
+        return amt;
+      }
+    }
+    return amt * (BUDGET_TO_MONTHLY[freq] || 1);
+  }
+
   function sumMonthlyExpenses(user) {
     if (!Array.isArray(user.expenses)) return 0;
-    return user.expenses.reduce((s, e) => {
-      // Respect the item's timing choice: sinking-fund expenses contribute
-      // 0 to monthly obligations (the paired Ipon goal takes the load
-      // instead, and is counted via sumMonthlySavings). Due-month expenses
-      // for quarterly/annual only count in the actual due month — outside
-      // the due month they're 0.
-      const timing = e.timing;
-      const amt = Number(e.amount) || 0;
-      const freq = e.frequency;
-      if (freq === 'quarterly' || freq === 'annually') {
-        if (timing === 'sinking-fund') return s;   // paired goal covers it
-        if (timing === 'due-month') {
-          const nowMonth = new Date().getMonth() + 1;
-          const dueMonth = Number(e.dueMonth);
-          if (freq === 'annually' && dueMonth && dueMonth !== nowMonth) return s;
-          // For quarterly with due-month timing, assume it counts every 3 months
-          // starting from the due month (or Jan if unset). Simplification: only
-          // count in months where (nowMonth - dueMonth) is divisible by 3.
-          if (freq === 'quarterly') {
-            const base = dueMonth || 1;
-            if (((nowMonth - base) % 3 + 3) % 3 !== 0) return s;
-          }
-          // In the due month, count the full amount
-          return s + amt;
-        }
-      }
-      // Everything else (smooth timing OR non-quarterly/annual): monthly-equivalent
-      return s + amt * (BUDGET_TO_MONTHLY[freq] || 1);
-    }, 0);
+    return user.expenses.reduce((s, e) => s + expenseMonthlyAmount(e), 0);
   }
   function sumMonthlySavings(user) {
     if (!Array.isArray(user.goals)) return 0;
@@ -10977,6 +11382,7 @@
           <div class="rt-info">
             <div class="name">${escapeAttr(name)}</div>
             <div class="meta">${escapeAttr(meta)}</div>
+            ${renderTagPills(t.tagIds, user)}
           </div>
           <div class="rt-amt ${t.type}">${amt}</div>
         </div>
@@ -11587,6 +11993,11 @@
   // to the paired expense's id so the next showBudgetView() call knows
   // to scroll that tile into view + flash it.
   let pendingScrollToExpense = null;
+  // Budget page multi-select — off by default. When active, tapping a tile
+  // toggles selection (instead of opening the detail view) and a subtotal
+  // bar shows above the list summing the selected items' monthly load.
+  let budgetSelectMode = false;
+  let budgetSelectedIds = new Set();
 
   // Empty-state "Add X" buttons on view screens
   document.addEventListener('click', async e => {
@@ -11850,8 +12261,11 @@
       // Helper: render a single budget item (was inline; extracted so both
       // groups can use it without duplicating).
       const renderBudgetItem = (exp) => {
+        const isSelected = budgetSelectedIds.has(exp.id);
         const item = document.createElement('div');
-        item.className = 'view-goal expense-tile';   // reuse the savings-style progress layout
+        item.className = 'view-goal expense-tile'
+          + (budgetSelectMode ? ' selectable' : '')
+          + (isSelected ? ' selected' : '');
         item.dataset.tapDetail = 'expense';
         item.dataset.entryId = exp.id;
         const due = dueText(exp);
@@ -11874,13 +12288,39 @@
         } else {
           rightText = `${peso(planned - spent)} left`;
         }
+        // For quarterly/annually expenses, show the monthly-equivalent
+        // alongside the raw amount so the user always sees "what does this
+        // cost me per month?" — regardless of timing (smooth / sinking-fund /
+        // due-month). The monthly figure comes from the standard multiplier
+        // (amount / 3 for quarterly, / 12 for annually).
+        const showMonthlyEq = exp.frequency === 'quarterly' || exp.frequency === 'annually';
+        const monthlyEq = showMonthlyEq
+          ? planned * (BUDGET_TO_MONTHLY[exp.frequency] || 1)
+          : 0;
+        const monthlyEqPart = showMonthlyEq && monthlyEq > 0
+          ? ` · ${peso(monthlyEq)}/mo`
+          : '';
+        // In select mode, hide the Edit / + Spent action buttons — tapping
+        // the whole tile just toggles selection. Also show a checkmark badge
+        // on the top-right for selected tiles.
+        const selectCheckHtml = budgetSelectMode
+          ? `<div class="tile-select-check">${isSelected ? '✓' : ''}</div>`
+          : '';
+        const actionHtml = budgetSelectMode
+          ? ''
+          : `<div class="view-item-action">
+              <button class="row-edit-btn" type="button" data-edit-expense="${exp.id}">Edit</button>
+              <button class="row-edit-btn primary" type="button" data-log-expense-item="${exp.id}">+ Spent</button>
+            </div>`;
         item.innerHTML = `
+          ${selectCheckHtml}
           <div class="view-goal-head">
             <div class="view-item-icon expense">${catIcon}</div>
             <div class="view-item-info">
               <p class="name">${escapeAttr(exp.name || 'Unnamed')}</p>
-              <p class="meta">${peso(planned)}${FREQ_LABEL[exp.frequency] ? ' ' + FREQ_LABEL[exp.frequency].toLowerCase() : ''}${due ? ' · ' + due : ''}</p>
+              <p class="meta">${peso(planned)}${FREQ_LABEL[exp.frequency] ? ' ' + FREQ_LABEL[exp.frequency].toLowerCase() : ''}${monthlyEqPart}${due ? ' · ' + due : ''}</p>
               ${paycheckLineHtml(exp, user)}
+              ${renderTagPills(exp.tagIds, user)}
             </div>
             <div class="view-item-amount">${Math.round(pctRaw)}%</div>
           </div>
@@ -11889,11 +12329,18 @@
             <span>${peso(spent)} spent</span>
             <span class="${rightClass}">${rightText}</span>
           </div>
-          <div class="view-item-action">
-            <button class="row-edit-btn" type="button" data-edit-expense="${exp.id}">Edit</button>
-            <button class="row-edit-btn primary" type="button" data-log-expense-item="${exp.id}">+ Spent</button>
-          </div>
+          ${actionHtml}
         `;
+        // In select mode: whole-tile tap toggles selection (intercepts before
+        // the global data-tap-detail handler opens the detail view).
+        if (budgetSelectMode) {
+          item.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (budgetSelectedIds.has(exp.id)) budgetSelectedIds.delete(exp.id);
+            else budgetSelectedIds.add(exp.id);
+            showBudgetView(user);
+          });
+        }
         // Direct handler for + Spent
         const spentBtn = item.querySelector('[data-log-expense-item]');
         if (spentBtn) {
@@ -11993,6 +12440,7 @@
       const SORT_OPTIONS = [
         { v: 'category',  label: 'Category' },
         { v: 'payroll',   label: 'Payroll' },
+        { v: 'tag',       label: 'Tag' },
         { v: 'alpha',     label: 'Alphabetical' },
         { v: 'due',       label: 'Due date' },
         { v: 'amount',    label: 'Amount' },
@@ -12002,29 +12450,76 @@
         const sortRow = document.createElement('div');
         sortRow.className = 'budget-sort-row';
         sortRow.innerHTML = `
-          <label class="budget-sort-lbl">Sort by</label>
-          <div class="select-wrap budget-sort-select">
-            <select id="budgetSortSelect" class="input select">
-              ${SORT_OPTIONS.map(o => `<option value="${o.v}" ${sortMode === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}
-            </select>
-            <span class="select-caret">▾</span>
+          <div class="budget-sort-left">
+            <label class="budget-sort-lbl">Sort by</label>
+            <div class="select-wrap budget-sort-select">
+              <select id="budgetSortSelect" class="input select">
+                ${SORT_OPTIONS.map(o => `<option value="${o.v}" ${sortMode === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}
+              </select>
+              <span class="select-caret">▾</span>
+            </div>
           </div>
+          <button type="button" class="budget-select-btn ${budgetSelectMode ? 'active' : ''}" id="budgetSelectToggle">
+            ${budgetSelectMode ? 'Done' : 'Select'}
+          </button>
         `;
         list.appendChild(sortRow);
         sortRow.querySelector('#budgetSortSelect').addEventListener('change', (ev) => {
           localStorage.setItem(SORT_KEY, ev.target.value);
-          showBudgetView(user);   // re-render with new sort
+          showBudgetView(user);
         });
+        sortRow.querySelector('#budgetSelectToggle').addEventListener('click', () => {
+          budgetSelectMode = !budgetSelectMode;
+          if (!budgetSelectMode) budgetSelectedIds.clear();
+          showBudgetView(user);
+        });
+
+        // Subtotal bar — only visible in select mode. Shows count + sum of
+        // selected items' monthly load, plus a "Clear" action.
+        if (budgetSelectMode) {
+          const bar = document.createElement('div');
+          bar.className = 'budget-select-bar';
+          bar.id = 'budgetSelectBar';
+          const selectedItems = (user.expenses || []).filter(e => budgetSelectedIds.has(e.id));
+          const selectedTotal = selectedItems.reduce((s, e) => s + expenseMonthlyAmount(e), 0);
+          const n = selectedItems.length;
+          bar.innerHTML = `
+            <div class="bsb-info">
+              <span class="bsb-count">${n} selected</span>
+              <span class="bsb-total">${peso(selectedTotal)}<span class="per">/mo</span></span>
+            </div>
+            ${n > 0 ? `<button type="button" class="bsb-clear" id="budgetSelectClear">Clear</button>` : ''}
+          `;
+          list.appendChild(bar);
+          const clearBtn = bar.querySelector('#budgetSelectClear');
+          if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+              budgetSelectedIds.clear();
+              showBudgetView(user);
+            });
+          }
+        }
       }
 
       // -------- Expenses list: grouped/sorted based on user selection --------
       const expenses = user.expenses || [];
-      const renderGroup = (headerText, items) => {
+      // Helper: monthly-load per occurrence of an item in a payroll group.
+      // Semi-monthly items appear twice (once per paycheck) so each occurrence
+      // is half the monthly total. Everything else contributes its full
+      // monthly amount to the single paycheck it's assigned to.
+      const perOccurrenceAmount = (e) => {
+        const monthly = expenseMonthlyAmount(e);
+        return e.frequency === 'semi-monthly' ? monthly / 2 : monthly;
+      };
+      const renderGroup = (headerText, items, subtotalFn) => {
         if (!items || !items.length) return;
         if (headerText) {
+          const subtotal = subtotalFn
+            ? items.reduce((s, e) => s + subtotalFn(e), 0)
+            : items.reduce((s, e) => s + expenseMonthlyAmount(e), 0);
           const head = document.createElement('div');
           head.className = 'budget-group-head';
-          head.textContent = headerText;
+          head.innerHTML = `<span>${escapeAttr(headerText)}</span><span class="budget-group-subtotal">${peso(subtotal)}/mo</span>`;
           list.appendChild(head);
         }
         items.forEach(exp => list.appendChild(renderBudgetItem(exp)));
@@ -12079,7 +12574,7 @@
         });
         [...groups.values()]
           .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
-          .forEach(g => renderGroup(g.label, g.items));
+          .forEach(g => renderGroup(g.label, g.items, perOccurrenceAmount));
       } else if (sortMode === 'alpha') {
         renderGroup('', [...expenses].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
       } else if (sortMode === 'amount') {
@@ -12094,6 +12589,27 @@
           return diff >= 0 ? diff : diff + 31;
         };
         renderGroup('', [...expenses].sort((a, b) => daysUntil(Number(a.dueDay)) - daysUntil(Number(b.dueDay))));
+      } else if (sortMode === 'tag') {
+        // Group by tag. An item with multiple tags appears in EACH tag's
+        // group (matches how payroll grouping duplicates semi-monthly).
+        // Untagged items go into a special "Untagged" group at the bottom.
+        const allTags = getAllTags(user);
+        const byTag = new Map();
+        allTags.forEach(t => byTag.set(t.id, { label: t.name, order: 0, items: [] }));
+        const untagged = [];
+        expenses.forEach(e => {
+          const ids = Array.isArray(e.tagIds) ? e.tagIds : [];
+          if (!ids.length) { untagged.push(e); return; }
+          ids.forEach(id => {
+            if (byTag.has(id)) byTag.get(id).items.push(e);
+          });
+        });
+        // Render in the same order tags appear in user.tags
+        allTags.forEach(t => {
+          const g = byTag.get(t.id);
+          if (g && g.items.length) renderGroup(g.label, g.items);
+        });
+        if (untagged.length) renderGroup('Untagged', untagged);
       } else if (sortMode === 'frequency') {
         const FREQ_ORDER = { weekly: 1, 'semi-monthly': 2, monthly: 3, quarterly: 4, annually: 5 };
         const FREQ_LABELS = { weekly: 'Weekly', 'semi-monthly': 'Semi-monthly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' };
@@ -12490,6 +13006,85 @@
         const { data } = await auth.updateUser({ data: { customCategories: next } });
         // Keep userCache fresh so subsequent renders (like the parent dropdown
         // refresh) see the newly-added category.
+        if (data?.user) userCache = data.user;
+        cleanup(record);
+      };
+      const onCancel = () => cleanup(null);
+      const onKey    = (e) => {
+        if (e.key === 'Escape') cleanup(null);
+        else if (e.key === 'Enter' && document.activeElement === nameInp) onSave();
+      };
+      saveBtn.addEventListener('click', onSave);
+      cancels.forEach(el => el.addEventListener('click', onCancel));
+      document.addEventListener('keydown', onKey);
+    });
+  }
+
+  // Open the tag add/edit modal. Pass an existing tag object to edit; omit
+  // to create a new one. Resolves with the saved tag ({id, name, color}) or
+  // null on cancel/backdrop dismiss.
+  function openTagModal(existing = null) {
+    const modal   = document.getElementById('tagModal');
+    const titleEl = document.getElementById('tagModalTitle');
+    const nameInp = document.getElementById('tagNameInput');
+    const gridEl  = document.getElementById('tagColorGrid');
+    const saveBtn = document.getElementById('tagSaveBtn');
+    const cancels = modal.querySelectorAll('[data-tagmodal-cancel]');
+
+    // Pick a default color for new tags — cycles through the palette based
+    // on how many tags already exist so consecutive adds don't collide.
+    let selectedColor = existing?.color || TAG_COLORS[0];
+    titleEl.textContent = existing ? 'Edit tag' : 'Add tag';
+    nameInp.value = existing?.name || '';
+
+    const renderGrid = () => {
+      gridEl.innerHTML = TAG_COLORS.map(c => `
+        <button type="button" class="tag-color-swatch ${selectedColor === c ? 'active' : ''}"
+                data-color="${c}"
+                style="background:${c}; color:${c};"
+                title="${c}" aria-label="Color ${c}"></button>
+      `).join('');
+      gridEl.querySelectorAll('[data-color]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedColor = btn.dataset.color;
+          renderGrid();
+        });
+      });
+    };
+    renderGrid();
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => nameInp.focus(), 100);
+
+    return new Promise(resolve => {
+      const cleanup = (result) => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        saveBtn.removeEventListener('click', onSave);
+        cancels.forEach(el => el.removeEventListener('click', onCancel));
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      const onSave = async () => {
+        const name = nameInp.value.trim();
+        if (!name) { toast('Please enter a tag name.', 'error'); return; }
+        const { data: sess } = await auth.getSession();
+        if (!sess?.session) { cleanup(null); return; }
+        const u = sess.session.user;
+        const current = getAllTags(u);
+        // Prevent name collisions on new tags (edits keep same id so ok)
+        if (!existing && current.some(t => (t.name || '').toLowerCase() === name.toLowerCase())) {
+          toast('A tag with this name already exists.', 'error');
+          return;
+        }
+        const record = existing
+          ? { ...existing, name, color: selectedColor }
+          : { id: 'tag_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, color: selectedColor };
+        const next = existing
+          ? current.map(t => t.id === existing.id ? record : t)
+          : [...current, record];
+        const { data } = await auth.updateUser({ data: { tags: next } });
         if (data?.user) userCache = data.user;
         cleanup(record);
       };
@@ -13073,6 +13668,7 @@
         manualPayFrom: e.manualPayFrom || null,
         timing: e.timing || 'smooth',
         sinkingFundGoalId: e.sinkingFundGoalId || null,
+        tagIds: Array.isArray(e.tagIds) ? e.tagIds : [],
       }));
     if (cleaned.length === 0 && expenseDraft.length > 0) {
       toast('Add a name and amount to each expense first.', 'error');
@@ -13246,6 +13842,7 @@
       linkedId: null,
       category: '',
       label: '',
+      tagIds: [],          // user-picked colored tags
       saveAsNew: false,
     };
   }
@@ -13283,6 +13880,7 @@
           linkedId: tx.linkedId || null,
           category: tx.category || '',
           label: tx.label || '',
+          tagIds: Array.isArray(tx.tagIds) ? tx.tagIds : [],
           saveAsNew: false,
         });
       }
@@ -13320,6 +13918,7 @@
     document.getElementById('txAmount').value = txDraft.amount ? String(txDraft.amount) : '';
     document.getElementById('txDate').value = txDraft.date;
     document.getElementById('txNote').value = txDraft.note || '';
+    renderTxTagChips();
 
     // Chrome updates for edit vs new mode
     const isEditing = !!editingTxId;
@@ -13335,6 +13934,58 @@
     updateTxModeVisibility();
     renderQuickLog(user);
     goto('transaction');
+  }
+
+  // Render the tag chips row on the transaction form. Same UX as the expense
+  // form: colored chip per selected tag with a ✕ to remove, plus an "+ Tag"
+  // button at the end that opens the picker.
+  function renderTxTagChips() {
+    const wrap = document.getElementById('txTagChips');
+    if (!wrap) return;
+    const selectedIds = Array.isArray(txDraft.tagIds) ? txDraft.tagIds : [];
+    const tags = getAllTags(userCache);
+    const selected = selectedIds.map(id => tags.find(t => t.id === id)).filter(Boolean);
+    wrap.innerHTML = `
+      ${selected.map(t => `
+        <span class="tag-chip" style="background:${t.color}18; color:${t.color}; border-color:${t.color}44;">
+          ${escapeAttr(t.name)}
+          <button type="button" class="tag-chip-remove" data-tx-remove-tag="${t.id}" aria-label="Remove tag">✕</button>
+        </span>
+      `).join('')}
+      <button type="button" class="tag-add-btn" id="txAddTagBtn">+ Tag</button>
+    `;
+    // Wire remove buttons
+    wrap.querySelectorAll('[data-tx-remove-tag]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const id = btn.dataset.txRemoveTag;
+        txDraft.tagIds = (txDraft.tagIds || []).filter(x => x !== id);
+        renderTxTagChips();
+      });
+    });
+    // Wire add button
+    const addBtn = document.getElementById('txAddTagBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const alreadySelected = new Set(txDraft.tagIds || []);
+        const available = getAllTags(userCache).filter(t => !alreadySelected.has(t.id));
+        const options = available.map(t => ({
+          key: t.id, label: t.name, sub: '', icon: '●',
+        }));
+        options.push({ key: '__new__', label: '+ Create new tag', sub: '', icon: '＋' });
+        const picked = await showPicker({ icon: '🏷', title: 'Add tag', options });
+        if (!picked) return;
+        if (picked === '__new__') {
+          const created = await openTagModal();
+          if (!created) return;
+          txDraft.tagIds = [...(txDraft.tagIds || []), created.id];
+        } else {
+          txDraft.tagIds = [...(txDraft.tagIds || []), picked];
+        }
+        renderTxTagChips();
+      });
+    }
   }
 
   // Show recent unique {type + linkedId + source} transactions as quick-tap chips
@@ -13874,6 +14525,7 @@
           linkedId: txDraft.linkedId,
           category: txDraft.category,
           label: txDraft.label.trim(),
+          tagIds: Array.isArray(txDraft.tagIds) ? txDraft.tagIds : [],
           updatedAt: new Date().toISOString(),
         };
         savedTxId = existing.id;
@@ -13893,6 +14545,7 @@
         linkedId: txDraft.linkedId,
         category: txDraft.category,
         label: txDraft.label.trim(),
+        tagIds: Array.isArray(txDraft.tagIds) ? txDraft.tagIds : [],
         createdAt: new Date().toISOString(),
       };
       transactions.unshift(tx);
@@ -14301,6 +14954,7 @@
               ${dateStr}${pmLabel ? '<span class="dot">·</span>' + pmLabel : ''}${src ? '<span class="dot">·</span>' + src : ''}
             </p>
             ${tx.note ? `<p class="note">"${escapeAttr(tx.note)}"</p>` : ''}
+            ${renderTagPills(tx.tagIds, user)}
           </div>
           <div class="txh-amt ${tx.type}">${amt}</div>
         `;
@@ -14608,6 +15262,7 @@
             <p class="name">${escapeAttr(primary)}</p>
             <p class="meta">${dateStr}${kind === 'wallet' ? '' : '<span class="dot">·</span>' + pmLabel}</p>
             ${tx.note ? `<p class="note">"${escapeAttr(tx.note)}"</p>` : ''}
+            ${renderTagPills(tx.tagIds, user)}
           </div>
           <div class="txh-amt ${tx.type}">${sign}${peso(tx.amount)}</div>
         `;
@@ -18229,6 +18884,75 @@
       );
       await auth.updateUser({ data: { customCategories: nextCustom, expenses: nextExpenses } });
       toast('Category deleted', 'success');
+    }
+  });
+
+  // Manage tags — same picker pattern as categories. Add / edit / delete.
+  document.getElementById('manageTagsCard').addEventListener('click', async () => {
+    const { data: sess } = await auth.getSession();
+    if (!sess?.session) return;
+    const u = sess.session.user;
+    const tags = getAllTags(u);
+    if (tags.length === 0) {
+      const created = await openTagModal();
+      if (created) toast(`Tag "${created.name}" added`, 'success');
+      return;
+    }
+    const options = tags.map(t => ({
+      key: t.id,
+      label: t.name,
+      sub: 'Tap to edit or delete',
+      icon: '●',   // simple bullet; color hint isn't rendered by showPicker but the tag list shows it clearly on tiles
+    }));
+    options.push({ key: '__add__', label: '+ Add new tag', sub: '', icon: '＋' });
+    const picked = await showPicker({ icon: '🏷', title: 'Manage tags', options });
+    if (!picked) return;
+    if (picked === '__add__') {
+      const created = await openTagModal();
+      if (created) toast(`Tag "${created.name}" added`, 'success');
+      return;
+    }
+    const target = tags.find(t => t.id === picked);
+    if (!target) return;
+    const usingCount =
+      (u.expenses || []).filter(e => Array.isArray(e.tagIds) && e.tagIds.includes(target.id)).length +
+      (u.transactions || []).filter(t => Array.isArray(t.tagIds) && t.tagIds.includes(target.id)).length;
+    const action = await showPicker({
+      icon: '🏷',
+      title: target.name,
+      options: [
+        { key: 'edit',   label: 'Edit name or color', sub: '', icon: '✎' },
+        { key: 'delete', label: 'Delete tag',
+          sub: usingCount > 0 ? `Used by ${usingCount} item${usingCount !== 1 ? 's' : ''} — will be removed from them` : 'Not in use',
+          icon: '⚠' },
+      ],
+    });
+    if (action === 'edit') {
+      await openTagModal(target);
+    } else if (action === 'delete') {
+      const ok = await showConfirm({
+        icon: '⚠',
+        title: `Delete "${target.name}"?`,
+        bodyHtml: usingCount > 0
+          ? `This tag is on <strong>${usingCount} item${usingCount !== 1 ? 's' : ''}</strong>. Removing the tag will unlink it from them (items themselves are not affected).`
+          : 'This tag will be removed from your list.',
+        okText: 'Delete',
+        cancelText: 'Cancel',
+      });
+      if (!ok) return;
+      const nextTags = tags.filter(t => t.id !== target.id);
+      const nextExpenses = (u.expenses || []).map(e =>
+        Array.isArray(e.tagIds) && e.tagIds.includes(target.id)
+          ? { ...e, tagIds: e.tagIds.filter(id => id !== target.id) }
+          : e
+      );
+      const nextTransactions = (u.transactions || []).map(t =>
+        Array.isArray(t.tagIds) && t.tagIds.includes(target.id)
+          ? { ...t, tagIds: t.tagIds.filter(id => id !== target.id) }
+          : t
+      );
+      await auth.updateUser({ data: { tags: nextTags, expenses: nextExpenses, transactions: nextTransactions } });
+      toast('Tag deleted', 'success');
     }
   });
 
