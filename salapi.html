@@ -7769,6 +7769,12 @@
         <label>Note <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
         <input class="input" type="text" id="loanNoteInput" placeholder="Anything worth remembering" maxlength="120" />
       </div>
+
+      <!-- Tags — same colored-label picker used on expenses/goals/transactions -->
+      <div class="field" id="loanTagsField">
+        <label>Tags <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+        <div class="tag-chips" id="loanTagChips"></div>
+      </div>
     </div>
 
     <div class="income-actions" style="margin-top: 24px;">
@@ -8282,7 +8288,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.27';
+  const APP_VERSION = '2026-08-10.29';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -10313,6 +10319,7 @@
       contribDay2: null, // semi-monthly only (second day)
       contribMonth: null,// annually only (1-12)
       manualPayFrom: null,   // {incomeId, payday} — overrides auto paycheck assignment
+      tagIds: [],            // user-picked colored tags for slicing (same system as expenses)
       ...overrides,
     };
   }
@@ -10501,6 +10508,8 @@
         ${renderContribDateFor(goal)}
       </div>
 
+      ${renderGoalTagsSection(goal)}
+
       <div class="goal-progress" data-progress-block>
         ${renderGoalProgress(goal)}
       </div>
@@ -10508,6 +10517,67 @@
 
     wireGoalCard(card, goal);
     return card;
+  }
+
+  // Tags section for the goal edit form. Same UX pattern as the expense
+  // form: chips of selected tags + "+ Tag" button that opens the picker.
+  function renderGoalTagsSection(goal) {
+    const selectedIds = Array.isArray(goal.tagIds) ? goal.tagIds : [];
+    const tags = getAllTags(userCache);
+    const selectedTags = selectedIds.map(id => tags.find(t => t.id === id)).filter(Boolean);
+    return `
+      <div class="tags-section" data-goal-tags-section>
+        <label class="paycheck-label">Tags</label>
+        <div class="tag-chips">
+          ${selectedTags.map(t => `
+            <span class="tag-chip" style="background:${t.color}18; color:${t.color}; border-color:${t.color}44;">
+              ${escapeAttr(t.name)}
+              <button type="button" class="tag-chip-remove" data-goal-remove-tag="${t.id}" aria-label="Remove tag">✕</button>
+            </span>
+          `).join('')}
+          <button type="button" class="tag-add-btn" data-goal-add-tag>+ Tag</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireGoalTagsSection(card, goal) {
+    const section = card.querySelector('[data-goal-tags-section]');
+    if (!section) return;
+    section.querySelectorAll('[data-goal-remove-tag]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const id = btn.dataset.goalRemoveTag;
+        goal.tagIds = (goal.tagIds || []).filter(x => x !== id);
+        section.outerHTML = renderGoalTagsSection(goal);
+        wireGoalTagsSection(card, goal);
+      });
+    });
+    const addBtn = section.querySelector('[data-goal-add-tag]');
+    if (addBtn) {
+      addBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const alreadySelected = new Set(goal.tagIds || []);
+        const available = getAllTags(userCache).filter(t => !alreadySelected.has(t.id));
+        const options = available.map(t => ({
+          key: t.id, label: t.name, sub: '',
+          icon: `<span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${t.color};"></span>`,
+        }));
+        options.push({ key: '__new__', label: '+ Create new tag', sub: '', icon: '＋' });
+        const picked = await showPicker({ icon: '🏷', title: 'Add tag', options });
+        if (!picked) return;
+        if (picked === '__new__') {
+          const created = await openTagModal();
+          if (!created) return;
+          goal.tagIds = [...(goal.tagIds || []), created.id];
+        } else {
+          goal.tagIds = [...(goal.tagIds || []), picked];
+        }
+        section.outerHTML = renderGoalTagsSection(goal);
+        wireGoalTagsSection(card, goal);
+      });
+    }
   }
 
   function renderContribDateFor(goal) {
@@ -10647,6 +10717,8 @@
       pb.innerHTML = renderGoalProgress(goal);
       updateSavingsBanner();
     };
+
+    wireGoalTagsSection(card, goal);
 
     card.querySelector('[data-field="name"]').addEventListener('input', e => { goal.name = e.target.value; });
     card.querySelector('[data-field="target"]').addEventListener('input', e => {
@@ -12698,25 +12770,27 @@
         };
         renderGroup('', [...mixedItems].sort((a, b) => daysUntil(itemDueDay(a)) - daysUntil(itemDueDay(b))));
       } else if (sortMode === 'tag') {
-        // Only expenses currently have tags — goals go into a separate group
-        // at the bottom labelled "Savings" so they're still visible in this sort.
+        // Group by tag. Both expenses AND goals can have tags. An item with
+        // multiple tags appears in each tag's group. Untagged items go into
+        // an "Untagged" group at the bottom.
         const allTags = getAllTags(user);
         const byTag = new Map();
         allTags.forEach(t => byTag.set(t.id, { label: t.name, items: [] }));
         const untagged = [];
-        expenses.forEach(e => {
-          const ids = Array.isArray(e.tagIds) ? e.tagIds : [];
-          if (!ids.length) { untagged.push(asExpenseItem(e)); return; }
+        const addTagged = (it) => {
+          const ids = Array.isArray(it.ref.tagIds) ? it.ref.tagIds : [];
+          if (!ids.length) { untagged.push(it); return; }
           ids.forEach(id => {
-            if (byTag.has(id)) byTag.get(id).items.push(asExpenseItem(e));
+            if (byTag.has(id)) byTag.get(id).items.push(it);
           });
-        });
+        };
+        expenses.forEach(e => addTagged(asExpenseItem(e)));
+        contributingGoals.forEach(g => addTagged(asGoalItem(g)));
         allTags.forEach(t => {
           const g = byTag.get(t.id);
           if (g && g.items.length) renderGroup(g.label, g.items);
         });
         if (untagged.length) renderGroup('Untagged', untagged);
-        if (contributingGoals.length) renderGroup('Savings', contributingGoals.map(asGoalItem));
       } else if (sortMode === 'frequency') {
         const FREQ_ORDER = { weekly: 1, 'semi-monthly': 2, monthly: 3, quarterly: 4, annually: 5 };
         const FREQ_LABELS = { weekly: 'Weekly', 'semi-monthly': 'Semi-monthly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' };
@@ -12803,6 +12877,7 @@
           <p class="name">${escapeAttr(g.name || 'Ipon')} ${sinkingPill}${linkedTag}</p>
           <p class="meta">${contribText}${dueLine}</p>
           ${paycheckLineHtml(g, user)}
+          ${renderTagPills(g.tagIds, user)}
         </div>
         <div class="view-item-amount ipon">${peso(monthly)}</div>
       </div>
@@ -12912,6 +12987,7 @@
             <div class="view-item-info">
               <p class="name">${escapeAttr(g.name || 'Goal')} ${sinkingPill}</p>
               <p class="meta">${metaLine}</p>
+              ${renderTagPills(g.tagIds, user)}
             </div>
             <div class="view-item-amount">${Math.round(pct)}%</div>
           </div>
@@ -13848,6 +13924,7 @@
         contribDay: g.contribDay, contribDay2: g.contribDay2, contribMonth: g.contribMonth,
         manualPayFrom: g.manualPayFrom || null,
         pairedExpenseId: g.pairedExpenseId || null,
+        tagIds: Array.isArray(g.tagIds) ? g.tagIds : [],
       }));
     if (cleaned.length === 0 && goalDraft.length > 0) {
       toast('Add a name and target amount to each goal first.', 'error');
@@ -17424,6 +17501,7 @@
             </div>
           </div>
           <div class="loan-progress revolving-util ${utilClass}"><div style="width:${utilPct}%"></div></div>
+          ${renderTagPills(l.tagIds, user)}
           <div class="row-actions loan-actions">
             <button class="row-edit-btn" type="button" data-action="edit">Edit</button>
             <button class="row-edit-btn primary" type="button" data-action="pay" ${isRevCleared ? 'disabled' : ''}>${payBtnLabel}</button>
@@ -17461,6 +17539,7 @@
           </div>
         </div>
         <div class="loan-progress"><div style="width:${pct}%"></div></div>
+        ${renderTagPills(l.tagIds, user)}
         <div class="row-actions loan-actions">
           <button class="row-edit-btn" type="button" data-action="edit">Edit</button>
           <button class="row-edit-btn primary" type="button" data-action="pay" ${isPaid ? 'disabled' : ''}>${payBtnLabel}</button>
@@ -17494,6 +17573,60 @@
 
   // -------- Loan add / edit / delete --------
   let editingLoanId = null;
+  // Loan tag draft — held here (not on the form fields) since it's an array
+  // populated via a picker, not a plain input. Reset on every openLoanEdit.
+  let loanDraftTagIds = [];
+
+  // Render the tag chips row on the loan edit form. Same picker pattern
+  // as the expense/goal/transaction forms.
+  function renderLoanTagChips() {
+    const wrap = document.getElementById('loanTagChips');
+    if (!wrap) return;
+    const tags = getAllTags(userCache);
+    const selected = loanDraftTagIds.map(id => tags.find(t => t.id === id)).filter(Boolean);
+    wrap.innerHTML = `
+      ${selected.map(t => `
+        <span class="tag-chip" style="background:${t.color}18; color:${t.color}; border-color:${t.color}44;">
+          ${escapeAttr(t.name)}
+          <button type="button" class="tag-chip-remove" data-loan-remove-tag="${t.id}" aria-label="Remove tag">✕</button>
+        </span>
+      `).join('')}
+      <button type="button" class="tag-add-btn" id="loanAddTagBtn">+ Tag</button>
+    `;
+    wrap.querySelectorAll('[data-loan-remove-tag]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const id = btn.dataset.loanRemoveTag;
+        loanDraftTagIds = loanDraftTagIds.filter(x => x !== id);
+        renderLoanTagChips();
+      });
+    });
+    const addBtn = document.getElementById('loanAddTagBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const alreadySelected = new Set(loanDraftTagIds);
+        const available = getAllTags(userCache).filter(t => !alreadySelected.has(t.id));
+        const options = available.map(t => ({
+          key: t.id, label: t.name, sub: '',
+          icon: `<span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${t.color};"></span>`,
+        }));
+        options.push({ key: '__new__', label: '+ Create new tag', sub: '', icon: '＋' });
+        const picked = await showPicker({ icon: '🏷', title: 'Add tag', options });
+        if (!picked) return;
+        if (picked === '__new__') {
+          const created = await openTagModal();
+          if (!created) return;
+          loanDraftTagIds = [...loanDraftTagIds, created.id];
+        } else {
+          loanDraftTagIds = [...loanDraftTagIds, picked];
+        }
+        renderLoanTagChips();
+      });
+    }
+  }
+
+
 
   // Frequency-driven label + input-swap logic. Called on open and whenever the
   // frequency select changes so the form always reads correctly.
@@ -17548,6 +17681,10 @@
     document.getElementById('loanDueDateInput').value = existing?.dueDate  || '';
     document.getElementById('loanStatusSelect').value = existing?.status   || 'active';
     document.getElementById('loanNoteInput').value    = existing?.note     || '';
+    // Hydrate the tag draft from the existing loan (or empty for new ones)
+    // and render the chips row.
+    loanDraftTagIds = Array.isArray(existing?.tagIds) ? [...existing.tagIds] : [];
+    renderLoanTagChips();
 
     // Revolving fields
     document.getElementById('loanRevolvingToggle').checked = !!existing?.isRevolving;
@@ -17756,7 +17893,7 @@
     if (editingLoanId) {
       const idx = loans.findIndex(l => l.id === editingLoanId);
       if (idx >= 0) {
-        loans[idx] = { ...loans[idx], ...record, updatedAt: now };
+        loans[idx] = { ...loans[idx], ...record, tagIds: [...loanDraftTagIds], updatedAt: now };
       }
     } else {
       loans.push({
@@ -17764,6 +17901,7 @@
         ...record,
         direction: pendingLoanDirection || 'payable',
         payments: [],
+        tagIds: [...loanDraftTagIds],
         addedAt: now, updatedAt: now,
       });
     }
@@ -19055,6 +19193,8 @@
     if (!target) return;
     const usingCount =
       (u.expenses || []).filter(e => Array.isArray(e.tagIds) && e.tagIds.includes(target.id)).length +
+      (u.goals || []).filter(g => Array.isArray(g.tagIds) && g.tagIds.includes(target.id)).length +
+      (u.loans || []).filter(l => Array.isArray(l.tagIds) && l.tagIds.includes(target.id)).length +
       (u.transactions || []).filter(t => Array.isArray(t.tagIds) && t.tagIds.includes(target.id)).length;
     const action = await showPicker({
       icon: '🏷',
@@ -19085,12 +19225,22 @@
           ? { ...e, tagIds: e.tagIds.filter(id => id !== target.id) }
           : e
       );
+      const nextGoals = (u.goals || []).map(g =>
+        Array.isArray(g.tagIds) && g.tagIds.includes(target.id)
+          ? { ...g, tagIds: g.tagIds.filter(id => id !== target.id) }
+          : g
+      );
+      const nextLoans = (u.loans || []).map(l =>
+        Array.isArray(l.tagIds) && l.tagIds.includes(target.id)
+          ? { ...l, tagIds: l.tagIds.filter(id => id !== target.id) }
+          : l
+      );
       const nextTransactions = (u.transactions || []).map(t =>
         Array.isArray(t.tagIds) && t.tagIds.includes(target.id)
           ? { ...t, tagIds: t.tagIds.filter(id => id !== target.id) }
           : t
       );
-      await auth.updateUser({ data: { tags: nextTags, expenses: nextExpenses, transactions: nextTransactions } });
+      await auth.updateUser({ data: { tags: nextTags, expenses: nextExpenses, goals: nextGoals, loans: nextLoans, transactions: nextTransactions } });
       toast('Tag deleted', 'success');
     }
   });
