@@ -5066,7 +5066,29 @@
     justify-content: space-between;
     gap: 12px;
     padding: 8px 0;
-    margin-bottom: 18px;
+    margin-bottom: 0;
+  }
+
+  /* Sticky container for the Sort/Select controls + selection subtotal bar.
+     Pins immediately below the sticky banner so users always see the sort
+     option and (crucially) the running selection total while scrolling the
+     list. Edge-to-edge cream backdrop matches the banner's full-bleed look. */
+  .budget-controls-sticky {
+    position: sticky;
+    top: 74px;    /* directly under the sticky header */
+    z-index: 24;  /* below banner (25) but above content */
+    background: var(--cream);
+    margin: 0 -24px;
+    padding: 6px 24px 12px;
+    box-shadow: 0 8px 12px -8px rgba(10, 37, 64, 0.10);
+  }
+  .budget-controls-sticky:empty {
+    display: none;
+    box-shadow: none;
+  }
+  .budget-controls-sticky .budget-select-bar {
+    margin-top: 10px;
+    margin-bottom: 0;
   }
   .budget-sort-left {
     display: flex;
@@ -7305,6 +7327,12 @@
       <div class="compare" id="budgetViewCompare"></div>
     </div>
 
+    <!-- Sticky sort/select controls — pin below the banner so they stay
+         visible + interactive while the expense list scrolls. Rendered by
+         showBudgetView(); starts empty and hidden until there's more than
+         one item to sort. -->
+    <div class="budget-controls-sticky" id="budgetControlsSticky"></div>
+
     <div id="budgetViewList"></div>
     <div class="view-empty" id="budgetViewEmpty" style="display:none;">
       <div class="ico">🎯</div>
@@ -8250,7 +8278,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.24';
+  const APP_VERSION = '2026-08-10.26';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -12346,7 +12374,7 @@
             const check = item.querySelector('.tile-select-check');
             if (check) check.textContent = nowSelected ? '✓' : '';
             // Update the subtotal bar without re-rendering the list
-            updateBudgetSelectionBar(user);
+            if (window._updateBudgetSelectionBar) window._updateBudgetSelectionBar(user);
           });
         }
         // Direct handler for + Spent
@@ -12399,50 +12427,13 @@
       // Collapsed by default (with a summary tile) to keep the Budget page
       // scannable — tap the summary to expand into individual goal tiles.
       // State is remembered per-device via localStorage.
-      if (contributingGoals.length > 0) {
-        const EXPANDED_KEY = 'silak-savings-expanded';
-        const isExpanded = localStorage.getItem(EXPANDED_KEY) === '1';
-        const goalCount = contributingGoals.length;
+      // ==== Layout order ====
+      // 1) Sort/Select row (always at the top, above everything)
+      // 2) Savings section — collapsible ONLY in category sort mode
+      //    (in other sort modes, goals mix into the sorted list below)
+      // 3) Expenses (+ goals in non-category modes)
 
-        // Summary tile — always visible, doubles as the section header
-        const summary = document.createElement('div');
-        summary.className = 'ipon-summary-tile';
-        summary.dataset.expanded = isExpanded ? '1' : '0';
-        summary.innerHTML = `
-          <div class="ipon-summary-icon">${svgIcon('savings')}</div>
-          <div class="ipon-summary-info">
-            <p class="ipon-summary-label">Savings</p>
-            <p class="ipon-summary-sub">${goalCount} ${goalCount === 1 ? 'goal' : 'goals'} · tap to ${isExpanded ? 'collapse' : 'see'}</p>
-          </div>
-          <div class="ipon-summary-amt">${peso(savingsTotal)}<span class="per">/mo</span></div>
-          <div class="ipon-summary-chev" aria-hidden="true">${isExpanded ? '▾' : '▸'}</div>
-        `;
-        list.appendChild(summary);
-
-        // Individual goal tiles inside a container that toggles display
-        const goalsWrap = document.createElement('div');
-        goalsWrap.className = 'ipon-goals-wrap';
-        goalsWrap.style.display = isExpanded ? 'block' : 'none';
-        contributingGoals.slice().sort((a, b) => {
-          const ad = Number(a.contribDay) || 99;
-          const bd = Number(b.contribDay) || 99;
-          if (ad !== bd) return ad - bd;
-          return (a.name || '').localeCompare(b.name || '');
-        }).forEach(g => goalsWrap.appendChild(renderIponBudgetItem(g, user)));
-        list.appendChild(goalsWrap);
-
-        summary.addEventListener('click', () => {
-          const nowExpanded = summary.dataset.expanded !== '1';
-          summary.dataset.expanded = nowExpanded ? '1' : '0';
-          goalsWrap.style.display = nowExpanded ? 'block' : 'none';
-          summary.querySelector('.ipon-summary-chev').textContent = nowExpanded ? '▾' : '▸';
-          summary.querySelector('.ipon-summary-sub').textContent =
-            `${goalCount} ${goalCount === 1 ? 'goal' : 'goals'} · tap to ${nowExpanded ? 'collapse' : 'see'}`;
-          localStorage.setItem(EXPANDED_KEY, nowExpanded ? '1' : '0');
-        });
-      }
-
-      // -------- Sort selector for the expenses list --------
+      // -------- 1) Sort/Select row (top-most, sticky under the banner) --------
       const SORT_KEY = 'silak-budget-sort';
       const sortMode = localStorage.getItem(SORT_KEY) || 'category';
       const SORT_OPTIONS = [
@@ -12454,7 +12445,13 @@
         { v: 'amount',    label: 'Amount' },
         { v: 'frequency', label: 'Frequency' },
       ];
-      if ((user.expenses || []).length > 1) {
+      // Render sort/select into the dedicated sticky container (outside the
+      // scrolling list) so they stay pinned under the banner + selection
+      // subtotal is always visible while scrolling through tiles.
+      const controlsHost = document.getElementById('budgetControlsSticky');
+      controlsHost.innerHTML = '';
+      const anyItemCount = (user.expenses || []).length + contributingGoals.length;
+      if (anyItemCount > 1) {
         const sortRow = document.createElement('div');
         sortRow.className = 'budget-sort-row';
         sortRow.innerHTML = `
@@ -12471,7 +12468,7 @@
             ${budgetSelectMode ? 'Done' : 'Select'}
           </button>
         `;
-        list.appendChild(sortRow);
+        controlsHost.appendChild(sortRow);
         sortRow.querySelector('#budgetSortSelect').addEventListener('change', (ev) => {
           localStorage.setItem(SORT_KEY, ev.target.value);
           showBudgetView(user);
@@ -12482,30 +12479,28 @@
           showBudgetView(user);
         });
 
-        // Subtotal bar — only visible in select mode. Shows count + sum of
-        // selected items' monthly load, plus a "Clear" action.
         if (budgetSelectMode) {
           const bar = document.createElement('div');
           bar.className = 'budget-select-bar';
           bar.id = 'budgetSelectBar';
-          list.appendChild(bar);
-          updateBudgetSelectionBar(user);   // populates initial content + wires Clear
+          controlsHost.appendChild(bar);
         }
       }
-
-      // Update the selection subtotal bar in place from budgetSelectedIds.
-      // Called after every selection toggle so we don't have to re-render
-      // the whole Budget page just to refresh the count + sum.
+      // Populate the subtotal bar (function is stateless — safe to call even
+      // when there's no bar rendered).
       window._updateBudgetSelectionBar = function(u) {
         const bar = document.getElementById('budgetSelectBar');
         if (!bar) return;
-        const selectedItems = (u.expenses || []).filter(e => budgetSelectedIds.has(e.id));
-        const selectedTotal = selectedItems.reduce((s, e) => s + expenseMonthlyAmount(e), 0);
-        const n = selectedItems.length;
+        const selectedExpenses = (u.expenses || []).filter(e => budgetSelectedIds.has(e.id));
+        const selectedGoals    = (u.goals    || []).filter(g => budgetSelectedIds.has(g.id));
+        const total =
+          selectedExpenses.reduce((s, e) => s + expenseMonthlyAmount(e), 0) +
+          selectedGoals.reduce((s, g)    => s + (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1), 0);
+        const n = selectedExpenses.length + selectedGoals.length;
         bar.innerHTML = `
           <div class="bsb-info">
             <span class="bsb-count">${n} selected</span>
-            <span class="bsb-total">${peso(selectedTotal)}<span class="per">/mo</span></span>
+            <span class="bsb-total">${peso(total)}<span class="per">/mo</span></span>
           </div>
           ${n > 0 ? `<button type="button" class="bsb-clear" id="budgetSelectClear">Clear</button>` : ''}
         `;
@@ -12513,44 +12508,132 @@
         if (clearBtn) {
           clearBtn.addEventListener('click', () => {
             budgetSelectedIds.clear();
-            // Update all tile visuals in place instead of re-rendering
-            document.querySelectorAll('.expense-tile.selectable.selected').forEach(el => {
+            document.querySelectorAll('.selectable.selected').forEach(el => {
               el.classList.remove('selected');
               const check = el.querySelector('.tile-select-check');
               if (check) check.textContent = '';
             });
-            updateBudgetSelectionBar(u);
+            window._updateBudgetSelectionBar(u);
           });
         }
       };
       const updateBudgetSelectionBar = window._updateBudgetSelectionBar;
+      updateBudgetSelectionBar(user);
+      // Sticky-position the controls RIGHT BELOW the banner. Banner height
+      // varies with content (label, amount, progress bar, comparison line),
+      // so we measure it at render time and set the controls' top offset to
+      // (header height + banner height). Re-runs on every render — cheap
+      // enough since it's just a getBoundingClientRect + style.setProperty.
+      requestAnimationFrame(() => {
+        const banner = document.getElementById('budgetViewBanner');
+        if (banner && banner.style.display !== 'none') {
+          const bh = banner.getBoundingClientRect().height;
+          // 74px = header height (40px button + 20+14 padding)
+          controlsHost.style.top = (74 + bh) + 'px';
+        } else {
+          controlsHost.style.top = '74px';
+        }
+      });
 
-      // -------- Expenses list: grouped/sorted based on user selection --------
+      // -------- 2) Savings collapsible section (Category mode only) --------
+      // Goals don't have categories, so in Category mode we still show them
+      // as their own top section. In every OTHER sort mode goals mix into
+      // the list below using the sort criterion (contribDay, contribution,
+      // paycheck assignment, etc), so we skip this section entirely.
+      if (sortMode === 'category' && contributingGoals.length > 0) {
+        const EXPANDED_KEY = 'silak-savings-expanded';
+        const isExpanded = localStorage.getItem(EXPANDED_KEY) === '1';
+        const goalCount = contributingGoals.length;
+
+        const summary = document.createElement('div');
+        summary.className = 'ipon-summary-tile';
+        summary.dataset.expanded = isExpanded ? '1' : '0';
+        summary.innerHTML = `
+          <div class="ipon-summary-icon">${svgIcon('savings')}</div>
+          <div class="ipon-summary-info">
+            <p class="ipon-summary-label">Savings</p>
+            <p class="ipon-summary-sub">${goalCount} ${goalCount === 1 ? 'goal' : 'goals'} · tap to ${isExpanded ? 'collapse' : 'see'}</p>
+          </div>
+          <div class="ipon-summary-amt">${peso(savingsTotal)}<span class="per">/mo</span></div>
+          <div class="ipon-summary-chev" aria-hidden="true">${isExpanded ? '▾' : '▸'}</div>
+        `;
+        list.appendChild(summary);
+
+        const goalsWrap = document.createElement('div');
+        goalsWrap.className = 'ipon-goals-wrap';
+        goalsWrap.style.display = isExpanded ? 'block' : 'none';
+        contributingGoals.slice().sort((a, b) => {
+          const ad = Number(a.contribDay) || 99;
+          const bd = Number(b.contribDay) || 99;
+          if (ad !== bd) return ad - bd;
+          return (a.name || '').localeCompare(b.name || '');
+        }).forEach(g => goalsWrap.appendChild(renderIponBudgetItem(g, user)));
+        list.appendChild(goalsWrap);
+
+        summary.addEventListener('click', (ev) => {
+          // Don't toggle if user tapped inside an already-open goal tile
+          if (ev.target.closest('.ipon-budget-tile')) return;
+          const nowExpanded = summary.dataset.expanded !== '1';
+          summary.dataset.expanded = nowExpanded ? '1' : '0';
+          goalsWrap.style.display = nowExpanded ? 'block' : 'none';
+          summary.querySelector('.ipon-summary-chev').textContent = nowExpanded ? '▾' : '▸';
+          summary.querySelector('.ipon-summary-sub').textContent =
+            `${goalCount} ${goalCount === 1 ? 'goal' : 'goals'} · tap to ${nowExpanded ? 'collapse' : 'see'}`;
+          localStorage.setItem(EXPANDED_KEY, nowExpanded ? '1' : '0');
+        });
+      }
+
+      // -------- 3) Expenses list: grouped/sorted based on user selection --------
       const expenses = user.expenses || [];
+
+      // Uniform item wrapper — each list entry knows whether it's an expense
+      // or a goal so the right renderer runs.
+      const asExpenseItem = (e) => ({ kind: 'expense', ref: e });
+      const asGoalItem    = (g) => ({ kind: 'goal',    ref: g });
+      // For non-category sort modes, mix expenses AND goals together.
+      const mixedItems = sortMode === 'category'
+        ? expenses.map(asExpenseItem)
+        : [...expenses.map(asExpenseItem), ...contributingGoals.map(asGoalItem)];
+
       // Helper: monthly-load per occurrence of an item in a payroll group.
       // Semi-monthly items appear twice (once per paycheck) so each occurrence
-      // is half the monthly total. Everything else contributes its full
-      // monthly amount to the single paycheck it's assigned to.
-      const perOccurrenceAmount = (e) => {
-        const monthly = expenseMonthlyAmount(e);
-        return e.frequency === 'semi-monthly' ? monthly / 2 : monthly;
+      // is half the monthly total.
+      const monthlyForItem = (item) => {
+        if (item.kind === 'goal') {
+          return (Number(item.ref.contribution) || 0) * (BUDGET_TO_MONTHLY[item.ref.frequency] || 1);
+        }
+        return expenseMonthlyAmount(item.ref);
       };
+      const perOccurrenceForItem = (item) => {
+        const m = monthlyForItem(item);
+        return item.ref.frequency === 'semi-monthly' ? m / 2 : m;
+      };
+      // Nameless-safe accessors
+      const itemName = (it) => (it.ref.name || '').toString();
+      const itemDueDay = (it) => Number(it.ref.dueDay ?? it.ref.contribDay) || null;
+      const itemFrequency = (it) => it.ref.frequency || 'monthly';
+      const itemAssignPay = (it) => it.kind === 'goal' ? assignPaycheck(it.ref, user) : assignPaycheck(it.ref, user);
+
+      const renderItem = (item) => item.kind === 'goal'
+        ? renderIponBudgetItem(item.ref, user)
+        : renderBudgetItem(item.ref);
+
       const renderGroup = (headerText, items, subtotalFn) => {
         if (!items || !items.length) return;
         if (headerText) {
           const subtotal = subtotalFn
-            ? items.reduce((s, e) => s + subtotalFn(e), 0)
-            : items.reduce((s, e) => s + expenseMonthlyAmount(e), 0);
+            ? items.reduce((s, it) => s + subtotalFn(it), 0)
+            : items.reduce((s, it) => s + monthlyForItem(it), 0);
           const head = document.createElement('div');
           head.className = 'budget-group-head';
           head.innerHTML = `<span>${escapeAttr(headerText)}</span><span class="budget-group-subtotal">${peso(subtotal)}/mo</span>`;
           list.appendChild(head);
         }
-        items.forEach(exp => list.appendChild(renderBudgetItem(exp)));
+        items.forEach(it => list.appendChild(renderItem(it)));
       };
 
       if (sortMode === 'category') {
-        // Category order: built-in first, then custom, then orphans
+        // Only expenses have categories; goals are already shown above.
         const builtInSet = new Set(CATEGORIES.map(c => c.v));
         const customList = Array.isArray(user.customCategories) ? user.customCategories : [];
         const customSet  = new Set(customList.map(c => c.v));
@@ -12564,83 +12647,79 @@
         const singleGroup = withItems.length === 1;
         withItems.forEach(catV => {
           const showHead = !singleGroup || contributingGoals.length > 0;
-          renderGroup(showHead ? getCategoryLabel(user, catV) : '', byCategory[catV]);
+          const items = byCategory[catV].map(asExpenseItem);
+          renderGroup(showHead ? getCategoryLabel(user, catV) : '', items);
         });
       } else if (sortMode === 'payroll') {
-        // Group by which paycheck covers each expense (income label · payday).
-        // Semi-monthly expenses appear TWICE — once under each due day's
-        // paycheck, so users see the full picture per paycheck.
-        const groups = new Map();   // key = "incomeId::payday", val = { label, order, items }
-        const addToGroup = (exp, pay) => {
+        // Group by paycheck across both expenses AND goals. Semi-monthly items
+        // appear TWICE (once per due day).
+        const groups = new Map();
+        const addToGroup = (item, pay) => {
           if (!pay) {
             const k = '__unassigned__';
             if (!groups.has(k)) groups.set(k, { label: 'Unassigned', order: 9999, items: [] });
-            groups.get(k).items.push(exp);
+            groups.get(k).items.push(item);
             return;
           }
           const k = `${pay.incomeId}::${pay.payday}`;
           if (!groups.has(k)) {
-            groups.set(k, {
-              label: `${pay.incomeName} · ${ordinal(pay.payday)}`,
-              order: pay.payday,
-              items: [],
-            });
+            groups.set(k, { label: `${pay.incomeName} · ${ordinal(pay.payday)}`, order: pay.payday, items: [] });
           }
-          groups.get(k).items.push(exp);
+          groups.get(k).items.push(item);
         };
-        expenses.forEach(e => {
-          if (e.frequency === 'semi-monthly' && e.dueDay && e.dueDay2) {
-            addToGroup(e, assignPaycheckForDay(e, user, Number(e.dueDay)));
-            addToGroup(e, assignPaycheckForDay(e, user, Number(e.dueDay2)));
+        mixedItems.forEach(it => {
+          const ref = it.ref;
+          const d1 = Number(ref.dueDay ?? ref.contribDay) || null;
+          const d2 = Number(ref.dueDay2 ?? ref.contribDay2) || null;
+          if (ref.frequency === 'semi-monthly' && d1 && d2) {
+            addToGroup(it, assignPaycheckForDay(ref, user, d1));
+            addToGroup(it, assignPaycheckForDay(ref, user, d2));
           } else {
-            addToGroup(e, assignPaycheck(e, user));
+            addToGroup(it, assignPaycheck(ref, user));
           }
         });
         [...groups.values()]
           .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
-          .forEach(g => renderGroup(g.label, g.items, perOccurrenceAmount));
+          .forEach(g => renderGroup(g.label, g.items, perOccurrenceForItem));
       } else if (sortMode === 'alpha') {
-        renderGroup('', [...expenses].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+        renderGroup('', [...mixedItems].sort((a, b) => itemName(a).localeCompare(itemName(b))));
       } else if (sortMode === 'amount') {
-        renderGroup('', [...expenses].sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0)));
+        renderGroup('', [...mixedItems].sort((a, b) => monthlyForItem(b) - monthlyForItem(a)));
       } else if (sortMode === 'due') {
-        // "Soonest first" — computed against today. Items due earlier in the
-        // month sort ahead; items with no due day sink to the bottom.
         const today = new Date().getDate();
         const daysUntil = (d) => {
           if (!d) return 999;
           const diff = d - today;
           return diff >= 0 ? diff : diff + 31;
         };
-        renderGroup('', [...expenses].sort((a, b) => daysUntil(Number(a.dueDay)) - daysUntil(Number(b.dueDay))));
+        renderGroup('', [...mixedItems].sort((a, b) => daysUntil(itemDueDay(a)) - daysUntil(itemDueDay(b))));
       } else if (sortMode === 'tag') {
-        // Group by tag. An item with multiple tags appears in EACH tag's
-        // group (matches how payroll grouping duplicates semi-monthly).
-        // Untagged items go into a special "Untagged" group at the bottom.
+        // Only expenses currently have tags — goals go into a separate group
+        // at the bottom labelled "Savings" so they're still visible in this sort.
         const allTags = getAllTags(user);
         const byTag = new Map();
-        allTags.forEach(t => byTag.set(t.id, { label: t.name, order: 0, items: [] }));
+        allTags.forEach(t => byTag.set(t.id, { label: t.name, items: [] }));
         const untagged = [];
         expenses.forEach(e => {
           const ids = Array.isArray(e.tagIds) ? e.tagIds : [];
-          if (!ids.length) { untagged.push(e); return; }
+          if (!ids.length) { untagged.push(asExpenseItem(e)); return; }
           ids.forEach(id => {
-            if (byTag.has(id)) byTag.get(id).items.push(e);
+            if (byTag.has(id)) byTag.get(id).items.push(asExpenseItem(e));
           });
         });
-        // Render in the same order tags appear in user.tags
         allTags.forEach(t => {
           const g = byTag.get(t.id);
           if (g && g.items.length) renderGroup(g.label, g.items);
         });
         if (untagged.length) renderGroup('Untagged', untagged);
+        if (contributingGoals.length) renderGroup('Savings', contributingGoals.map(asGoalItem));
       } else if (sortMode === 'frequency') {
         const FREQ_ORDER = { weekly: 1, 'semi-monthly': 2, monthly: 3, quarterly: 4, annually: 5 };
         const FREQ_LABELS = { weekly: 'Weekly', 'semi-monthly': 'Semi-monthly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' };
         const byFreq = {};
-        expenses.forEach(e => {
-          const f = e.frequency || 'monthly';
-          (byFreq[f] = byFreq[f] || []).push(e);
+        mixedItems.forEach(it => {
+          const f = itemFrequency(it);
+          (byFreq[f] = byFreq[f] || []).push(it);
         });
         Object.keys(byFreq)
           .sort((a, b) => (FREQ_ORDER[a] || 9) - (FREQ_ORDER[b] || 9))
@@ -12685,8 +12764,12 @@
   // source of truth for goal data).
   function renderIponBudgetItem(g, user) {
     const isSinking = isSinkingFundGoal(g);
+    const isSelected = budgetSelectedIds.has(g.id);
     const item = document.createElement('div');
-    item.className = 'view-goal expense-tile ipon-budget-tile' + (isSinking ? ' sinking-fund' : '');
+    item.className = 'view-goal expense-tile ipon-budget-tile'
+      + (isSinking ? ' sinking-fund' : '')
+      + (budgetSelectMode ? ' selectable' : '')
+      + (isSelected ? ' selected' : '');
     item.dataset.tapDetail = 'goal';
     item.dataset.entryId = g.id;
     const icon = renderGoalIcon(g.icon);
@@ -12697,7 +12780,19 @@
     const sinkingPill = isSinking ? '<span class="sinking-fund-pill">Sinking Fund</span>' : '';
     const footerLbl = isSinking ? 'Reserved for future bill' : 'Monthly contribution';
     const footerLink = isSinking ? 'Edit on Budget →' : 'Edit on Ipon →';
+    // Selection checkmark badge (only in select mode)
+    const selectCheckHtml = budgetSelectMode
+      ? `<div class="tile-select-check">${isSelected ? '✓' : ''}</div>`
+      : '';
+    // Footer hidden in select mode — the tile IS the toggle.
+    const footerHtml = budgetSelectMode ? '' : `
+      <div class="ipon-budget-footer">
+        <span class="lbl">${footerLbl}</span>
+        <span class="link">${footerLink}</span>
+      </div>
+    `;
     item.innerHTML = `
+      ${selectCheckHtml}
       <div class="view-goal-head">
         <div class="view-item-icon savings">${icon}</div>
         <div class="view-item-info">
@@ -12707,11 +12802,22 @@
         </div>
         <div class="view-item-amount ipon">${peso(monthly)}</div>
       </div>
-      <div class="ipon-budget-footer">
-        <span class="lbl">${footerLbl}</span>
-        <span class="link">${footerLink}</span>
-      </div>
+      ${footerHtml}
     `;
+    // In select mode: whole-tile tap toggles selection (in place, no re-render).
+    if (budgetSelectMode) {
+      item.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const nowSelected = !budgetSelectedIds.has(g.id);
+        if (nowSelected) budgetSelectedIds.add(g.id);
+        else budgetSelectedIds.delete(g.id);
+        item.classList.toggle('selected', nowSelected);
+        const check = item.querySelector('.tile-select-check');
+        if (check) check.textContent = nowSelected ? '✓' : '';
+        if (window._updateBudgetSelectionBar) window._updateBudgetSelectionBar(user);
+      });
+      return item;
+    }
     item.addEventListener('click', async (ev) => {
       const { data } = await auth.getSession();
       if (!data.session) return;
