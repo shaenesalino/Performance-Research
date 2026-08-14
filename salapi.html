@@ -8288,7 +8288,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.29';
+  const APP_VERSION = '2026-08-10.30';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -12313,7 +12313,14 @@
       else unassigned += fullMonthly;
     };
     (user.expenses || []).forEach(e => {
-      const monthly = (Number(e.amount) || 0) * (BUDGET_TO_MONTHLY[e.frequency] || 1);
+      // Use expenseMonthlyAmount (not raw amount×freq) so per-paycheck
+      // totals match the top-line monthly obligations. Timing matters here:
+      //   - sinking-fund expenses contribute 0 (their paired goal covers it,
+      //     and the goal itself is included via contributingGoals below)
+      //   - due-month quarterly/annual contribute the full amount ONLY in
+      //     the actual due month, 0 elsewhere
+      //   - smooth timing (accrual) contributes the monthly-average
+      const monthly = expenseMonthlyAmount(e);
       bumpForItem(e, monthly);
     });
     contributingGoals.forEach(g => {
