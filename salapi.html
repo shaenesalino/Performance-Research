@@ -5090,6 +5090,10 @@
     margin-top: 10px;
     margin-bottom: 0;
   }
+  /* Breathing room between the sticky sort/select controls and the first
+     content below (Savings summary tile or first expense group). Applied
+     only inside the Budget view so it doesn't affect other lists. */
+  #budgetViewList { padding-top: 18px; }
   .budget-sort-left {
     display: flex;
     align-items: center;
@@ -8278,7 +8282,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.26';
+  const APP_VERSION = '2026-08-10.27';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
