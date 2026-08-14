@@ -5037,6 +5037,40 @@
   .tmc-num .val.negative { color: var(--orange); }
   .tmc-num .val.positive { color: var(--teal); }
 
+  /* Sort selector row on the Budget page — sits above the expenses list.
+     Small inline label + a compact select pill on the right. Bottom margin
+     gives breathing room before the first group header / expense tile. */
+  .budget-sort-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    margin-bottom: 18px;
+  }
+  .budget-sort-lbl {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .budget-sort-select {
+    flex: 0 0 auto;
+    max-width: 180px;
+  }
+  .budget-sort-select .input.select {
+    padding: 6px 30px 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--navy);
+    background: var(--cream-2);
+    border-color: var(--sand);
+    height: auto;
+    min-height: 0;
+  }
+
   /* Dual-column layout: Budget left | Discretionary left. Two large numbers
      with progress bars underneath, split by a subtle vertical divider. */
   .tmc-dual {
@@ -7918,7 +7952,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.15';
+  const APP_VERSION = '2026-08-10.17';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -11953,37 +11987,125 @@
         });
       }
 
-      // Iterate categories in a stable order: built-in first (canonical
-       // order), then user's custom categories (in the order they were added),
-       // then any orphan category values that don't match either (e.g., a
-       // custom category that was deleted but expenses still reference it —
-       // those fall back to still being visible under their raw category key).
-      const orderedCatKeys = [];
-      const builtInSet = new Set(CATEGORIES.map(c => c.v));
-      const customList = Array.isArray(user.customCategories) ? user.customCategories : [];
-      const customSet  = new Set(customList.map(c => c.v));
-      CATEGORIES.forEach(c => orderedCatKeys.push(c.v));
-      customList.forEach(c => orderedCatKeys.push(c.v));
-      Object.keys(byCategory).forEach(k => {
-        if (!builtInSet.has(k) && !customSet.has(k)) orderedCatKeys.push(k);
-      });
+      // -------- Sort selector for the expenses list --------
+      const SORT_KEY = 'silak-budget-sort';
+      const sortMode = localStorage.getItem(SORT_KEY) || 'category';
+      const SORT_OPTIONS = [
+        { v: 'category',  label: 'Category' },
+        { v: 'payroll',   label: 'Payroll' },
+        { v: 'alpha',     label: 'Alphabetical' },
+        { v: 'due',       label: 'Due date' },
+        { v: 'amount',    label: 'Amount' },
+        { v: 'frequency', label: 'Frequency' },
+      ];
+      if ((user.expenses || []).length > 1) {
+        const sortRow = document.createElement('div');
+        sortRow.className = 'budget-sort-row';
+        sortRow.innerHTML = `
+          <label class="budget-sort-lbl">Sort by</label>
+          <div class="select-wrap budget-sort-select">
+            <select id="budgetSortSelect" class="input select">
+              ${SORT_OPTIONS.map(o => `<option value="${o.v}" ${sortMode === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}
+            </select>
+            <span class="select-caret">▾</span>
+          </div>
+        `;
+        list.appendChild(sortRow);
+        sortRow.querySelector('#budgetSortSelect').addEventListener('change', (ev) => {
+          localStorage.setItem(SORT_KEY, ev.target.value);
+          showBudgetView(user);   // re-render with new sort
+        });
+      }
 
-      const totalCategoriesWithItems = orderedCatKeys.filter(k => byCategory[k] && byCategory[k].length).length;
-      const singleGroup = totalCategoriesWithItems === 1;
-      orderedCatKeys.forEach(catV => {
-        const items = byCategory[catV];
-        if (!items || items.length === 0) return;
-        // Always show a header when Savings section is above (needs the
-        // "Expenses" separator too, unless the user has zero savings goals).
-        const showHead = !singleGroup || contributingGoals.length > 0;
-        if (showHead) {
+      // -------- Expenses list: grouped/sorted based on user selection --------
+      const expenses = user.expenses || [];
+      const renderGroup = (headerText, items) => {
+        if (!items || !items.length) return;
+        if (headerText) {
           const head = document.createElement('div');
           head.className = 'budget-group-head';
-          head.textContent = getCategoryLabel(user, catV);
+          head.textContent = headerText;
           list.appendChild(head);
         }
         items.forEach(exp => list.appendChild(renderBudgetItem(exp)));
-      });
+      };
+
+      if (sortMode === 'category') {
+        // Category order: built-in first, then custom, then orphans
+        const builtInSet = new Set(CATEGORIES.map(c => c.v));
+        const customList = Array.isArray(user.customCategories) ? user.customCategories : [];
+        const customSet  = new Set(customList.map(c => c.v));
+        const orderedCatKeys = [];
+        CATEGORIES.forEach(c => orderedCatKeys.push(c.v));
+        customList.forEach(c => orderedCatKeys.push(c.v));
+        Object.keys(byCategory).forEach(k => {
+          if (!builtInSet.has(k) && !customSet.has(k)) orderedCatKeys.push(k);
+        });
+        const withItems = orderedCatKeys.filter(k => byCategory[k] && byCategory[k].length);
+        const singleGroup = withItems.length === 1;
+        withItems.forEach(catV => {
+          const showHead = !singleGroup || contributingGoals.length > 0;
+          renderGroup(showHead ? getCategoryLabel(user, catV) : '', byCategory[catV]);
+        });
+      } else if (sortMode === 'payroll') {
+        // Group by which paycheck covers each expense (income label · payday).
+        // Semi-monthly expenses appear TWICE — once under each due day's
+        // paycheck, so users see the full picture per paycheck.
+        const groups = new Map();   // key = "incomeId::payday", val = { label, order, items }
+        const addToGroup = (exp, pay) => {
+          if (!pay) {
+            const k = '__unassigned__';
+            if (!groups.has(k)) groups.set(k, { label: 'Unassigned', order: 9999, items: [] });
+            groups.get(k).items.push(exp);
+            return;
+          }
+          const k = `${pay.incomeId}::${pay.payday}`;
+          if (!groups.has(k)) {
+            groups.set(k, {
+              label: `${pay.incomeName} · ${ordinal(pay.payday)}`,
+              order: pay.payday,
+              items: [],
+            });
+          }
+          groups.get(k).items.push(exp);
+        };
+        expenses.forEach(e => {
+          if (e.frequency === 'semi-monthly' && e.dueDay && e.dueDay2) {
+            addToGroup(e, assignPaycheckForDay(e, user, Number(e.dueDay)));
+            addToGroup(e, assignPaycheckForDay(e, user, Number(e.dueDay2)));
+          } else {
+            addToGroup(e, assignPaycheck(e, user));
+          }
+        });
+        [...groups.values()]
+          .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
+          .forEach(g => renderGroup(g.label, g.items));
+      } else if (sortMode === 'alpha') {
+        renderGroup('', [...expenses].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+      } else if (sortMode === 'amount') {
+        renderGroup('', [...expenses].sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0)));
+      } else if (sortMode === 'due') {
+        // "Soonest first" — computed against today. Items due earlier in the
+        // month sort ahead; items with no due day sink to the bottom.
+        const today = new Date().getDate();
+        const daysUntil = (d) => {
+          if (!d) return 999;
+          const diff = d - today;
+          return diff >= 0 ? diff : diff + 31;
+        };
+        renderGroup('', [...expenses].sort((a, b) => daysUntil(Number(a.dueDay)) - daysUntil(Number(b.dueDay))));
+      } else if (sortMode === 'frequency') {
+        const FREQ_ORDER = { weekly: 1, 'semi-monthly': 2, monthly: 3, quarterly: 4, annually: 5 };
+        const FREQ_LABELS = { weekly: 'Weekly', 'semi-monthly': 'Semi-monthly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' };
+        const byFreq = {};
+        expenses.forEach(e => {
+          const f = e.frequency || 'monthly';
+          (byFreq[f] = byFreq[f] || []).push(e);
+        });
+        Object.keys(byFreq)
+          .sort((a, b) => (FREQ_ORDER[a] || 9) - (FREQ_ORDER[b] || 9))
+          .forEach(f => renderGroup(FREQ_LABELS[f] || f, byFreq[f]));
+      }
 
       // Outside-budget summary for this month
       const outside = outsideBudgetThisMonth(user.transactions);
