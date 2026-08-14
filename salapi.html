@@ -8250,7 +8250,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.22';
+  const APP_VERSION = '2026-08-10.23';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9721,7 +9721,7 @@
           key: t.id,
           label: t.name,
           sub: '',
-          icon: '●',
+          icon: `<span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${t.color};"></span>`,
         }));
         options.push({ key: '__new__', label: '+ Create new tag', sub: '', icon: '＋' });
         const picked = await showPicker({ icon: '🏷', title: 'Add tag', options });
@@ -13467,6 +13467,10 @@
   }
   function afterBudgetSave(user) {
     if (singleEditMode && singleEditMode.type === 'budget') {
+      // Remember which expense the user was editing so showBudgetView
+      // scrolls back to it and flashes it — avoids the "jump to top" UX
+      // where the user has to hunt for the tile they just saved.
+      if (singleEditMode.id) pendingScrollToExpense = singleEditMode.id;
       singleEditMode = null;
       showBudgetView(user);
       return;
@@ -13971,7 +13975,8 @@
         const alreadySelected = new Set(txDraft.tagIds || []);
         const available = getAllTags(userCache).filter(t => !alreadySelected.has(t.id));
         const options = available.map(t => ({
-          key: t.id, label: t.name, sub: '', icon: '●',
+          key: t.id, label: t.name, sub: '',
+          icon: `<span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${t.color};"></span>`,
         }));
         options.push({ key: '__new__', label: '+ Create new tag', sub: '', icon: '＋' });
         const picked = await showPicker({ icon: '🏷', title: 'Add tag', options });
@@ -18902,7 +18907,7 @@
       key: t.id,
       label: t.name,
       sub: 'Tap to edit or delete',
-      icon: '●',   // simple bullet; color hint isn't rendered by showPicker but the tag list shows it clearly on tiles
+      icon: `<span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${t.color};"></span>`,
     }));
     options.push({ key: '__add__', label: '+ Add new tag', sub: '', icon: '＋' });
     const picked = await showPicker({ icon: '🏷', title: 'Manage tags', options });
