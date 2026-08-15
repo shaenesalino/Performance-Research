@@ -2902,119 +2902,196 @@
   /* ==============================
      HOME — REMINDERS
      ============================== */
-  .reminders-card {
-    background: var(--white);
-    border: 1.5px solid var(--sand);
-    border-radius: 20px;
-    padding: 18px 20px;
-    margin-top: 20px;
-    box-shadow: 0 4px 14px rgba(10, 37, 64, 0.05);
-  }
-  .reminders-head {
+  /* Coming-Up notification pill on Home. Single glance-able row that
+     opens a bottom sheet listing the actual reminders when tapped. Accent
+     color shifts based on urgency (overdue = error, today = orange,
+     future = teal). */
+  .reminders-pill {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  .reminders-head h3 {
-    font-family: "Fraunces", serif;
-    font-weight: 700;
-    font-size: 17px;
-    color: var(--navy);
-    margin: 0;
-    letter-spacing: -0.2px;
-    flex: 1;
-  }
-  .reminders-count {
-    background: var(--cream-2);
-    color: var(--navy);
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 10px;
+    gap: 12px;
+    width: 100%;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
     border-radius: 999px;
-    letter-spacing: 0.3px;
+    padding: 10px 16px 10px 12px;
+    margin-top: 20px;
+    box-shadow: 0 4px 14px rgba(10, 37, 64, 0.05);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
   }
-  .reminders-count.urgent {
-    background: var(--error);
-    color: var(--white);
+  .reminders-pill:hover  { border-color: var(--muted); box-shadow: 0 6px 18px rgba(10, 37, 64, 0.08); }
+  .reminders-pill:active { transform: scale(0.99); }
+  .reminders-pill .rp-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    background: rgba(44, 188, 177, 0.14);
+    color: var(--teal);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .reminders-pill .rp-body { flex: 1; min-width: 0; }
+  .reminders-pill .rp-title {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.1;
+    margin-bottom: 2px;
+  }
+  .reminders-pill .rp-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .reminders-pill .rp-chev {
+    color: var(--muted);
+    font-size: 18px;
+    font-weight: 400;
+    flex-shrink: 0;
+  }
+  /* Urgency accents — subtly recolor the icon circle + border tint */
+  .reminders-pill[data-urgency="overdue"] {
+    border-color: rgba(214, 69, 69, 0.4);
+  }
+  .reminders-pill[data-urgency="overdue"] .rp-icon {
+    background: rgba(214, 69, 69, 0.14);
+    color: var(--error);
+  }
+  .reminders-pill[data-urgency="today"] {
+    border-color: rgba(242, 114, 49, 0.4);
+  }
+  .reminders-pill[data-urgency="today"] .rp-icon {
+    background: rgba(242, 114, 49, 0.14);
+    color: var(--orange);
   }
 
-  .reminder-row {
+  /* Reminders bottom sheet — slides up from the bottom, contains the actual
+     notification-style cards for each upcoming bill. */
+  .reminders-modal .reminders-modal-sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    max-height: 80vh;
     background: var(--cream);
-    border: 1px solid transparent;
-    border-radius: 14px;
-    padding: 12px 14px;
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    box-shadow: 0 -8px 32px rgba(10, 37, 64, 0.18);
+    display: flex;
+    flex-direction: column;
+    z-index: 101;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+  .reminders-modal.open .reminders-modal-sheet {
+    transform: translateY(0);
+  }
+  .reminders-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 22px 24px 12px;
+    border-bottom: 1px solid var(--sand);
+  }
+  .reminders-modal-title {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 4px;
+    letter-spacing: -0.2px;
+  }
+  .reminders-modal-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0;
+  }
+  .reminders-modal-close {
+    background: var(--cream-2);
+    border: none;
+    color: var(--navy);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    font-size: 20px;
+    line-height: 1;
+    display: grid; place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .reminders-modal-close:hover { background: var(--sand); }
+  .reminders-modal-list {
+    padding: 16px 20px 32px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Individual notification-style reminder card inside the sheet */
+  .reminder-notif {
     display: grid;
     grid-template-columns: auto 1fr auto;
     gap: 12px;
     align-items: center;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.15s;
+    background: var(--white);
+    border: 1px solid var(--sand);
+    border-radius: 14px;
+    padding: 14px 16px;
     text-align: left;
     font-family: inherit;
-    width: 100%;
-    border-left-width: 3px;
-    border-left-color: var(--sand);
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.15s ease;
+    box-shadow: 0 2px 8px rgba(10, 37, 64, 0.04);
   }
-  .reminder-row:last-child { margin-bottom: 0; }
-  .reminder-row:hover {
-    background: var(--white);
-    border-color: var(--sand);
-    border-left-color: var(--navy);
-    transform: translateX(2px);
-  }
-  .reminder-row.overdue { border-left-color: var(--error); }
-  .reminder-row.today   { border-left-color: var(--orange); }
-  .reminder-row.soon    { border-left-color: var(--yellow); }
-
-  .reminder-icon {
-    width: 34px; height: 34px;
-    border-radius: 10px;
-    background: var(--white);
+  .reminder-notif:hover  { border-color: var(--muted); }
+  .reminder-notif:active { transform: scale(0.99); }
+  .reminder-notif.overdue { border-left: 4px solid var(--error); }
+  .reminder-notif.today   { border-left: 4px solid var(--orange); }
+  .reminder-notif.soon    { border-left: 4px solid var(--yellow); }
+  .reminder-notif .rn-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--cream-2);
     border: 1px solid var(--sand);
     display: grid; place-items: center;
     color: var(--navy);
     flex-shrink: 0;
   }
-  .reminder-icon .svg-inline-icon { width: 16px; height: 16px; }
-  .reminder-info { min-width: 0; }
-  .reminder-info .name {
-    font-weight: 600;
-    font-size: 14px;
+  .reminder-notif .rn-icon .svg-inline-icon { width: 18px; height: 18px; }
+  .reminder-notif .rn-body { min-width: 0; }
+  .reminder-notif .rn-name {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    font-weight: 700;
     color: var(--navy);
     margin: 0 0 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .reminder-info .when {
-    font-size: 11px;
-    letter-spacing: 0.2px;
-    margin: 0;
+  .reminder-notif .rn-meta {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
     color: var(--muted);
+    font-weight: 500;
   }
-  .reminder-info .when .rel {
-    font-weight: 700;
-  }
-  .reminder-row.overdue .when .rel { color: var(--error); }
-  .reminder-row.today   .when .rel { color: var(--orange); }
-  .reminder-row.soon    .when .rel { color: #B8850A; }
-
-  .reminder-amt {
-    font-family: "Fraunces", serif;
+  .reminder-notif .rn-meta .rel { font-weight: 700; }
+  .reminder-notif.overdue .rn-meta .rel { color: var(--error); }
+  .reminder-notif.today   .rn-meta .rel { color: var(--orange); }
+  .reminder-notif.soon    .rn-meta .rel { color: #B8850A; }
+  .reminder-notif .rn-amt {
+    font-family: 'Fraunces', serif;
     font-size: 16px;
     font-weight: 700;
     color: var(--navy);
     text-align: right;
     white-space: nowrap;
-  }
-
-  .reminders-empty {
-    text-align: center;
-    padding: 12px 8px;
-    color: var(--muted);
-    font-size: 13px;
   }
 
   /* Action row on income / budget / goals / wallet / loan tiles.
@@ -7273,15 +7350,37 @@
       </div>
     </button>
 
-    <!-- Reminders (kept, styled compact) -->
-    <div class="reminders-card" id="remindersCard" style="display:none;">
-      <div class="reminders-head">
-        <h3>Coming up</h3>
-        <span class="reminders-count" id="remindersCount">0</span>
+    <!-- Coming Up — notification pill. Compact glance-able summary that
+         opens a bottom sheet listing all upcoming/overdue bills when tapped.
+         Colored accent shifts with urgency (red = overdue, orange = today,
+         teal = future). Hidden entirely when there's nothing coming up. -->
+    <button type="button" class="reminders-pill" id="remindersPill" style="display:none;">
+      <div class="rp-icon" id="remindersPillIcon">🔔</div>
+      <div class="rp-body">
+        <div class="rp-title" id="remindersPillTitle">Coming up</div>
+        <div class="rp-sub" id="remindersPillSub">—</div>
       </div>
-      <div id="remindersList"></div>
-    </div>
+      <div class="rp-chev">→</div>
+    </button>
   </section>
+
+  <!-- Reminders bottom sheet — opens when the pill is tapped. Modal built
+       on the same base as showConfirm/showPicker (cream backdrop + card),
+       but the card slides up from the bottom and the body is a scrollable
+       list of the upcoming bills. -->
+  <div class="confirm-modal reminders-modal" id="remindersModal" aria-hidden="true">
+    <div class="confirm-modal-backdrop" data-remindmodal-cancel></div>
+    <div class="reminders-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="remindersModalTitle">
+      <div class="reminders-modal-head">
+        <div>
+          <h3 class="reminders-modal-title" id="remindersModalTitle">Coming up</h3>
+          <p class="reminders-modal-sub" id="remindersModalSub"></p>
+        </div>
+        <button type="button" class="reminders-modal-close" data-remindmodal-cancel aria-label="Close">×</button>
+      </div>
+      <div class="reminders-modal-list" id="remindersModalList"></div>
+    </div>
+  </div>
 
   <!-- ============ INCOME VIEW ============ -->
   <section class="screen" id="screen-income-view" style="padding: 24px;">
@@ -8288,7 +8387,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.31';
+  const APP_VERSION = '2026-08-10.32';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -11107,62 +11206,103 @@
   }
 
   function renderReminders(user) {
-    const card = document.getElementById('remindersCard');
-    const list = document.getElementById('remindersList');
-    const countEl = document.getElementById('remindersCount');
-
+    const pill = document.getElementById('remindersPill');
     const items = getUpcomingDueThisMonth(user);
     if (items.length === 0) {
-      // Hide the card entirely — cleaner home
-      card.style.display = 'none';
+      pill.style.display = 'none';
       return;
     }
-
-    card.style.display = 'block';
+    // Determine highest urgency to color the pill accent
     const overdueCount = items.filter(x => x.daysDiff < 0).length;
-    countEl.textContent = items.length;
-    countEl.classList.toggle('urgent', overdueCount > 0);
+    const todayCount   = items.filter(x => x.daysDiff >= 0 && x.daysDiff <= 1).length;
+    const urgency = overdueCount > 0 ? 'overdue'
+                   : todayCount   > 0 ? 'today'
+                   : 'soon';
+    const total = items.reduce((s, r) => s + (Number(r.exp.amount) || 0), 0);
+    const n = items.length;
 
-    list.innerHTML = '';
+    // Sub-line describes the mix, e.g. "3 bills · ₱6,500 · 1 overdue"
+    const parts = [`${n} bill${n !== 1 ? 's' : ''}`, peso(total)];
+    if (overdueCount > 0) parts.push(`${overdueCount} overdue`);
+    else if (todayCount > 0) parts.push(`${todayCount} today`);
+
+    pill.style.display = 'flex';
+    pill.dataset.urgency = urgency;
+    document.getElementById('remindersPillTitle').textContent = 'Coming up';
+    document.getElementById('remindersPillSub').textContent = parts.join(' · ');
+    document.getElementById('remindersPillIcon').textContent = urgency === 'overdue' ? '⚠' : '🔔';
+  }
+
+  // Tap the pill → open the sheet with the full list
+  document.getElementById('remindersPill').addEventListener('click', async () => {
+    const { data } = await auth.getSession();
+    if (!data.session) return;
+    openRemindersModal(data.session.user);
+  });
+
+  // Show the bottom sheet listing all upcoming/overdue bills. Uses the same
+  // .confirm-modal base as showPicker so backdrop + Escape close logic works.
+  function openRemindersModal(user) {
+    const modal = document.getElementById('remindersModal');
+    const listEl = document.getElementById('remindersModalList');
+    const subEl  = document.getElementById('remindersModalSub');
+    const cancels = modal.querySelectorAll('[data-remindmodal-cancel]');
+    const items = getUpcomingDueThisMonth(user);
+    const total = items.reduce((s, r) => s + (Number(r.exp.amount) || 0), 0);
+    subEl.textContent = `${items.length} bill${items.length !== 1 ? 's' : ''} · ${peso(total)}`;
+
+    listEl.innerHTML = '';
     items.forEach(({ exp, dueDate, daysDiff }) => {
       let cls = '';
-      if (daysDiff < 0)      cls = 'overdue';
+      if (daysDiff < 0)       cls = 'overdue';
       else if (daysDiff <= 1) cls = 'today';
       else if (daysDiff <= 6) cls = 'soon';
-
       const catIcon = CATEGORY_ICONS[exp.category] || svgIcon('box');
       const dateStr = dueDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
       const rel = relativeDueLabel(daysDiff);
-
       const row = document.createElement('button');
-      row.className = 'reminder-row ' + cls;
+      row.className = 'reminder-notif ' + cls;
       row.type = 'button';
       row.setAttribute('data-remind-expense', exp.id);
       row.innerHTML = `
-        <div class="reminder-icon">${catIcon}</div>
-        <div class="reminder-info">
-          <p class="name">${escapeAttr(exp.name || 'Expense')}</p>
-          <p class="when">Due ${dateStr} · <span class="rel">${rel}</span></p>
+        <div class="rn-icon">${catIcon}</div>
+        <div class="rn-body">
+          <div class="rn-name">${escapeAttr(exp.name || 'Expense')}</div>
+          <div class="rn-meta">Due ${dateStr} · <span class="rel">${rel}</span></div>
         </div>
-        <div class="reminder-amt">${peso(exp.amount)}</div>
+        <div class="rn-amt">${peso(exp.amount)}</div>
       `;
-      list.appendChild(row);
+      row.addEventListener('click', async () => {
+        closeRemindersModal();
+        const { data } = await auth.getSession();
+        if (!data.session) return;
+        openTransactionScreen(data.session.user, {
+          type: 'expense',
+          source: 'set',
+          linkedId: exp.id,
+        });
+      });
+      listEl.appendChild(row);
     });
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+
+    function closeRemindersModal() {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      cancels.forEach(el => el.removeEventListener('click', closeRemindersModal));
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e) { if (e.key === 'Escape') closeRemindersModal(); }
+    cancels.forEach(el => el.addEventListener('click', closeRemindersModal));
+    document.addEventListener('keydown', onKey);
   }
 
-  // Tapping a reminder → open transaction form pre-filled with that expense
-  document.addEventListener('click', async e => {
-    const row = e.target.closest('[data-remind-expense]');
-    if (!row) return;
-    const expenseId = row.dataset.remindExpense;
-    const { data } = await auth.getSession();
-    if (!data.session) return;
-    openTransactionScreen(data.session.user, {
-      type: 'expense',
-      source: 'set',
-      linkedId: expenseId,
-    });
-  });
+  // (The old delegated [data-remind-expense] handler is gone — the
+  // notification-style reminders now attach their own click handlers when
+  // rendered into the bottom-sheet modal, letting us close the modal first
+  // before opening the transaction form.)
 
   // Tapping "+ Received" on an income row → open transaction form pre-filled
   document.addEventListener('click', async e => {
