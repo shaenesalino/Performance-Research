@@ -8288,7 +8288,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.30';
+  const APP_VERSION = '2026-08-10.31';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -11405,11 +11405,16 @@
     document.getElementById('tmcDiscretionaryBar').classList.toggle('over', discretionaryLeft < 0);
   }
 
-  // Goals Progress carousel — horizontal scroll of goal cards
+  // Goals Progress carousel — horizontal scroll of goal cards.
+  // Sinking-fund goals are hidden here because they're tightly coupled to
+  // an expense (Sun Life quarterly, etc.) — they're really monthly bill
+  // set-asides, not aspirational savings. The user sees them on Budget +
+  // Ipon pages already; showing them here would clutter the "progress"
+  // signal for actual goals like Family Travel, Emergency Fund, etc.
   function renderGoalsCarousel(user) {
     const head = document.getElementById('goalsHead');
     const wrap = document.getElementById('goalsCarousel');
-    const goals = Array.isArray(user.goals) ? user.goals : [];
+    const goals = (Array.isArray(user.goals) ? user.goals : []).filter(g => !isSinkingFundGoal(g));
     if (goals.length === 0) { head.style.display = 'none'; wrap.style.display = 'none'; return; }
 
     head.style.display = 'flex';
