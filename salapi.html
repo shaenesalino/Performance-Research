@@ -8387,7 +8387,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.32';
+  const APP_VERSION = '2026-08-10.34';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -11618,13 +11618,22 @@
       const dateStr = formatTxDate(t.date);
       const sign = t.type === 'expense' ? '−' : t.type === 'income' ? '+' : '';
       const amt = `${sign}${peso(t.amount)}`;
-      // Meta: wallet or revolving-account name if we have one, else source label
-      const wallet = (user.wallets || []).find(w => w.id === t.wallet);
-      const revAcct = wallet ? null : (user.loans || []).find(l => l.id === t.wallet && l.isRevolving);
-      const walletName = wallet
-        ? (wallet.label || PAYMENT_NAME[wallet.method] || 'Wallet')
-        : (revAcct ? `${revAcct.name || 'Credit'} · Credit` : '');
-      const meta = [dateStr, walletName].filter(Boolean).join(' · ');
+      // Meta: for transfers, show "From → To" instead of just From
+      let meta;
+      if (t.type === 'transfer') {
+        const fromW = (user.wallets || []).find(w => w.id === t.wallet);
+        const toW   = (user.wallets || []).find(w => w.id === t.toWallet);
+        const fromName = fromW ? (fromW.label || PAYMENT_NAME[fromW.method] || 'Wallet') : 'Wallet';
+        const toName   = toW   ? (toW.label   || PAYMENT_NAME[toW.method]   || 'Wallet') : 'Wallet';
+        meta = [dateStr, `${fromName} → ${toName}`].filter(Boolean).join(' · ');
+      } else {
+        const wallet = (user.wallets || []).find(w => w.id === t.wallet);
+        const revAcct = wallet ? null : (user.loans || []).find(l => l.id === t.wallet && l.isRevolving);
+        const walletName = wallet
+          ? (wallet.label || PAYMENT_NAME[wallet.method] || 'Wallet')
+          : (revAcct ? `${revAcct.name || 'Credit'} · Credit` : '');
+        meta = [dateStr, walletName].filter(Boolean).join(' · ');
+      }
       return `
         <div class="recent-tx-row" data-tx-id="${escapeAttr(t.id)}">
           <div class="rt-icon ${t.type}">${icon}</div>
@@ -14412,6 +14421,13 @@
   }
 
   function renderTxSource() {
+    // Transfer type has no "source" — from/to wallets are picked in the
+    // transfer wrap instead, and this whole section (#txSourceWrap) is
+    // hidden by updateTxModeVisibility. Bail early to avoid crashing on
+    // `list.forEach` when SOURCE_LABELS[txDraft.type] is undefined — that
+    // crash was killing the tab handler before it could show the transfer
+    // pickers, leaving the form stuck showing the budget-item dropdown.
+    if (txDraft.type === 'transfer') return;
     const list = SOURCE_LABELS[txDraft.type];
     const label = txDraft.type === 'expense' ? 'Where does this come from?'
               : txDraft.type === 'income'  ? 'Where does this go to?'
@@ -14971,7 +14987,11 @@
     setLoading(btn, false);
 
     if (error) { toast(error.message, 'error'); return; }
-    const kindLabel = txDraft.type === 'expense' ? 'Expense' : txDraft.type === 'income' ? 'Income' : 'Saving';
+    const kindLabel = txDraft.type === 'expense'  ? 'Expense'
+                    : txDraft.type === 'income'   ? 'Income'
+                    : txDraft.type === 'saving'   ? 'Saving'
+                    : txDraft.type === 'transfer' ? 'Transfer'
+                    : 'Transaction';
     const wasEditing = !!editingTxId;
     editingTxId = null;
     if (wasEditing) {
