@@ -6189,6 +6189,16 @@
     color: #C48E00;
   }
 
+  /* Small hint text under the "starting wallet" picker on the loan form. */
+  .loan-start-wallet-hint {
+    margin-top: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+    font-weight: 500;
+  }
+
   /* Pill next to the goal name marking it as a sinking fund. Same visual
      pattern as .ipon-linked-pin (subtle tinted background + colored text)
      but with the sinking-fund gold accent instead of teal. */
@@ -7869,6 +7879,20 @@
         <input class="input" type="text" id="loanNoteInput" placeholder="Anything worth remembering" maxlength="120" />
       </div>
 
+      <!-- Wallet field — shown only when creating a new loan. Records the
+           initial money movement (money OUT for pautang, money IN for utang)
+           on the picked wallet. Optional: leave "None" to skip creating a
+           starting transaction (useful for loans where the money moved before
+           you started tracking). -->
+      <div class="field" id="loanStartWalletField">
+        <label id="loanStartWalletLbl">Wallet <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+        <div class="select-wrap">
+          <select class="input select" id="loanStartWalletSelect"></select>
+          <span class="select-caret">▾</span>
+        </div>
+        <div class="loan-start-wallet-hint" id="loanStartWalletHint"></div>
+      </div>
+
       <!-- Tags — same colored-label picker used on expenses/goals/transactions -->
       <div class="field" id="loanTagsField">
         <label>Tags <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
@@ -7918,7 +7942,7 @@
     </div>
 
     <div>
-      <div class="tx-mini-label">From wallet</div>
+      <div class="tx-mini-label" id="lpWalletLabel">From wallet</div>
       <div class="payment-grid" id="lpWalletGrid"></div>
     </div>
 
@@ -8387,7 +8411,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.34';
+  const APP_VERSION = '2026-08-10.36';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -11070,7 +11094,16 @@
   }
 
   function spentThisPeriod(expenseItem, transactions) {
-    const period = getCurrentPeriod(expenseItem.frequency || 'monthly');
+    // Semi-monthly expenses (paid twice a month) are shown against the whole
+    // month's plan on the tile — not per half-month. That matches how users
+    // think ("I paid family contribution ₱4,000 this month, still owe another
+    // ₱4,000") and avoids the disorienting flip on the 16th where a paid
+    // 1st–15th cycle disappears from view. Every other frequency keeps its
+    // own natural period.
+    const freqForPeriod = expenseItem.frequency === 'semi-monthly'
+      ? 'monthly'
+      : (expenseItem.frequency || 'monthly');
+    const period = getCurrentPeriod(freqForPeriod);
     return (transactions || [])
       .filter(t => t.type === 'expense' && t.source === 'set' && t.linkedId === expenseItem.id)
       .filter(t => isDateInPeriod(t.date, period))
@@ -12536,7 +12569,11 @@
         const due = dueText(exp);
         const catIcon = CATEGORY_ICONS[exp.category] || svgIcon('box');
         const spent = spentThisPeriod(exp, user.transactions);
-        const planned = Number(exp.amount) || 0;
+        // For semi-monthly, the tile shows monthly progress (both payments
+        // together) — planned is the monthly total, not one occurrence.
+        // Keeps the tile in sync with how spentThisPeriod counts semi-monthly.
+        const rawAmount = Number(exp.amount) || 0;
+        const planned = exp.frequency === 'semi-monthly' ? rawAmount * 2 : rawAmount;
         const pctRaw = planned > 0 ? (spent / planned) * 100 : 0;
         const pct = Math.min(pctRaw, 100);
         let barVariant = '', rightText = '', rightClass = '';
@@ -15453,9 +15490,13 @@
       titleEl.textContent = exp.name || 'Expense';
       const cat = CATEGORIES.find(c => c.v === exp.category);
       const catIcon = CATEGORY_ICONS[exp.category] || svgIcon('box');
-      const period = getCurrentPeriod(exp.frequency || 'monthly');
+      // For semi-monthly, treat the tile like a monthly view (matches
+      // spentThisPeriod's own semi-monthly override + the Budget page tile).
+      const freqForPeriod = exp.frequency === 'semi-monthly' ? 'monthly' : (exp.frequency || 'monthly');
+      const period = getCurrentPeriod(freqForPeriod);
       const spent = spentThisPeriod(exp, txs);
-      const planned = Number(exp.amount) || 0;
+      const rawAmount = Number(exp.amount) || 0;
+      const planned = exp.frequency === 'semi-monthly' ? rawAmount * 2 : rawAmount;
       const pctRaw = planned > 0 ? Math.round((spent / planned) * 100) : 0;
       const pct = Math.min(pctRaw, 100);
       let barClass = '', valClass = '';
@@ -17902,6 +17943,34 @@
       statusSel.options[2].textContent = 'In default';
     }
 
+    // Initial-movement wallet field — only meaningful for NEW loans (once
+    // saved, the initial movement tx exists and shouldn't be duplicated).
+    // For existing loans, hide the field entirely.
+    const startWalletField = document.getElementById('loanStartWalletField');
+    if (isEditing) {
+      startWalletField.style.display = 'none';
+    } else {
+      startWalletField.style.display = '';
+      const startWalletSel = document.getElementById('loanStartWalletSelect');
+      const wallets = Array.isArray(user.wallets) ? user.wallets : [];
+      startWalletSel.innerHTML = `<option value="">None (skip — no starting transaction)</option>` +
+        wallets.map(w => {
+          const name = (w.label && w.label.trim()) || PAYMENT_NAME[w.method] || 'Wallet';
+          return `<option value="${w.id}">${escapeAttr(name)}</option>`;
+        }).join('');
+      startWalletSel.value = '';
+      // Labels + hints flip based on direction
+      const lblEl  = document.getElementById('loanStartWalletLbl');
+      const hintEl = document.getElementById('loanStartWalletHint');
+      if (isReceivable) {
+        lblEl.innerHTML = `Money left from wallet <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span>`;
+        hintEl.textContent = 'The wallet the money came from when you lent it out. Will be recorded as a starting expense.';
+      } else {
+        lblEl.innerHTML = `Money received to wallet <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span>`;
+        hintEl.textContent = 'The wallet the money came into when you borrowed it. Will be recorded as a starting income.';
+      }
+    }
+
     // Frequency-driven label + input-swap
     updateLoanFormForFrequency(isReceivable);
     // Rebind so the change handler always uses the current direction
@@ -18061,26 +18130,60 @@
     const { data: sess } = await auth.getSession();
     const user = sess.session.user;
     const loans = Array.isArray(user.loans) ? [...user.loans] : [];
+    // Transaction list starts unchanged; may append a starting movement below
+    let transactions = Array.isArray(user.transactions) ? [...user.transactions] : [];
 
+    let newLoanId = null;
     if (editingLoanId) {
       const idx = loans.findIndex(l => l.id === editingLoanId);
       if (idx >= 0) {
         loans[idx] = { ...loans[idx], ...record, tagIds: [...loanDraftTagIds], updatedAt: now };
       }
     } else {
+      newLoanId = 'ln_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       loans.push({
-        id: 'ln_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: newLoanId,
         ...record,
         direction: pendingLoanDirection || 'payable',
         payments: [],
         tagIds: [...loanDraftTagIds],
         addedAt: now, updatedAt: now,
       });
+
+      // If the user picked a starting wallet, record the initial money
+      // movement as a transaction so wallet balances stay accurate:
+      //   - Pautang (receivable): money LEFT that wallet → expense
+      //   - Utang   (payable):    money CAME INTO that wallet → income
+      // linkedLoanId makes it appear in loan history and stay OUT of
+      // regular income/spent totals (isLoanPaymentTx filters it).
+      const startWalletId = document.getElementById('loanStartWalletSelect')?.value || '';
+      const startAmount = Number(record.originalAmount) || Number(record.currentBalance) || 0;
+      if (startWalletId && startAmount > 0 && !record.isRevolving) {
+        const wallet = (user.wallets || []).find(w => w.id === startWalletId);
+        const isReceivable = (pendingLoanDirection || 'payable') === 'receivable';
+        const txId = 'tx_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        transactions.push({
+          id: txId,
+          type: isReceivable ? 'expense' : 'income',
+          source: 'outside',
+          amount: startAmount,
+          date: new Date().toISOString().slice(0, 10),
+          note: isReceivable
+            ? `Lent out: ${record.name || 'pautang'}`
+            : `Borrowed: ${record.name || 'utang'}`,
+          paymentMethod: wallet ? wallet.method : 'cash',
+          wallet: startWalletId,
+          linkedLoanId: newLoanId,
+          category: 'other',
+          label: (isReceivable ? 'Lent: ' : 'Borrowed: ') + (record.name || LOAN_LABEL[record.type] || 'loan'),
+          createdAt: new Date().toISOString(),
+        });
+      }
     }
 
     const btn = document.getElementById('saveLoanBtn');
     setLoading(btn, true, 'Saving…');
-    const { data, error } = await auth.updateUser({ data: { loans } });
+    const { data, error } = await auth.updateUser({ data: { loans, transactions } });
     setLoading(btn, false);
     if (error) { toast(error.message, 'error'); return; }
     editingLoanId = null;
@@ -18120,6 +18223,8 @@
     const contextLbl = document.querySelector('#loanPaymentContext .lbl');
     if (contextLbl) contextLbl.textContent = isReceivable ? 'Collecting from' : 'Paying toward';
     document.getElementById('saveLoanPaymentBtn').textContent = isReceivable ? 'Record collection' : 'Record payment';
+    // Wallet label: money leaves your wallet for utang; goes INTO your wallet for pautang
+    document.getElementById('lpWalletLabel').textContent = isReceivable ? 'To wallet' : 'From wallet';
 
     document.getElementById('loanPaymentLoanName').textContent = loan.name || LOAN_LABEL[loan.type] || 'Loan';
     // Revolving accounts have a derived balance; fixed loans have a stored one.
@@ -18197,7 +18302,12 @@
 
     if (amount <= 0) { toast('Enter a payment amount greater than zero.', 'error'); return; }
     if (!date)       { toast('Pick a date.', 'error'); return; }
-    if (!walletId)   { toast('Pick a wallet to pay from.', 'error'); return; }
+    if (!walletId)   {
+      const loanCheck = (userCache.loans || []).find(l => l.id === payingLoanId);
+      const isReceivable = loanCheck && (loanCheck.direction || 'payable') === 'receivable';
+      toast(isReceivable ? 'Pick a wallet to receive into.' : 'Pick a wallet to pay from.', 'error');
+      return;
+    }
 
     const { data: sess } = await auth.getSession();
     const user = sess.session.user;
