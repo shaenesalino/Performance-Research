@@ -6181,9 +6181,14 @@
   .ipon-budget-tile.sinking-fund .view-item-amount.ipon {
     color: #C48E00;
   }
+  .ipon-budget-tile.sinking-fund .view-goal-mini-bar,
+  .view-goal.sinking-fund .view-goal-mini-bar {
+    background: rgba(139, 100, 0, 0.18);
+    height: 8px;
+  }
   .ipon-budget-tile.sinking-fund .view-goal-mini-bar > div,
   .view-goal.sinking-fund .view-goal-mini-bar > div {
-    background: linear-gradient(to right, var(--gold), #E8A600);
+    background: linear-gradient(to right, #C48E00, #8B6400);
   }
   .ipon-budget-tile.sinking-fund .ipon-budget-footer .link {
     color: #C48E00;
@@ -8431,7 +8436,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.45';
+  const APP_VERSION = '2026-08-10.46';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
