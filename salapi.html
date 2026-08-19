@@ -8411,7 +8411,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.37';
+  const APP_VERSION = '2026-08-10.40';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9004,7 +9004,6 @@
     cash: svgIcon('cash'),
     bank: svgIcon('bank'),
     ewallet: svgIcon('phone'),
-    envelope: svgIcon('gem'),  // reuse gem icon as an envelope stand-in
     other: svgIcon('plus'),
     // Legacy — kept so older wallets still render an icon until the user
     // opens them and re-picks a type in the consolidated list.
@@ -10447,6 +10446,7 @@
       deadline: '',    // 'YYYY-MM' string, optional
       saved: 0,        // optional starting amount (unlinked goals only)
       walletId: null,  // if set, goal progress mirrors this wallet's balance
+      assetId: null,   // if set, goal progress mirrors this asset's current value
       contribDay: null,  // day of week (weekly) OR day of month (semi/monthly/quarterly/annually)
       contribDay2: null, // semi-monthly only (second day)
       contribMonth: null,// annually only (1-12)
@@ -10633,6 +10633,26 @@
             <span class="select-caret">▾</span>
           </div>
           <div class="payday-hint" data-wallet-hint style="display:none;"></div>
+        </div>
+
+        <div class="field wide">
+          <label>Tracks an asset <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional — auto-syncs with the asset's value)</span></label>
+          <div class="select-wrap">
+            <select class="input select" data-field="assetId">
+              <option value="">Not linked to an asset</option>
+              ${(userCache?.assets || []).map(a => {
+                // One-to-one: an asset can back one ipon at most. Existing
+                // claims from other goals are disabled but shown with a hint.
+                const claimedBy = (userCache?.goals || []).find(og => og.id !== goal.id && og.assetId === a.id);
+                const draftClaim = goalDraft.find(og => og.id !== goal.id && og.assetId === a.id);
+                const taken = claimedBy || draftClaim;
+                const takenName = taken ? (taken.name || 'another goal') : '';
+                return `<option value="${a.id}" ${goal.assetId === a.id ? 'selected' : ''} ${taken ? 'disabled' : ''}>${escapeAttr(a.name || 'Asset')}${taken ? ` — used by ${escapeAttr(takenName)}` : ''}</option>`;
+              }).join('')}
+            </select>
+            <span class="select-caret">▾</span>
+          </div>
+          <div class="payday-hint" data-asset-hint style="display:none;"></div>
         </div>
       </div>
 
@@ -10881,32 +10901,69 @@
       refreshProgress();
     });
     const walletSel = card.querySelector('[data-field="walletId"]');
-    if (walletSel) {
-      const applyWalletLink = () => {
-        const isLinked = !!goal.walletId;
-        const startingContainer = card.querySelector('[data-field-container="saved"]');
-        const hint             = card.querySelector('[data-wallet-hint]');
-        if (startingContainer) startingContainer.style.display = isLinked ? 'none' : '';
-        if (hint) {
-          if (isLinked) {
-            const linkedWallet = (userCache?.wallets || []).find(w => w.id === goal.walletId);
-            const linkedName = linkedWallet
-              ? ((linkedWallet.label && linkedWallet.label.trim()) || PAYMENT_NAME[linkedWallet.method] || 'Wallet')
-              : 'this wallet';
-            hint.textContent = `Progress tracks ${linkedName}'s balance. Update the wallet's balance to change your saved amount.`;
-            hint.style.display = 'block';
-          } else {
-            hint.style.display = 'none';
-          }
+    const assetSel  = card.querySelector('[data-field="assetId"]');
+    // Compute + apply visual state for BOTH linkers together — links are
+    // mutually exclusive (a goal can be wallet-linked OR asset-linked, not
+    // both). Picking one auto-clears the other so state stays consistent.
+    const applyLinkedState = () => {
+      const isWalletLinked = !!goal.walletId;
+      const isAssetLinked  = !!goal.assetId;
+      const startingContainer = card.querySelector('[data-field-container="saved"]');
+      const walletHint = card.querySelector('[data-wallet-hint]');
+      const assetHint  = card.querySelector('[data-asset-hint]');
+      // Hide the "starting amount" field when either link is on — the
+      // saved value is derived from the linked wallet/asset instead.
+      if (startingContainer) {
+        startingContainer.style.display = (isWalletLinked || isAssetLinked) ? 'none' : '';
+      }
+      // Wallet hint
+      if (walletHint) {
+        if (isWalletLinked) {
+          const linkedWallet = (userCache?.wallets || []).find(w => w.id === goal.walletId);
+          const linkedName = linkedWallet
+            ? ((linkedWallet.label && linkedWallet.label.trim()) || PAYMENT_NAME[linkedWallet.method] || 'Wallet')
+            : 'this wallet';
+          walletHint.textContent = `Progress tracks ${linkedName}'s balance. Update the wallet's balance to change your saved amount.`;
+          walletHint.style.display = 'block';
+        } else {
+          walletHint.style.display = 'none';
         }
-      };
-      applyWalletLink();   // initial render
+      }
+      // Asset hint
+      if (assetHint) {
+        if (isAssetLinked) {
+          const linkedAsset = (userCache?.assets || []).find(a => a.id === goal.assetId);
+          const linkedName = linkedAsset?.name || 'this asset';
+          assetHint.textContent = `Progress tracks ${linkedName}'s value. Update the asset in Net Worth to change your saved amount.`;
+          assetHint.style.display = 'block';
+        } else {
+          assetHint.style.display = 'none';
+        }
+      }
+      // Disable the OTHER picker when one is chosen (visual signal of
+      // mutual exclusion; also prevents accidentally picking both).
+      if (walletSel) walletSel.disabled = isAssetLinked;
+      if (assetSel)  assetSel.disabled  = isWalletLinked;
+    };
+    if (walletSel) {
       walletSel.addEventListener('change', e => {
         goal.walletId = e.target.value || null;
-        applyWalletLink();
+        if (goal.walletId) goal.assetId = null;   // enforce mutual exclusion
+        if (assetSel) assetSel.value = goal.assetId || '';
+        applyLinkedState();
         refreshProgress();
       });
     }
+    if (assetSel) {
+      assetSel.addEventListener('change', e => {
+        goal.assetId = e.target.value || null;
+        if (goal.assetId) goal.walletId = null;   // enforce mutual exclusion
+        if (walletSel) walletSel.value = goal.walletId || '';
+        applyLinkedState();
+        refreshProgress();
+      });
+    }
+    applyLinkedState();   // initial render
 
     wireContribBlock(card, goal);
 
@@ -11022,6 +11079,7 @@
         deadline: g.deadline || '',
         saved: Number(g.saved) || 0,
         walletId: g.walletId || null,
+        assetId:  g.assetId  || null,
         contribDay:   g.contribDay,
         contribDay2:  g.contribDay2,
         contribMonth: g.contribMonth,
@@ -11042,6 +11100,16 @@
         return;
       }
       walletClaims[g.walletId] = g.name;
+    }
+    // Same enforcement for assets — one goal per asset.
+    const assetClaims = {};
+    for (const g of cleaned) {
+      if (!g.assetId) continue;
+      if (assetClaims[g.assetId]) {
+        toast('Two goals can\'t share the same asset. Pick a different asset for one of them.', 'error');
+        return;
+      }
+      assetClaims[g.assetId] = g.name;
     }
 
     const btn = document.getElementById('saveGoalsBtn');
@@ -11158,6 +11226,14 @@
     if (goal.walletId && userCache) {
       const wallet = (userCache.wallets || []).find(w => w.id === goal.walletId);
       if (wallet) return computeWalletBalance(wallet, transactions);
+    }
+    // Asset-linked ipon: the goal's saved amount IS the linked asset's current
+    // value. Useful for tracking things like MP2 or a stock portfolio where the
+    // value grows from contributions AND dividends/market gains. User edits the
+    // asset value directly (via Net Worth) — no per-contribution transactions.
+    if (goal.assetId && userCache) {
+      const asset = (userCache.assets || []).find(a => a.id === goal.assetId);
+      if (asset) return Number(asset.value) || 0;
     }
     // Unlinked goal (classic model): starting amount + logged contributions.
     return (Number(goal.saved) || 0) + totalContributedTo(goal.id, transactions);
@@ -13061,7 +13137,9 @@
     const monthly = (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1);
     const contribText = `${peso(g.contribution)}${FREQ_LABEL[g.frequency] ? ' ' + FREQ_LABEL[g.frequency].toLowerCase() : ''}`;
     const dueLine = g.contribDay ? ` · ${ordinal(g.contribDay)}` : '';
-    const linkedTag  = g.walletId ? '<span class="ipon-linked-pin">wallet-linked</span>' : '';
+    const linkedTag  = g.walletId ? '<span class="ipon-linked-pin">wallet-linked</span>'
+                     : g.assetId  ? '<span class="ipon-linked-pin">asset-linked</span>'
+                     : '';
     const sinkingPill = isSinking ? '<span class="sinking-fund-pill">Sinking Fund</span>' : '';
     const footerLbl = isSinking ? 'Reserved for future bill' : 'Monthly contribution';
     const footerLink = isSinking ? 'Edit on Budget →' : 'Edit on Ipon →';
@@ -13168,10 +13246,16 @@
         // Wallet link info — if this goal mirrors a wallet's balance
         const linkedWallet = g.walletId ? (user.wallets || []).find(w => w.id === g.walletId) : null;
         const linkedName = linkedWallet ? ((linkedWallet.label && linkedWallet.label.trim()) || PAYMENT_NAME[linkedWallet.method] || 'Wallet') : null;
-        // For wallet-linked goals, the "monthly contribution" concept doesn't apply
-        // (progress tracks the wallet directly). Show "in [Wallet]" instead.
+        // Asset link info — if this goal mirrors an asset's current value
+        const linkedAsset = g.assetId ? (user.assets || []).find(a => a.id === g.assetId) : null;
+        const linkedAssetName = linkedAsset ? (linkedAsset.name || 'Asset') : null;
+        // Meta line reflects the link type. For wallet/asset-linked goals,
+        // the "monthly contribution" concept doesn't drive progress (link
+        // does), so show the link source instead.
         const metaLine = linkedName
           ? `In ${escapeAttr(linkedName)} · target ${peso(target)}`
+          : linkedAssetName
+          ? `Tracks ${escapeAttr(linkedAssetName)} · target ${peso(target)}`
           : `${peso(monthlyContrib)}/mo${cdt ? ' · ' + cdt : ''} · target ${peso(target)}`;
         const sinkingPill = isSinking ? '<span class="sinking-fund-pill">Sinking Fund</span>' : '';
 
@@ -13182,8 +13266,15 @@
         // Sinking-fund goals: no direct edit/log buttons — they're controlled
         // by the paired expense on the Budget page. Tap the tile to jump to
         // the expense edit form.
+        // Asset-linked goals: no direct "+Saved" — progress comes from
+        // updating the asset value in Net Worth. Show a hint pointing there.
         const actionButtons = isSinking
           ? `<div class="view-item-action"><span class="sinking-fund-hint">Edit on Budget →</span></div>`
+          : linkedAssetName
+          ? `<div class="view-item-action">
+              <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
+              <button class="row-edit-btn primary" type="button" data-jump-asset="${g.assetId}">Update in Assets →</button>
+            </div>`
           : `<div class="view-item-action">
               <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
               <button class="row-edit-btn primary" type="button" data-log-goal="${g.id}">+ Saved</button>
@@ -13248,6 +13339,24 @@
               openTransactionScreen(data.session.user, {
                 type: 'saving', source: 'set', linkedId: g.id,
               });
+            }
+          });
+        }
+
+        // Direct handler for "Update in Assets →" (asset-linked goals).
+        // Jumps straight to the Net Worth screen and opens the asset editor.
+        const jumpAssetBtn = card.querySelector('[data-jump-asset]');
+        if (jumpAssetBtn) {
+          jumpAssetBtn.addEventListener('click', async ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const assetId = jumpAssetBtn.dataset.jumpAsset;
+            const { data } = await auth.getSession();
+            if (!data.session) return;
+            if (typeof openAssetEdit === 'function') {
+              openAssetEdit(data.session.user, assetId);
+            } else if (typeof showAssetsScreen === 'function') {
+              showAssetsScreen(data.session.user);
             }
           });
         }
@@ -14128,6 +14237,7 @@
         target: Number(g.target) || 0, contribution: Number(g.contribution) || 0,
         frequency: g.frequency, deadline: g.deadline || '', saved: Number(g.saved) || 0,
         walletId: g.walletId || null,
+        assetId:  g.assetId  || null,
         contribDay: g.contribDay, contribDay2: g.contribDay2, contribMonth: g.contribMonth,
         manualPayFrom: g.manualPayFrom || null,
         pairedExpenseId: g.pairedExpenseId || null,
@@ -16750,20 +16860,30 @@
       empty.style.display = 'none';
       let total = 0;
 
-      // Group wallets by payment method type. Order: Bank → E-wallet (GCash,
-      // Maya) → Cash → Card → Other so accounts (biggest balances usually)
-      // show first, then daily-use wallets, then cash, then card/other.
+      // Group wallets by type. Order: Bank → E-wallet → Cash → Other so
+      // accounts (biggest balances usually) show first, then daily-use
+      // wallets, then cash, then anything else. Each group accepts both the
+      // current type value AND any legacy aliases so pre-consolidation
+      // wallets still appear in the right bucket.
       const GROUP_ORDER = [
-        { key: 'bank',    label: 'Bank accounts',   methods: ['bank']          },
-        { key: 'ewallet', label: 'E-wallets',       methods: ['gcash', 'maya'] },
-        { key: 'cash',    label: 'Cash',            methods: ['cash']          },
-        { key: 'card',    label: 'Cards',           methods: ['card']          },
-        { key: 'other',   label: 'Other',           methods: ['other']         },
+        { key: 'bank',    label: 'Bank accounts',   methods: ['bank']                       },
+        { key: 'ewallet', label: 'E-wallets',       methods: ['ewallet', 'gcash', 'maya']  },
+        { key: 'cash',    label: 'Cash',            methods: ['cash']                       },
+        { key: 'other',   label: 'Other',           methods: ['other', 'card']              },
       ];
+      const knownMethods = new Set(GROUP_ORDER.flatMap(g => g.methods));
       const grouped = GROUP_ORDER.map(g => ({
         ...g,
         wallets: wallets.filter(w => g.methods.includes(w.method)),
       })).filter(g => g.wallets.length > 0);
+      // Any wallet with an unrecognized method falls into Other so it stays
+      // visible even if a future type gets added and this list falls behind.
+      const orphans = wallets.filter(w => !knownMethods.has(w.method));
+      if (orphans.length) {
+        const otherGroup = grouped.find(g => g.key === 'other');
+        if (otherGroup) otherGroup.wallets.push(...orphans);
+        else grouped.push({ key: 'other', label: 'Other', methods: [], wallets: orphans });
+      }
 
       // Helper — render a single wallet row (extracted so we don't duplicate)
       const renderWalletRow = (w) => {
@@ -17570,7 +17690,12 @@
     if (!confirm('Delete this asset? This can\'t be undone.')) return;
     const { data: sess } = await auth.getSession();
     const assets = (sess.session.user.assets || []).filter(a => a.id !== editingAssetId);
-    const { data, error } = await auth.updateUser({ data: { assets } });
+    // Unlink any goals that were tracking this asset — otherwise their
+    // "saved" value would silently fall back to 0 (asset value gone).
+    const goals = (sess.session.user.goals || []).map(g =>
+      g.assetId === editingAssetId ? { ...g, assetId: null } : g
+    );
+    const { data, error } = await auth.updateUser({ data: { assets, goals } });
     if (error) { toast(error.message, 'error'); return; }
     editingAssetId = null;
     toast('Asset deleted', 'success');
