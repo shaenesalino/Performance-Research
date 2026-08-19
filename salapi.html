@@ -8411,7 +8411,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.41';
+  const APP_VERSION = '2026-08-10.42';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -10614,19 +10614,23 @@
         </div>
 
         <div class="field wide">
-          <label>Saved in wallet <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional — auto-tracks wallet balance)</span></label>
+          <label>Saved in wallet <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional — auto-tracks wallet balance; for sinking funds, becomes the destination when you tap + Saved)</span></label>
           <div class="select-wrap">
             <select class="input select" data-field="walletId">
               <option value="">Not linked to a wallet</option>
               ${(userCache?.wallets || []).map(w => {
                 const label = (w.label && w.label.trim()) || (PAYMENT_NAME[w.method] || 'Wallet');
-                // A wallet can only back one ipon at a time. Show wallets already
-                // claimed by another goal as disabled with a hint, but keep this
-                // goal's own wallet selectable so it stays visible when editing.
-                const claimedBy = (userCache?.goals || []).find(og => og.id !== goal.id && og.walletId === w.id);
-                const draftClaim = goalDraft.find(og => og.id !== goal.id && og.walletId === w.id);
-                const taken = claimedBy || draftClaim;
-                const takenName = taken ? (taken.name || 'another goal') : '';
+                // Sinking-fund goals can share destination wallets (money flows
+                // in via linked transfers). Non-sinking goals are exclusive
+                // (goal mirrors wallet balance — sharing would double-count).
+                const isThisSinking = !!goal.pairedExpenseId;
+                let taken = false, takenName = '';
+                if (!isThisSinking) {
+                  const claimedBy = (userCache?.goals || []).find(og => og.id !== goal.id && og.walletId === w.id && !og.pairedExpenseId);
+                  const draftClaim = goalDraft.find(og => og.id !== goal.id && og.walletId === w.id && !og.pairedExpenseId);
+                  const claim = claimedBy || draftClaim;
+                  if (claim) { taken = true; takenName = claim.name || 'another goal'; }
+                }
                 return `<option value="${w.id}" ${goal.walletId === w.id ? 'selected' : ''} ${taken ? 'disabled' : ''}>${escapeAttr(label)}${taken ? ` — used by ${escapeAttr(takenName)}` : ''}</option>`;
               }).join('')}
             </select>
@@ -10923,7 +10927,10 @@
           const linkedName = linkedWallet
             ? ((linkedWallet.label && linkedWallet.label.trim()) || PAYMENT_NAME[linkedWallet.method] || 'Wallet')
             : 'this wallet';
-          walletHint.textContent = `Progress tracks ${linkedName}'s balance. Update the wallet's balance to change your saved amount.`;
+          const isThisSinking = !!goal.pairedExpenseId;
+          walletHint.textContent = isThisSinking
+            ? `Money you save toward this fund will transfer into ${linkedName}. Progress tracks only these linked transfers, so this destination can be shared with other sinking funds.`
+            : `Progress tracks ${linkedName}'s balance. Update the wallet's balance to change your saved amount.`;
           walletHint.style.display = 'block';
         } else {
           walletHint.style.display = 'none';
@@ -11090,11 +11097,15 @@
       return;
     }
 
-    // Enforce 1-wallet-per-goal: if any wallet appears on more than one goal,
-    // bail with a clear message rather than silently saving conflicting state.
+    // Enforce 1-wallet-per-goal FOR MIRROR-STYLE LINKS (non-sinking goals).
+    // Sinking-fund goals use walletId as a destination (money flows in via
+    // transfers, progress tracked from those transfers), so multiple can
+    // share the same destination wallet without conflict.
     const walletClaims = {};
     for (const g of cleaned) {
       if (!g.walletId) continue;
+      const isSinking = !!g.pairedExpenseId;
+      if (isSinking) continue;   // sinking funds can share dest wallets
       if (walletClaims[g.walletId]) {
         toast('Two goals can\'t share the same wallet. Pick a different wallet for one of them.', 'error');
         return;
@@ -11201,7 +11212,13 @@
   function contributionsThisMonth(goalId, transactions) {
     const period = getCurrentPeriod('monthly');
     const list = (transactions || [])
-      .filter(t => t.type === 'saving' && t.source === 'set' && t.linkedId === goalId)
+      .filter(t => {
+        // Standard saving-type contribution
+        if (t.type === 'saving' && t.source === 'set' && t.linkedId === goalId) return true;
+        // Transfer with linkedId (sinking-fund destination-wallet contributions)
+        if (t.type === 'transfer' && t.linkedId === goalId) return true;
+        return false;
+      })
       .filter(t => isDateInPeriod(t.date, period));
     return {
       total: list.reduce((s, t) => s + (Number(t.amount) || 0), 0),
@@ -11212,17 +11229,39 @@
   // Total contributed to a goal from all "From goals" transactions (all-time)
   function totalContributedTo(goalId, transactions) {
     return (transactions || [])
-      .filter(t => t.type === 'saving' && t.source === 'set' && t.linkedId === goalId)
+      .filter(t => {
+        // Standard saving-type contribution (unlinked or classic goals)
+        if (t.type === 'saving' && t.source === 'set' && t.linkedId === goalId) return true;
+        // Transfer with linkedId matching the goal — used by sinking-fund
+        // goals that have a destination wallet: the user does + Saved,
+        // money physically transfers from a source wallet into the sinking
+        // fund's destination wallet, and we count that transfer as the
+        // contribution amount.
+        if (t.type === 'transfer' && t.linkedId === goalId) return true;
+        return false;
+      })
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
   }
+
+  // For contributionsThisMonth (rendering the "this month" savings count on
+  // goal tiles), same rule: include both saving and transfer types.
 
   // Total saved for a goal = user-entered starting amount + all-time contributions from transactions.
   // Kept as a helper so display never gets out of sync with the transaction log.
   function totalSavedFor(goal, transactions) {
-    // Wallet-linked ipon: the goal's saved amount IS the linked wallet's balance.
-    // Money in that wallet is the money set aside for this goal — deposits and
-    // withdrawals flow through naturally without needing separate "contribution"
-    // transactions.
+    // Sinking-fund goals with a destination wallet: money PHYSICALLY moves
+    // into that wallet via linked transfers, but the "saved" total is the
+    // sum of those transfers (not the wallet's whole balance) — that way
+    // multiple sinking funds can share one wallet (e.g. Sun Life Mama +
+    // Sun Life Shaene both saving into GoTyme) and each still tracks its
+    // own progress independently.
+    if (goal.walletId && isSinkingFundGoal(goal)) {
+      return (Number(goal.saved) || 0) + totalContributedTo(goal.id, transactions);
+    }
+    // Non-sinking wallet-linked ipon: the goal's saved amount IS the linked
+    // wallet's balance. Money in that wallet is the money set aside for this
+    // goal — deposits and withdrawals flow through naturally without needing
+    // separate "contribution" transactions. One-goal-per-wallet enforced.
     if (goal.walletId && userCache) {
       const wallet = (userCache.wallets || []).find(w => w.id === goal.walletId);
       if (wallet) return computeWalletBalance(wallet, transactions);
@@ -13249,13 +13288,18 @@
         // Asset link info — if this goal mirrors an asset's current value
         const linkedAsset = g.assetId ? (user.assets || []).find(a => a.id === g.assetId) : null;
         const linkedAssetName = linkedAsset ? (linkedAsset.name || 'Asset') : null;
-        // Meta line reflects the link type. For wallet/asset-linked goals,
-        // the "monthly contribution" concept doesn't drive progress (link
-        // does), so show the link source instead.
-        const metaLine = linkedName
-          ? `In ${escapeAttr(linkedName)} · target ${peso(target)}`
+        // Meta line reflects the link type. For wallet-linked goals the
+        // "monthly contribution" concept doesn't drive progress (link
+        // does), so show the link source instead. Sinking-fund goals with
+        // a destination wallet get their own phrasing since the wallet is
+        // a destination, not a mirror.
+        const metaLine =
+          (linkedName && isSinking)
+            ? `Saves into ${escapeAttr(linkedName)} · target ${peso(target)}`
+          : linkedName
+            ? `In ${escapeAttr(linkedName)} · target ${peso(target)}`
           : linkedAssetName
-          ? `Tracks ${escapeAttr(linkedAssetName)} · target ${peso(target)}`
+            ? `Tracks ${escapeAttr(linkedAssetName)} · target ${peso(target)}`
           : `${peso(monthlyContrib)}/mo${cdt ? ' · ' + cdt : ''} · target ${peso(target)}`;
         const sinkingPill = isSinking ? '<span class="sinking-fund-pill">Sinking Fund</span>' : '';
 
