@@ -8411,7 +8411,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.40';
+  const APP_VERSION = '2026-08-10.41';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -13263,22 +13263,16 @@
         card.className = 'view-goal' + (isSinking ? ' sinking-fund' : '');
         card.dataset.tapDetail = 'goal';
         card.dataset.entryId = g.id;
-        // Sinking-fund goals: no direct edit/log buttons — they're controlled
-        // by the paired expense on the Budget page. Tap the tile to jump to
-        // the expense edit form.
-        // Asset-linked goals: no direct "+Saved" — progress comes from
-        // updating the asset value in Net Worth. Show a hint pointing there.
-        const actionButtons = isSinking
-          ? `<div class="view-item-action"><span class="sinking-fund-hint">Edit on Budget →</span></div>`
-          : linkedAssetName
-          ? `<div class="view-item-action">
-              <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
-              <button class="row-edit-btn primary" type="button" data-jump-asset="${g.assetId}">Update in Assets →</button>
-            </div>`
-          : `<div class="view-item-action">
-              <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
-              <button class="row-edit-btn primary" type="button" data-log-goal="${g.id}">+ Saved</button>
-            </div>`;
+        // Every non-Sinking goal gets the standard Edit + Saved buttons.
+        // Sinking-fund goals: Edit is routed to the paired Budget expense
+        // (see click handler below), but + Saved works normally — you're
+        // recording money you set aside toward the upcoming bill.
+        // Asset-linked goals: + Saved records a contribution and ALSO
+        // increments the tracked asset's value (see tx save handler).
+        const actionButtons = `<div class="view-item-action">
+          <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
+          <button class="row-edit-btn primary" type="button" data-log-goal="${g.id}">+ Saved</button>
+        </div>`;
         card.innerHTML = `
           <div class="view-goal-head">
             <div class="view-item-icon saving">${renderGoalIcon(g.icon)}</div>
@@ -13302,17 +13296,22 @@
         // and scrolls to the paired expense tile (with a flash highlight),
         // rather than opening any edit form. The expense is the source of
         // truth — Ipon is just a mirror.
+        // Sinking-fund goals: tapping the tile (outside buttons) jumps to
+        // the paired Budget expense with a flash highlight — the expense is
+        // the source of truth. Button clicks (Edit, + Saved) are handled by
+        // their own wiring below and stopPropagation to avoid triggering
+        // this tile-level navigation.
         if (isSinking) {
           card.addEventListener('click', async (ev) => {
-            // Stop the global [data-tap-detail] click handler from opening
-            // the goal detail modal — we're doing our own navigation.
+            // If the click originated on any button inside the action row,
+            // let that button's handler run instead.
+            if (ev.target.closest('.view-item-action')) return;
             ev.stopPropagation();
             const { data } = await auth.getSession();
             if (!data.session) return;
             pendingScrollToExpense = g.pairedExpenseId;
             showBudgetView(data.session.user);
           });
-          return;   // skip the +Saved/Edit wiring below
         }
 
         // Direct handler for + Saved.
@@ -13343,25 +13342,10 @@
           });
         }
 
-        // Direct handler for "Update in Assets →" (asset-linked goals).
-        // Jumps straight to the Net Worth screen and opens the asset editor.
-        const jumpAssetBtn = card.querySelector('[data-jump-asset]');
-        if (jumpAssetBtn) {
-          jumpAssetBtn.addEventListener('click', async ev => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            const assetId = jumpAssetBtn.dataset.jumpAsset;
-            const { data } = await auth.getSession();
-            if (!data.session) return;
-            if (typeof openAssetEdit === 'function') {
-              openAssetEdit(data.session.user, assetId);
-            } else if (typeof showAssetsScreen === 'function') {
-              showAssetsScreen(data.session.user);
-            }
-          });
-        }
-
-        // Direct handler for row Edit
+        // Direct handler for row Edit. Sinking-fund goals are controlled
+        // via their paired Budget expense — clicking Edit here jumps to the
+        // Budget view and scrolls to that expense. All other goals open the
+        // Ipon edit form as usual.
         const editBtn = card.querySelector('.row-edit-btn');
         if (editBtn) {
           editBtn.addEventListener('click', async ev => {
@@ -13369,6 +13353,11 @@
             ev.stopPropagation();
             const { data } = await auth.getSession();
             if (!data.session) return;
+            if (isSinking && g.pairedExpenseId) {
+              pendingScrollToExpense = g.pairedExpenseId;
+              showBudgetView(data.session.user);
+              return;
+            }
             singleEditMode = { type: 'savings', id: g.id };
             openSavingsScreen(data.session.user);
           });
@@ -15100,6 +15089,43 @@
     }
     const updates = { transactions };
 
+    // Asset-linked goal contributions: bump the tracked asset's value.
+    // A "saving" transaction (source='set', linkedId=<goal_id>) against a
+    // goal that has assetId set should increment that asset's value by the
+    // saved amount — this is how manual + Saved on asset-linked goals like
+    // MP2 stays in sync with the asset (single source of truth). For edits,
+    // we apply the delta between the new amount and the old amount, and if
+    // the linked goal changed, reverse the old asset and apply to the new.
+    const goals = Array.isArray(user.goals) ? user.goals : [];
+    const findGoalAsset = (goalId) => {
+      const g = goals.find(x => x.id === goalId);
+      return g && g.assetId ? g.assetId : null;
+    };
+    const assetDeltas = {};   // { [assetId]: delta }
+    if (editingTxId) {
+      // Reverse the old contribution effect (if any)
+      const oldTx = (user.transactions || []).find(t => t.id === editingTxId);
+      if (oldTx && oldTx.type === 'saving' && oldTx.source === 'set' && oldTx.linkedId) {
+        const oldAssetId = findGoalAsset(oldTx.linkedId);
+        if (oldAssetId) assetDeltas[oldAssetId] = (assetDeltas[oldAssetId] || 0) - (Number(oldTx.amount) || 0);
+      }
+    }
+    // Apply the new contribution effect (if any)
+    if (txDraft.type === 'saving' && txDraft.source === 'set' && txDraft.linkedId) {
+      const newAssetId = findGoalAsset(txDraft.linkedId);
+      if (newAssetId) assetDeltas[newAssetId] = (assetDeltas[newAssetId] || 0) + (Number(txDraft.amount) || 0);
+    }
+    // Fold non-zero deltas into the user.assets array update
+    const changedAssetIds = Object.keys(assetDeltas).filter(id => assetDeltas[id] !== 0);
+    if (changedAssetIds.length && Array.isArray(user.assets)) {
+      updates.assets = user.assets.map(a => {
+        if (assetDeltas[a.id]) {
+          return { ...a, value: Math.max(0, (Number(a.value) || 0) + assetDeltas[a.id]), updatedAt: new Date().toISOString() };
+        }
+        return a;
+      });
+    }
+
     // "Also add to my ___" only applies to new transactions, not edits
     if (!editingTxId && txDraft.saveAsNew) {
       if (txDraft.type === 'expense' && txDraft.source === 'new') {
@@ -15206,8 +15232,23 @@
     if (!editingTxId) return;
     if (!confirm('Delete this transaction? This can\'t be undone.')) return;
     const { data: sess } = await auth.getSession();
-    const list = (sess.session.user.transactions || []).filter(t => t.id !== editingTxId);
-    const { data, error } = await auth.updateUser({ data: { transactions: list } });
+    const user = sess.session.user;
+    const oldTx = (user.transactions || []).find(t => t.id === editingTxId);
+    const list = (user.transactions || []).filter(t => t.id !== editingTxId);
+    const updates = { transactions: list };
+    // Asset-linked reversal: if the deleted tx was a saving contribution
+    // to an asset-linked goal, decrement that asset's value back down.
+    if (oldTx && oldTx.type === 'saving' && oldTx.source === 'set' && oldTx.linkedId) {
+      const goal = (user.goals || []).find(g => g.id === oldTx.linkedId);
+      if (goal && goal.assetId && Array.isArray(user.assets)) {
+        updates.assets = user.assets.map(a =>
+          a.id === goal.assetId
+            ? { ...a, value: Math.max(0, (Number(a.value) || 0) - (Number(oldTx.amount) || 0)), updatedAt: new Date().toISOString() }
+            : a
+        );
+      }
+    }
+    const { data, error } = await auth.updateUser({ data: updates });
     if (error) { toast(error.message, 'error'); return; }
     editingTxId = null;
     toast('Transaction deleted', 'success');
