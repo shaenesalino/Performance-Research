@@ -8431,7 +8431,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.44';
+  const APP_VERSION = '2026-08-10.45';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -11232,13 +11232,17 @@
     };
   }
 
-  function contributionsThisMonth(goalId, transactions) {
+  function contributionsThisMonth(goalId, transactions, goal) {
     const period = getCurrentPeriod('monthly');
+    const isSinkingWithDestWallet = goal && !!goal.pairedExpenseId && !!goal.walletId;
     const list = (transactions || [])
       .filter(t => {
+        if (isSinkingWithDestWallet) {
+          return t.type === 'transfer' && t.linkedId === goalId;
+        }
         // Standard saving-type contribution
         if (t.type === 'saving' && t.source === 'set' && t.linkedId === goalId) return true;
-        // Transfer with linkedId (sinking-fund destination-wallet contributions)
+        // Transfer with linkedId (wallet-linked destination contributions)
         if (t.type === 'transfer' && t.linkedId === goalId) return true;
         return false;
       })
@@ -11250,16 +11254,21 @@
   }
 
   // Total contributed to a goal from all "From goals" transactions (all-time)
-  function totalContributedTo(goalId, transactions) {
+  function totalContributedTo(goalId, transactions, goal) {
+    // For sinking-fund goals with a destination wallet, ONLY transfers count.
+    // Saving-type transactions on those goals were pre-fix leftovers — they
+    // silently drained the destination wallet instead of adding to it, so
+    // counting them would inflate the "saved" total and mismatch reality.
+    // (Users can review/delete those old tx from Transactions history.)
+    const isSinkingWithDestWallet = goal && !!goal.pairedExpenseId && !!goal.walletId;
     return (transactions || [])
       .filter(t => {
-        // Standard saving-type contribution (unlinked or classic goals)
+        if (isSinkingWithDestWallet) {
+          return t.type === 'transfer' && t.linkedId === goalId;
+        }
+        // Standard: saving-type (classic/asset-linked/unlinked) OR transfer-type
+        // with linkedId matching (wallet-linked contributions).
         if (t.type === 'saving' && t.source === 'set' && t.linkedId === goalId) return true;
-        // Transfer with linkedId matching the goal — used by sinking-fund
-        // goals that have a destination wallet: the user does + Saved,
-        // money physically transfers from a source wallet into the sinking
-        // fund's destination wallet, and we count that transfer as the
-        // contribution amount.
         if (t.type === 'transfer' && t.linkedId === goalId) return true;
         return false;
       })
@@ -11279,7 +11288,7 @@
     // Sun Life Shaene both saving into GoTyme) and each still tracks its
     // own progress independently.
     if (goal.walletId && isSinkingFundGoal(goal)) {
-      return (Number(goal.saved) || 0) + totalContributedTo(goal.id, transactions);
+      return (Number(goal.saved) || 0) + totalContributedTo(goal.id, transactions, goal);
     }
     // Non-sinking wallet-linked ipon: the goal's saved amount IS the linked
     // wallet's balance. Money in that wallet is the money set aside for this
@@ -11298,7 +11307,7 @@
       if (asset) return Number(asset.value) || 0;
     }
     // Unlinked goal (classic model): starting amount + logged contributions.
-    return (Number(goal.saved) || 0) + totalContributedTo(goal.id, transactions);
+    return (Number(goal.saved) || 0) + totalContributedTo(goal.id, transactions, goal);
   }
 
   function receivedThisPeriod(incomeItem, transactions) {
@@ -13303,7 +13312,7 @@
         const pct = target > 0 ? Math.min((saved / target) * 100, 100) : 0;
         const isDone = target > 0 && saved >= target;
         const monthlyContrib = (Number(g.contribution) || 0) * (BUDGET_TO_MONTHLY[g.frequency] || 1);
-        const contribs = contributionsThisMonth(g.id, user.transactions);
+        const contribs = contributionsThisMonth(g.id, user.transactions, g);
         const cdt = contribDateText(g);
         // Wallet link info — if this goal mirrors a wallet's balance
         const linkedWallet = g.walletId ? (user.wallets || []).find(w => w.id === g.walletId) : null;
@@ -15772,7 +15781,7 @@
       const pctRaw = target > 0 ? Math.round((saved / target) * 100) : 0;
       const pct = Math.min(pctRaw, 100);
       const isDone = target > 0 && saved >= target;
-      const contribs = contributionsThisMonth(g.id, txs);
+      const contribs = contributionsThisMonth(g.id, txs, g);
       const remaining = Math.max(target - saved, 0);
       summaryEl.innerHTML = `
         <div class="entry-summary-card">
