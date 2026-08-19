@@ -6199,6 +6199,26 @@
     font-weight: 500;
   }
 
+  /* Sinking-fund banner at the top of the goal edit form. Tells the user
+     that most fields sync from the paired Budget expense, and that the
+     wallet field acts as the destination for + Saved transfers. */
+  .sinking-fund-form-hint {
+    background: rgba(249, 180, 0, 0.12);
+    border: 1px solid rgba(249, 180, 0, 0.35);
+    color: #8A6300;
+    padding: 12px 14px;
+    border-radius: 12px;
+    margin-bottom: 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    line-height: 1.45;
+    font-weight: 500;
+  }
+  .sinking-fund-form-hint strong {
+    color: #6E4E00;
+    font-weight: 700;
+  }
+
   /* Pill next to the goal name marking it as a sinking fund. Same visual
      pattern as .ipon-linked-pin (subtle tinted background + colored text)
      but with the sinking-fund gold accent instead of teal. */
@@ -8411,7 +8431,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.42';
+  const APP_VERSION = '2026-08-10.43';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -10555,11 +10575,17 @@
     const card = document.createElement('div');
     card.className = 'goal-card';
     card.dataset.id = goal.id;
+    const isSinking = isSinkingFundGoal(goal);
 
     card.innerHTML = `
+      ${isSinking ? `
+        <div class="sinking-fund-form-hint">
+          <strong>Sinking Fund</strong> — Name, amount, frequency, and contribution date sync from the paired Budget expense. Set a destination wallet below to route your + Saved transfers.
+        </div>
+      ` : ''}
       <div class="goal-card-head">
         <span class="goal-tag">
-          <span class="goal-icon">${renderGoalIcon(goal.icon)}</span> Savings goal
+          <span class="goal-icon">${renderGoalIcon(goal.icon)}</span> ${isSinking ? 'Sinking Fund' : 'Savings goal'}
         </span>
         <button type="button" class="goal-delete" data-action="delete" title="Remove">✕</button>
       </div>
@@ -13386,10 +13412,11 @@
           });
         }
 
-        // Direct handler for row Edit. Sinking-fund goals are controlled
-        // via their paired Budget expense — clicking Edit here jumps to the
-        // Budget view and scrolls to that expense. All other goals open the
-        // Ipon edit form as usual.
+        // Direct handler for row Edit. Opens the Ipon goal edit form for
+        // every goal — including sinking-fund goals, since some fields (like
+        // the destination wallet) live on the goal itself, not the paired
+        // expense. Tap the tile (outside buttons) to jump to the paired
+        // expense instead.
         const editBtn = card.querySelector('.row-edit-btn');
         if (editBtn) {
           editBtn.addEventListener('click', async ev => {
@@ -13397,11 +13424,6 @@
             ev.stopPropagation();
             const { data } = await auth.getSession();
             if (!data.session) return;
-            if (isSinking && g.pairedExpenseId) {
-              pendingScrollToExpense = g.pairedExpenseId;
-              showBudgetView(data.session.user);
-              return;
-            }
             singleEditMode = { type: 'savings', id: g.id };
             openSavingsScreen(data.session.user);
           });
