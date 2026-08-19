@@ -7548,7 +7548,7 @@
     </div>
 
     <div class="field">
-      <label>Payment method</label>
+      <label>Type</label>
       <div class="select-wrap">
         <select class="input select" id="walletMethodSelect"></select>
         <span class="select-caret">▾</span>
@@ -8411,7 +8411,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.36';
+  const APP_VERSION = '2026-08-10.37';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9000,8 +9000,17 @@
   // preserved separately for use in <select> options where native controls can't
   // render inline SVG.
   const PAYMENT_SVG = {
-    cash: svgIcon('cash'), card: svgIcon('card'), gcash: svgIcon('phone'),
-    maya: svgIcon('phone'), bank: svgIcon('bank'), other: svgIcon('plus'),
+    // Current wallet types
+    cash: svgIcon('cash'),
+    bank: svgIcon('bank'),
+    ewallet: svgIcon('phone'),
+    envelope: svgIcon('gem'),  // reuse gem icon as an envelope stand-in
+    other: svgIcon('plus'),
+    // Legacy — kept so older wallets still render an icon until the user
+    // opens them and re-picks a type in the consolidated list.
+    card:  svgIcon('card'),
+    gcash: svgIcon('phone'),
+    maya:  svgIcon('phone'),
   };
   const CATEGORY_SVG = {
     housing: svgIcon('house'), bills: svgIcon('bulb'), food: svgIcon('cart'),
@@ -14212,13 +14221,20 @@
   // TRANSACTIONS
   // =========================================================================
   const PAYMENT_METHODS = [
-    { v: 'cash',  icon: '💵', label: 'Cash'  },
-    { v: 'card',  icon: '💳', label: 'Card'  },
-    { v: 'gcash', icon: '📱', label: 'GCash' },
-    { v: 'maya',  icon: '💜', label: 'Maya'  },
-    { v: 'bank',  icon: '🏦', label: 'Bank'  },
-    { v: 'other', icon: '➕', label: 'Other' },
+    { v: 'cash',     icon: '💵', label: 'Cash'     },
+    { v: 'bank',     icon: '🏦', label: 'Bank'     },
+    { v: 'ewallet',  icon: '📱', label: 'E-wallet' },
+    { v: 'other',    icon: '➕', label: 'Other'    },
   ];
+  // Legacy aliases — older wallets stored 'gcash', 'maya', or 'card' as their
+  // method value before the type list was consolidated. Map them for display
+  // so existing wallets still show a sensible icon + label until the user
+  // edits and re-picks a type. New wallets can't pick these values.
+  const LEGACY_PAYMENT_MAP = {
+    gcash: { icon: '📱', label: 'E-wallet' },
+    maya:  { icon: '📱', label: 'E-wallet' },
+    card:  { icon: '💳', label: 'Card'     },
+  };
 
   // Source labels per transaction type
   const SOURCE_LABELS = {
@@ -15733,7 +15749,14 @@
   // WALLETS
   // =========================================================================
   const PAYMENT_ICON = PAYMENT_SVG;   // Now returns SVG markup for standalone rendering
-  const PAYMENT_NAME = Object.fromEntries(PAYMENT_METHODS.map(p => [p.v, p.label]));
+  // Human-readable names for wallet types. Includes legacy aliases so old
+  // wallets that stored 'gcash', 'maya', or 'card' still display correctly.
+  const PAYMENT_NAME = {
+    ...Object.fromEntries(PAYMENT_METHODS.map(p => [p.v, p.label])),
+    gcash: 'GCash',   // legacy — mapped to E-wallet on new saves
+    maya:  'Maya',    // legacy — mapped to E-wallet on new saves
+    card:  'Card',    // legacy — no longer available in the picker
+  };
 
   let editingWalletId = null; // when set, save updates existing; null means adding new
 
