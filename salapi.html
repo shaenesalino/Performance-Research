@@ -8431,7 +8431,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.43';
+  const APP_VERSION = '2026-08-10.44';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -10481,14 +10481,11 @@
     if (singleEditMode && singleEditMode.type === 'savings') {
       if (singleEditMode.id) {
         const entry = (user.goals || []).find(g => g.id === singleEditMode.id);
-        // Safety net — sinking-fund goals should never be edited directly.
-        // If the user landed here somehow (bookmark, back button, code path
-        // we missed), redirect to the paired expense's edit form.
-        if (entry && isSinkingFundGoal(entry)) {
-          singleEditMode = { type: 'budget', id: entry.pairedExpenseId };
-          openBudgetScreen(user);
-          return;
-        }
+        // Sinking-fund goals ARE editable here now — mostly so users can set
+        // the destination wallet or tags. Name/amount/frequency/date will be
+        // resynced from the paired Budget expense on the next expense save,
+        // but wallet-link + tags stay independent (goal-only fields). A
+        // banner at the top of the goal card explains this to the user.
         goalDraft = entry ? [JSON.parse(JSON.stringify(entry))] : [newGoal()];
       } else {
         goalDraft = [newGoal()];
@@ -14302,13 +14299,17 @@
       toast('Add a name and target amount to each goal first.', 'error');
       return;
     }
-    // Enforce 1-wallet-per-goal (for single-edit, check against existing goals too)
+    // Enforce 1-wallet-per-goal FOR MIRROR-STYLE LINKS (non-sinking goals).
+    // Sinking-fund goals use walletId as a destination (transfers routed
+    // there), so multiple sinking funds can share one wallet.
     const otherGoals = (singleEditMode && singleEditMode.type === 'savings')
       ? (userCache.goals || []).filter(g => g.id !== (singleEditMode.id || null))
       : [];
     const walletClaims = {};
     for (const g of [...otherGoals, ...cleaned]) {
       if (!g.walletId) continue;
+      const isSinking = !!g.pairedExpenseId;
+      if (isSinking) continue;
       if (walletClaims[g.walletId] && walletClaims[g.walletId] !== g.id) {
         toast('That wallet already backs another ipon. Pick a different wallet.', 'error');
         return;
