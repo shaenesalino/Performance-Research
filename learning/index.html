@@ -377,8 +377,17 @@ button{touch-action:manipulation;font-family:inherit;}
 .rd-kind{text-align:center;font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:1.5px;
   text-transform:uppercase;color:var(--orange);margin-bottom:8px;}
 /* fixed, generous card — must NOT flex:1, or one letter floats in a full-screen white field */
-.rd-card{flex:0 0 auto;min-height:min(42svh,340px);display:flex;align-items:center;justify-content:center;
+.rd-card{flex:0 1 auto;min-height:min(42svh,340px);max-height:min(60svh,520px);overflow-y:auto;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;align-items:center;justify-content:center;
   background:#fff;border-radius:26px;padding:22px 18px;box-shadow:0 6px 20px rgba(8,42,91,.09);}
+.rd-inner{width:100%;}
+.rd-syl{font-family:var(--body);font-weight:700;font-size:clamp(13px,3.4vw,18px);color:var(--grey);
+  letter-spacing:1.5px;margin-bottom:8px;text-align:center;}
+/* a tula/kuwento is a passage, not a flash card: smaller, left aligned, line breaks kept */
+.rd-text.passage{font-family:var(--body);font-weight:700;font-size:clamp(15px,3.9vw,22px);
+  line-height:1.6;text-align:left;white-space:pre-line;}
+.rd-ans{text-align:center;font-size:13px;font-weight:800;color:#12808C;background:#EAFAFC;
+  border-radius:12px;padding:9px 12px;margin:0 0 10px;}
 .rd-text{font-family:var(--disp);font-weight:800;color:var(--navy);text-align:center;line-height:1.15;word-break:break-word;}
 .rd-text.xl{font-size:clamp(96px,34vw,220px);}
 .rd-text.lg{font-size:clamp(52px,17vw,124px);}
@@ -614,10 +623,14 @@ button{touch-action:manipulation;font-family:inherit;}
     </div>
     <div class="rd-wrap">
       <div class="rd-kind" id="rdKind"></div>
-      <div class="rd-card"><div class="rd-text" id="rdText"></div></div>
+      <div class="rd-card"><div class="rd-inner">
+        <div class="rd-syl" id="rdSyl"></div>
+        <div class="rd-text" id="rdText"></div>
+      </div></div>
       <div class="rd-count" id="rdCount"></div>
+      <div class="rd-ans" id="rdAns"></div>
       <div class="rd-parent">
-        <div class="rd-parent-h">PARA SA MAGULANG &mdash; NABASA BA ITO?</div>
+        <div class="rd-parent-h" id="rdPrompt">PARA SA MAGULANG &mdash; NABASA BA ITO?</div>
         <div class="rd-btns">
           <button class="rd-no" onclick="markRead(false)" id="rdNoBtn">Hindi pa</button>
           <button class="rd-yes" onclick="markRead(true)" id="rdYesBtn">Nabasa</button>
@@ -843,158 +856,515 @@ const AVATARS={
 const AVATAR_KEYS=Object.keys(AVATARS);
 
 /* ===================== FILIPINO: MARUNGKO APPROACH =====================
-   Marungko teaches the SOUND of each letter (tunog), not the letter name, in a
-   fixed non-alphabetical order chosen so that blending can start early. It is
-   strictly cumulative: a lesson may only use letters already introduced.
+   Transcribed from the Marungko Booklets 1-5 ("Gabay sa Pagbasa",
+   inihanda ni Teacher Kim Dela Cruz) kept in learning/marungko/.
 
-   Sequence: m s a i o b e u t k l y n g r d p h w ng
-   Blending begins at Aralin 3, when the first vowel (a) arrives.
+   Marungko teaches the SOUND of each letter (tunog), not the letter name, in a
+   fixed non-alphabetical order, and it is strictly cumulative: a lesson only
+   uses letters already introduced.
+
+   Lesson order as published:
+     Booklet 1 : Mm Aa Ss | Ii Oo | Bb
+     Booklet 2 : Ee | Uu | Tt | Kk | Ll
+     Booklet 3 : Yy | Nn | Gg | Rr | Pp
+     Booklet 4 : Ng ng | Dd | Hh | Ww
+     Booklet 5 : Cc | Ff | Jj | Ññ | Vv | Xx | Zz | Qu  (mga hiram na titik)
+
+   Note that Mm Aa Ss arrive together, so blending starts in Aralin 1, and that
+   Ng comes BEFORE Dd Hh Ww.
 
    These are PARENT-ASSESSED missions: the child reads each item aloud in person
    and the grown-up marks it read / not yet. There is no correct "tap" answer.
 
-   SUPABASE SWAP POINT: candidate for a `marungko_lessons` table. The letter
-   legality rule is enforced by tools/verify (see checkMarungko) — keep it true
-   for any lesson you add or reorder.                                          */
-const MARUNGKO_ORDER=['m','s','a','i','o','b','e','u','t','k','l','y','n','g','r','d','p','h','w','ng'];
+   SUPABASE SWAP POINT: candidate for a `marungko_lessons` table. The cumulative
+   letter rule is checked by marungko.mjs — keep it passing for any edit.      */
 
-/* item kinds, in teaching order within a lesson */
-const RD_KIND={tunog:'Tunog',pantig:'Pantig',salita:'Salita',parirala:'Parirala',pangungusap:'Pangungusap'};
+/* letters in teaching order; one lesson may introduce more than one */
+const MARUNGKO_ORDER=[
+  ['m','a','s'],['i','o'],['b'],['e'],['u'],['t'],['k'],['l'],
+  ['y'],['n'],['g'],['r'],['p'],['ng'],['d'],['h'],['w'],
+  ['c'],['f'],['j'],['ñ'],['v'],['x'],['z'],['q','u']
+];
+/* consonants in teaching order — drives the syllable tables */
+const MK_CONS=['m','s','b','t','k','l','y','n','g','r','p','ng','d','h','w'];
+const MK_V=['a','e','i','o','u'];
 
-/* helper: build an items array from grouped plain text, keeps the data terse */
-function _rd(groups){
+/* Each consonant lesson in the booklets is built from two systematic blocks:
+     block 1: the Cv row, then Cv+coda rows for every consonant taught so far
+     block 2: the vC row, then coda+vC rows for every consonant taught before it
+   This reproduces the printed tables exactly (verified against Kk, Ll, Yy, Nn,
+   Gg, Rr, Pp, Ng, Dd and Ww). */
+function _tab1(c){
+  var upto=MK_CONS.slice(0,MK_CONS.indexOf(c)+1);
+  var rows=[MK_V.map(function(v){return c+v;}).join(' ')];
+  upto.forEach(function(k){ rows.push(MK_V.map(function(v){return c+v+k;}).join(' ')); });
+  return rows;
+}
+function _tab2(c){
+  var before=MK_CONS.slice(0,MK_CONS.indexOf(c));
+  var rows=[MK_V.map(function(v){return v+c;}).join(' ')];
+  before.forEach(function(k){ rows.push(MK_V.map(function(v){return k+v+c;}).join(' ')); });
+  return rows;
+}
+/* the vowel lessons (Ee, Uu) drill the consonants taught so far against the new vowel */
+function _vtab(v){
+  return ['m','s','b'].map(function(c){ return [c+v,c+v+'m',c+v+'s',c+v+'b'].join(' '); });
+}
+
+const RD_ORDER=['tunog','sama','pantig','salita','sama2','pantig2','salita2',
+                'tandaan','parirala','pangungusap','tula','tanong','dila'];
+const RD_KIND={tunog:'Tunog',sama:'Pagsasama',pantig:'Pantig',salita:'Salita',
+               tandaan:'Tandaan',parirala:'Parirala',pangungusap:'Pangungusap',
+               tula:'Tula',tanong:'Tanong',dila:'Pabaluktot-dila'};
+/* "syl|word" for salita, "Title||body" for tula, "Question|answer" for tanong */
+function _L(g){
   var out=[];
-  Object.keys(groups).forEach(function(k){
-    (groups[k]||[]).forEach(function(t){ out.push({k:k,r:t}); });
+  RD_ORDER.forEach(function(key){
+    var kind=key.replace(/2$/,'');
+    (g[key]||[]).forEach(function(s){
+      if(kind==='salita'){ var p=s.split('|'); out.push({k:'salita',r:p[1]||p[0],syl:p[1]?p[0]:''}); }
+      else if(kind==='tula'){ var q=s.split('||'); out.push({k:'tula',r:q[1]||q[0],ttl:q[1]?q[0]:''}); }
+      else if(kind==='tanong'){ var t=s.split('|'); out.push({k:'tanong',r:t[0],ans:t[1]||'',syl:'Itanong ng magulang'}); }
+      else out.push({k:kind,r:s});
+    });
   });
   return out;
 }
 
 const MARUNGKO_LESSONS=[
- {id:'fi1', mode:'reading', sound:'m', letter:'Mm', title:'Tunog /m/', items:_rd({
-   tunog:['m','M','m m m','M m'] })},
+/* ---------------- BOOKLET 1 ---------------- */
+{id:'fi1', book:1, letter:'Mm Aa Ss', sound:'m a s', title:'Mm Aa Ss', items:_L({
+  tunog:['m','a','s'],
+  sama:['m a ma','a m am','s a sa','a s as'],
+  pantig:['ma am ma','am am ma','sa sa as','sa as as'],
+  salita:['a-ma|ama','ma-ma|mama','am|am','sa-ma|sama','sa-sa-ma|sasama',
+          'sa-ma-sa-ma|sama-sama','a-sa|asa','a-a-sa|aasa','ma-sa|masa','ma-sa-ma|masama'],
+  sama2:['ma m mam','sa m sam','ma s mas','sa s sas'],
+  pantig2:['mam sam mam','sam sam mam','sas sas mas','sas mas mas'],
+  salita2:['mam|mam','Sam|Sam','a-sam|asam','a-sam-a-sam|asam-asam'],
+  tandaan:['ang','sa','mas'],
+  parirala:['ang mama','ang ama','ang am','sasama ang','masa ang','masama ang','asam-asam ang'],
+  pangungusap:['Sasama sa mama.','Ang ama ang sasama.','Sama-sama ang masa.'] })},
 
- {id:'fi2', mode:'reading', sound:'s', letter:'Ss', title:'Tunog /s/', items:_rd({
-   tunog:['s','S','s s s','S s','m s','s m'] })},
+{id:'fi2', book:1, letter:'Ii Oo', sound:'i o', title:'Ii Oo', items:_L({
+  tunog:['i','o'],
+  sama:['i m im','i s is','s i si','m i mi','o m om','o s os','s o so','m o mo'],
+  pantig:['mi is im','si im mi','is si im','mi im si','so mo om','os so mo','mo os so','om om os'],
+  salita:['i-sa|isa','i-i-sa|iisa','mi-sa|misa','ma-mi|mami','si-si|sisi','ma-si-si|masisi',
+          'ma-is|mais','a-mo|amo','ma-a-mo|maamo','a-so|aso','o-so|oso','ma-so|maso'],
+  sama2:['mi m mim','si m sim','mi s mis','si s sis','mo m mom','so m som','mo s mos','so s sos'],
+  pantig2:['mim sis sim','mis sim mis','sim sis mim','mim mis sis',
+           'mom sos som','sos mos sos','som mom mos','mos som mom'],
+  salita2:['a-sim|asim','ma-a-sim|maasim','mi-sis|misis','mis-mo|mismo'],
+  tandaan:['mga','si'],
+  parirala:['ang aso','mga aso','ang mais','mga mais','maasim ang miso','maasim ang mga miso'],
+  tula:['Ang Mga Aso||Si Ami ang aso. Si Mimi ang aso.\nMaamo ang mga aso.\nSasama-sama ang mga aso sa amo.\nIsama mo ang mga aso.\nSi Simo ang amo.'],
+  tanong:['Sino ang amo ng mga aso?|Si Simo','Ilang aso ang nabanggit sa tula?|Dalawa',
+          'Ano ang mga pangalan ng mga aso?|Ami at Mimi'] })},
 
- {id:'fi3', mode:'reading', sound:'a', letter:'Aa', title:'Tunog /a/', items:_rd({
-   tunog:['a','A'],
-   pantig:['ma','sa','am','as'],
-   salita:['ama','mama','masa','sama','asa'] })},
+{id:'fi3', book:1, letter:'Bb', sound:'b', title:'Tunog /b/', items:_L({
+  tunog:['b','B'],
+  sama:['b a ba','b i bi','b o bo','a b ab','i b ib','o b ob'],
+  pantig:['bo bi ba','ba bo bi','bi ba bo','ab ob ib','ob ib ab','ib ab ob'],
+  salita:['ba-ba|baba','ba-ba-ba|bababa','ma-ba-ba|mababa','ba-so|baso','ba-sa|basa',
+          'ba-ba-sa|babasa','ma-ba-sa|mabasa','i-ba|iba','i-ba-i-ba|iba-iba','ba-o|bao',
+          'sa-ba|saba','sa-bi|sabi','sa-bi-sa-bi|sabi-sabi','ma-sa-bi|masabi','bi-sa|bisa',
+          'ma-bi-sa|mabisa','a-bo|abo','si-ba|siba','ma-si-ba|masiba','bi-bo|bibo',
+          'sim-ba|simba','sam-ba|samba'],
+  pantig2:['ba bam bas bab','bi bim bis bib','bo bom bos bob',
+           'ab mab sab','ib mib sib','ob mob sob'],
+  pangungusap:['Basa si Bambi.','Masiba si Bimbo.','Si Sab ang bibo.','Si Ambo ang bababa.',
+               'Iba si Bimbi.','Maamo si Mabo.'],
+  tula:['Maasim ang Miso!||Maasim.\nMami ba? Am ba? Mais ba? Saba ba?\nMiso!\nIba ang miso!\nMaasim ang miso!\nMasiba ang oso sa maasim.\nSi Bimbo ang oso. Sa oso ang miso.'],
+  tanong:['Anong pagkain ang maasim?|Ang miso','Kanino ang maasim na miso?|Kay Bimbo',
+          'Paano nalaman na kay Bimbo ang miso?|Dahil masiba ang oso'] })},
 
- {id:'fi4', mode:'reading', sound:'i', letter:'Ii', title:'Tunog /i/', items:_rd({
-   tunog:['i','I'],
-   pantig:['mi','si','im','is'],
-   salita:['isa','misa','mais','asim','sisi'] })},
+/* ---------------- BOOKLET 2 ---------------- */
+{id:'fi4', book:2, letter:'Ee', sound:'e', title:'Tunog /e/', items:_L({
+  tunog:['e','E'],
+  sama:['e m em','e s es','e b eb','m e me','s e se','b e be'],
+  pantig:['eb es em','em eb es','es em eb','me se be','be me se','se be me'],
+  salita:['ba-ba-e|babae','me-sa|mesa','bi-be|bibe','be-so|beso','se-bo|sebo','ma-se-bo|masebo'],
+  pantig2:_vtab('e'),
+  salita2:['bo-ses|boses','bas-bas|basbas','be-ses|beses','ba-se|base',
+           'sa-sam-ba|sasamba','si-sim-ba|sisimba'],
+  tandaan:['ako','mo','oo'],
+  pangungusap:['Ako si Eba.','Ako si Bebe.','Ako si Mesi.','Ako si Ema.',
+               'Mga bibe mo? Oo.','Misis mo? Oo.','Boses mo? Oo.','Isa ang aso mo? Oo.'],
+  tula:['Ako si Eba||Ako si Eba.\nBabae ako. Bibo ako.\nMasiba sa saba. Masiba sa mami.\nMasiba sa miso. Masiba sa mais.\nSama sa mama sa misa.\nSama sa ama sa samba.'],
+  tanong:['Ano ang pangalan ng babae sa tula?|Eba','Ano ang hilig niyang gawin?|Kumain',
+          'Saan kaya siya pupunta?|Sa simbahan'] })},
 
- {id:'fi5', mode:'reading', sound:'o', letter:'Oo', title:'Tunog /o/', items:_rd({
-   tunog:['o','O'],
-   pantig:['mo','so','om','os'],
-   salita:['oo','aso','amo','oso','maso'] })},
+{id:'fi5', book:2, letter:'Uu', sound:'u', title:'Tunog /u/', items:_L({
+  tunog:['u','U'],
+  sama:['u m um','u s us','u b ub','m u mu','s u su','b u bu'],
+  pantig:['ub us um','um ub us','us um ub','mu su bu','bu mu su','su bu mu'],
+  salita:['u-sa|usa','u-be|ube','u-so|uso','bu-o|buo','bu-mu-o|bumuo','su-si|susi',
+          'mu-mo|mumo','u-si-sa|usisa','ma-u-si-sa|mausisa','u-bo|ubo','u-mu-bo|umubo',
+          'u-mu-u-bo|umuubo','su-bo|subo','su-su-bo|susubo','su-mu-bo|sumubo'],
+  pantig2:_vtab('u'),
+  salita2:['u-bos|ubos','u-mu-bos|umubos','u-bas|ubas','bus|bus','sub-sob|subsob',
+           'su-mub-sob|sumubsob','mus-mos|musmos'],
+  tula:['Ubos!||Sumubo ang musmos. Subo ang ube.\nSumubo si ama. Subo ang ubas.\nSumubo si mama. Subo ang saba.\nAba! Ubos ang ube.\nUbos ang ubas. Ubos ang saba.\nMga masisiba ba?'],
+  tanong:['Ano ang sinubo ng musmos?|Ube','Bakit kaya naubos ang pagkain nila?|Kinain nila',
+          'Bakit mahalaga na inuubos ang pagkain?|Dahil biyaya ito'] })},
 
- {id:'fi6', mode:'reading', sound:'b', letter:'Bb', title:'Tunog /b/', items:_rd({
-   tunog:['b','B'],
-   pantig:['ba','bi','bo'],
-   salita:['basa','baso','abo','bao','sabi','bibo'],
-   parirala:['basa mo','abo sa baso'] })},
+{id:'fi6', book:2, letter:'Tt', sound:'t', title:'Tunog /t/', items:_L({
+  tunog:['t','T'],
+  sama:['t a ta','a t at','t e te','e t et','t i ti','i t it','t o to','o t ot','t u tu','u t ut'],
+  pantig:['to tu ta','te ti tu','ta tu te','et ot at','it ut et','ot at it'],
+  salita:['ta-sa|tasa','ta-o|tao','ma-ta-o|matao','ta-ba|taba','ta-ta-ba|tataba',
+          'ma-ta-ba|mataba','ba-ta|bata','ba-ba-ta|babata','bu-ma-ta|bumata','bu-to|buto',
+          'ma-bu-to|mabuto','ta-ma|tama','tu-ma-ma|tumama','tu-bo|tubo','tu-mu-bo|tumubo',
+          'bo-te|bote','ba-it|bait','ma-ba-it|mabait'],
+  pantig2:['ta tam tas tab tat','te tem tes teb tet','ti tim tis tib tit',
+           'to tom tos tob tot','tu tum tus tub tut',
+           'ma mat sa sat ba bat','me met se set be bet','mi mit si sit bi bit',
+           'mo mot so sot bo bot','mu mut su sut bu but'],
+  salita2:['a-tis|atis','tim-ba|timba','bu-tas|butas','tam-bo|tambo','ba-tis|batis','i-tim|itim'],
+  tandaan:['ito','ay'],
+  pangungusap:['Ito ay tuta. Maamo ito.','Ito ay ube. Matamis ito.','Ang timba ay butas.',
+               'Ang mesa ay itim.','Ito ay mga bata.'],
+  tula:['Ako si Sam||Ako si Sam. Ako ay bata.\nAko ay babae.\nAng mama ay si Tesa.\nSi mama Tesa ay mabait.\nAng ama ay si Tomi.\nSi ama Tomi ay mabuti.\nAng mga aso ay maaamo.\nSi Bobot ay maamo. Si Bebet ay maamo.'],
+  tanong:['Ano ang pangalan ng babae sa tula?|Sam','Ano ang pangalan ng kanyang ina?|Tesa',
+          'Ilan ang kanyang aso?|Dalawa','Ano kaya ang nararamdaman ng bata?|Masaya'] })},
 
- {id:'fi7', mode:'reading', sound:'e', letter:'Ee', title:'Tunog /e/', items:_rd({
-   tunog:['e','E'],
-   pantig:['be','me','se'],
-   salita:['mesa','beso','sebo','bibe'],
-   parirala:['basa sa mesa','bibe sa mesa'] })},
+{id:'fi7', book:2, letter:'Kk', sound:'k', title:'Tunog /k/', items:_L({
+  tunog:['k','K'],
+  pantig:_tab1('k'),
+  salita:['ka-ma|kama','tu-ka|tuka','ka-ti|kati','ma-ka-ti|makati','ke-so|keso','ki-ta|kita',
+          'ma-ki-ta|makita','si-ko|siko','ku-bo|kubo','ku-ko|kuko','bi-ik|biik'],
+  pantig2:_tab2('k'),
+  salita2:['sa-kim|sakim','sik-sik|siksik','su-mik-sik|sumiksik','sak-si|saksi','ba-kas|bakas',
+           'ta-kas|takas','ta-kam|takam','ba-tok|batok','i-tik|itik','i-tak|itak'],
+  tandaan:['kami','ko'],
+  parirala:['ang mama ko','mga kasama ko','ang aso ko'],
+  pangungusap:['Kami ay tumatakbo.','Kami ay babasa.','Kami ay mga biik.','Kami ay mga bata.',
+               'Sumiksik kami.','Tumakas kami.'],
+  tula:['Sa Kubo||Sa kubo kami ay sama-sama.\nSa kama kami ay tabi-tabi.\nAng ate ko.\nAng mama ko.\nAng ama ko.\nAng bibe ko.\nAng biik ko.'],
+  tanong:['Saan nakatira ang pamilya?|Sa kubo','Ilang tao ang nakatira sa kubo?|Lima',
+          'Sino ang hindi nakatira sa kubo?|Ang kuya','Saan kaya nakatayo ang kubo?|Sa bukid'] })},
 
- {id:'fi8', mode:'reading', sound:'u', letter:'Uu', title:'Tunog /u/', items:_rd({
-   tunog:['u','U'],
-   pantig:['bu','mu','su'],
-   salita:['usa','buo','ubo','ubas','subo'],
-   parirala:['ubas sa mesa','usa sa mesa'] })},
+{id:'fi8', book:2, letter:'Ll', sound:'l', title:'Tunog /l/', items:_L({
+  tunog:['l','L'],
+  pantig:_tab1('l'),
+  salita:['la-ta|lata','la-la-ki|lalaki','bo-la|bola','ma-la-bo|malabo','li-ma|lima','bi-li|bili',
+          'bu-mi-li|bumili','bu-mi-bi-li|bumibili','lo-la|lola','lu-ma|luma','lu-to|luto',
+          'ma-lu-to|maluto','ma-lu-lu-to|maluluto'],
+  pantig2:_tab2('l'),
+  salita2:['ka-sal|kasal','ki-los|kilos','ku-mi-los|kumilos','li-kot|likot','ma-li-kot|malikot',
+           'ba-lik|balik','bu-ma-lik|bumalik','ba-ba-lik|babalik','la-kas|lakas',
+           'ma-la-kas|malakas','ba-li-kat|balikat','ku-lit|kulit','ma-ku-lit|makulit',
+           'bi-lis|bilis','ma-bi-lis|mabilis','ak-lat|aklat'],
+  tandaan:['sila'],
+  pangungusap:['Sila ay mga bata. Sila ay makukulit.','Sila ay mga aso. Sila ay maaamo.',
+               'Sila ay mga ate ko. Sila ay mababait.','Sila ay aalis. Sila ay babalik.'],
+  tula:['Ang Mga Bata||Ang mga bata ay makukulit.\nSila ay mabibilis kumilos.\nSila ay malilikot.\nSila ay mga bibo.\nSila ay aalis… babalik…\nAalis… babalik…'],
+  tanong:['Sino ang mga inilarawan sa tula?|Ang mga bata',
+          'Ano kaya ang nararamdaman ng matatanda?|Sila ay napapagod'],
+  dila:['basa base baso','base baso basa','bata mata lata','lata bata mata',
+        'baso laso maso','luto kuto buto','lasa basa tasa'] })},
 
- {id:'fi9', mode:'reading', sound:'t', letter:'Tt', title:'Tunog /t/', items:_rd({
-   tunog:['t','T'],
-   pantig:['ta','ti','to','te','tu'],
-   salita:['mata','bata','tao','tubo','itim','tama','tita'],
-   pangungusap:['Tama ito.','Basa ito.'] })},
+/* ---------------- BOOKLET 3 ---------------- */
+{id:'fi9', book:3, letter:'Yy', sound:'y', title:'Tunog /y/', items:_L({
+  tunog:['y','Y'],
+  pantig:_tab1('y'),
+  salita:['sa-ya|saya','la-ya|laya','ye-ma|yema','ye-lo|yelo','ye-so|yeso','yo-yo|yoyo',
+          'ta-yo|tayo','tu-ma-yo|tumayo','la-yo|layo','ya-mot|yamot'],
+  pantig2:_tab2('y'),
+  salita2:['ka-may|kamay','o-koy|okoy','ba-boy|baboy','ka-suy|kasuy','a-moy|amoy',
+           'sa-bay|sabay','ka-la-may|kalamay','ta-tay|tatay','sa-kay|sakay',
+           'su-klay|suklay','ku-lay|kulay','sak-lay|saklay'],
+  tandaan:['kay','siya'],
+  pangungusap:['Masaya ako.','Malaya siya.','Matamis ang yema.','Tatlo ang yelo.',
+               'Ito ay yoyo ko.','Tumatayo ang lalaki.','Malambot ang kamay.',
+               'Ang baboy ay mataba.','Masaya si tatay.','Sumakay ako sa bus.',
+               'Kay kuya ang aklat.','Ang baso ay kay lola.',
+               'Siya si Kim. Siya ay makulit.','Siya ang lola ko.'],
+  tula:['Ako kaya?||Ang maya ay kay lolo.\nAng itik ay kay lola.\nAng baboy ay kay tatay.\nAng biik ay kay mama.\nAng aso ay kay kuya.\nAng bibe ay kay ate.\nAko kaya?\nAy oso! Ayoko!',
+        'Si Lola Sita||Kasama ko si Lola Sita.\nSiya ay ate ko.\nSiya ay tita ko.\nSiya ay mama ko.\nSiya ang lola ko.\nSiya si Lola Sita.\nSiya ay mabait.\nSiya ay malakas.'],
+  tanong:['Ano ang nais magkaroon ng nagsasalita?|Alaga','Anong hayop ang ayaw niyang alagaan?|Oso',
+          'Sino ang inilarawan sa ikalawang tula?|Si Lola Sita',
+          'Sino kaya ang naglalarawan kay Lola Sita?|Ang apo niya'] })},
 
- {id:'fi10', mode:'reading', sound:'k', letter:'Kk', title:'Tunog /k/', items:_rd({
-   tunog:['k','K'],
-   pantig:['ka','ki','ko','ke','ku'],
-   salita:['kama','kubo','kita','sakit','bakit','ako','kami'],
-   pangungusap:['Ako ito.','Kita ko ito.'] })},
+{id:'fi10', book:3, letter:'Nn', sound:'n', title:'Tunog /n/', items:_L({
+  tunog:['n','N'],
+  pantig:_tab1('n'),
+  salita:['mi-na-na|minana','bi-na-ta|binata','Ne-ne|Nene','ma-ni|mani','Ma-ni-la|Manila',
+          'a-ni-no|anino','ku-ma-in|kumain','ba-ya-ni|bayani','an-tok|antok',
+          'i-na-an-tok|inaantok','na-nay|nanay'],
+  pantig2:_tab2('n'),
+  salita2:['am-bon|ambon','u-ma-am-bon|umaambon','u-lan|ulan','se-men-to|semento',
+           'li-nis|linis','ma-li-nis|malinis','u-nan|unan','nu-nal|nunal','ka-nin|kanin'],
+  tandaan:['may','alin','sino'],
+  pangungusap:['Minana ko ito kay lolo.','Kay Nene ang bulaklak.','Malayo ang Manila.',
+               'Kita ko ang anino ko.','Kumain na kami kanina.','Si nanay ay mabait.',
+               'Mas malakas ang ulan.','Malinis na ito.','Luto na ang kanin.',
+               'May manika si Monika.','Alin ang malambot?','Sino ang may aklat?'],
+  tula:['Manila||Malayo ang Manila.\nMay mainit na mga semento.\nSiksikan ang mga tao.\nNatakot ako.\nMay mabait na nakilala.\nSalamat sa kabaitan.\nMasaya na ako muli.\nMay masaya na ala-ala.'],
+  tanong:['Sa simula, anong naramdaman ng nagsasalita?|Takot',
+          'Bakit kaya niya ito naramdaman?|Mag-isa siya sa malayong lugar',
+          'Sa huli, anong naramdaman niya?|Saya',
+          'Bakit nagbago ang kanyang damdamin?|May nakilala siyang mabait na tao'] })},
 
- {id:'fi11', mode:'reading', sound:'l', letter:'Ll', title:'Tunog /l/', items:_rd({
-   tunog:['l','L'],
-   pantig:['la','li','lo','le','lu'],
-   salita:['lola','lolo','bola','lima','sulat','malaki','lamesa'],
-   pangungusap:['Lola ko ito.','Kita ko si Lola.'] })},
+{id:'fi11', book:3, letter:'Gg', sound:'g', title:'Tunog /g/', items:_L({
+  tunog:['g','G'],
+  pantig:_tab1('g'),
+  salita:['ga-bi|gabi','ga-tas|gatas','a-gi-la|agila','gi-ni-sa|ginisa','sa-go|sago',
+          'na-li-go|naligo','gu-sa-li|gusali','gu-ya-ba-no|guyabano','na-gu-tom|nagutom'],
+  pantig2:_tab2('g'),
+  salita2:['ga-gam-ba|gagamba','git-na|gitna','ma-gas-tos|magastos','tu-big|tubig',
+           'ma-bi-gat|mabigat','ma-ba-gal|mabagal','gin-to|ginto','ma-sig-la|masigla',
+           'ka-i-bi-gan|kaibigan'],
+  tandaan:['ng','sana','bakit','kasi'],
+  pangungusap:['Ay! Gabi na!','Matamis ang gatas.','Malaya ang mga agila.','Ginisa ang ulam.',
+               'Naligo ako kanina.','Matataas ang mga gusali.','Nagutom si tatay.',
+               'Takot ako sa gagamba.','Tubig ang ininom ko.','Kaibigan kita.',
+               'Bumili siya ng gamot.','Nagluto ng gulay.',
+               'Bakit ka galit? Gutom kasi ako.','Bakit ka nagbabasa? Gusto ko kasi matuto.'],
+  tula:['Gusto ko!||Gusto ko sana ng manika.\nGusto ko sana ng malamig na gulaman.\nGusto ko sana ng bago na gamit.\nGutom na si tatay.\nGusto niya ng makakain.\nBumili ako ng kanin.\nBumili ako ng ulam.\nBinigay ko kay tatay.\nMasaya ako.\nMasaya kasi si tatay.'],
+  tanong:['Ano ang binili niya?|Kanin at ulam','Bakit niya binili ang mga ito?|Iyon ang gusto ng tatay niya',
+          'Naging masaya ba siya? Bakit?|Oo, kasi naging masaya ang tatay niya'] })},
 
- {id:'fi12', mode:'reading', sound:'y', letter:'Yy', title:'Tunog /y/', items:_rd({
-   tunog:['y','Y'],
-   pantig:['ya','yo','yu','ay'],
-   salita:['yaya','siya','kayo','baboy','yelo','saya'],
-   pangungusap:['Siya si Yaya.','Masaya ako.'] })},
+{id:'fi12', book:3, letter:'Rr', sound:'r', title:'Tunog /r/', items:_L({
+  tunog:['r','R'],
+  pantig:_tab1('r'),
+  salita:['gi-ta-ra|gitara','ba-su-ra|basura','re-ga-lo|regalo','re-ta-so|retaso',
+          'la-ga-ri|lagari','sa-ri-sa-ri|sari-sari','nag-la-ro|naglaro','ro-sas|rosas',
+          'la-ru-an|laruan'],
+  pantig2:_tab2('r'),
+  salita2:['rey-na|reyna','rel-ye-no|relyeno','ram-bu-tan|rambutan','bar-ya|barya',
+           'lu-gar|lugar','bar-ko|barko','ru-rok|rurok','a-ray|aray','nag-a-ral|nag-aral'],
+  tandaan:['at'],
+  parirala:['masama at mabuti','mabigat at magaan','mabilis at mabagal','tuyo at basa'],
+  pangungusap:['Malakas ang tunog ng gitara.','Ilabas mo ang basura.','Salamat sa regalo mo.',
+               'Matalas ang lagari ni tatay.','Naglaro kami ni kuya.','Bago ang laruan niya.',
+               'Siya ang reyna ng bansa.','Makatas ang rambutan.','Malinis ang lugar.',
+               'Aray! Masakit!','Nag-aral ako ng mabuti.'],
+  tula:['Ang Regalo Kay Nanay||Matagal ng gusto ni nanay bumili ng relo.\nAng nais niya na kulay ay rosas.\nBumili siya ng bigas.\nAt ng aklat ko.\nAt ng manika ni ate.\nAt ng laruan ni bunso.\nNasaan ang relo na gusto ni nanay?\nBumili kami nina ate at bunso.\nBinili si nanay ng relo na rosas.'],
+  tanong:['Ano ang nais bilhin ni nanay?|Relo','Bakit hindi niya binibili ang gusto niya?|Inuuna niya ang gusto ng pamilya',
+          'Paano nagkaroon ng relong rosas si nanay?|Binili siya ng mga anak niya',
+          'Bakit kaya ito ginawa ng mga anak niya?|Dahil mahal nila si nanay'] })},
 
- {id:'fi13', mode:'reading', sound:'n', letter:'Nn', title:'Tunog /n/', items:_rd({
-   tunog:['n','N'],
-   pantig:['na','ni','no','ne','nu'],
-   salita:['nanay','ina','anak','kanin','bunso','minsan'],
-   pangungusap:['Si Nanay ay masaya.','Anak ko ito.'] })},
+{id:'fi13', book:3, letter:'Pp', sound:'p', title:'Tunog /p/', items:_L({
+  tunog:['p','P'],
+  pantig:_tab1('p'),
+  salita:['pa-la-ka|palaka','ka-la-pa-ti|kalapati','pe-ra|pera','pi-ko|piko','pi-ta-ka|pitaka',
+          'ka-pi-ra-so|kapiraso','pu-so|puso','pu-mi-la|pumila','pu-mu-tok|pumutok'],
+  pantig2:_tab2('p'),
+  salita2:['ma-la-pit|malapit','ma-sa-rap|masarap','ma-si-kip|masikip','pin-to|pinto',
+           'pu-mun-ta|pumunta','pis-ta|pista','sa-pot|sapot','Pas-ko|Pasko',
+           'pi-nuk-pok|pinukpok'],
+  tandaan:['ano'],
+  pangungusap:['Tumalon ang palaka.','Ang kalapati ay malaya.','Ubos na ang pera ko.',
+               'Masaya maglaro ng piko.','Ano ang laman ng pitaka?','Maligaya ang mga puso.',
+               'Pumila lagi ng tama.','Masarap ang ulam.','Buksan mo ang pinto.',
+               'Masaya ang pista.','Malapit na ang Pasko.','Ano ang matamis?'],
+  tula:['Ang mga Kulay||Ano ang kulay ng tubig sa ilog?\nAsul. Kay linis.\nAno ang kulay ng mga ulap?\nPuti. Gaya ng mga bulak.\nAno ang kulay ng puso?\nPula. Puno ng pag-ibig.\nAno ang kulay ng sapatos ni tatay?\nItim. Gamit niya palagi.\nAno ang kulay ng labi ni nanay?\nRosas. Palagi na masaya.'],
+  tanong:['Tungkol saan ang tula?|Ang mga kulay','Anong bagay inihalintulad ang mga ulap?|Bulak',
+          'Ano ang ibig sabihin na masaya ang labi ni nanay?|Palagi siyang nakangiti'] })},
 
- {id:'fi14', mode:'reading', sound:'g', letter:'Gg', title:'Tunog /g/', items:_rd({
-   tunog:['g','G'],
-   pantig:['ga','gi','go','ge','gu'],
-   salita:['ang','gamot','gulay','bigas','itlog','gabi'],
-   pangungusap:['Ang gabi ay malamig.','Kumain ka ng gulay.'] })},
+/* ---------------- BOOKLET 4 ---------------- */
+{id:'fi14', book:4, letter:'Ng ng', sound:'ng', title:'Tunog /ng/', items:_L({
+  tunog:['ng','Ng'],
+  pantig:_tab1('ng'),
+  salita:['te-nga|tenga','pa-nga-ko|pangako','nga-yon|ngayon','bi-ngi|bingi',
+          'na-ngi-nig|nanginig','ma-ba-ngo|mabango','na-ka-ngi-ti|nakangiti','ngu-so|nguso',
+          'bu-ma-ngon|bumangon'],
+  pantig2:_tab2('ng'),
+  salita2:['ma-lung-kot|malungkot','ing-git|inggit','ma-ta-pang|matapang','Ling-go|Linggo',
+           'lu-ma-ngoy|lumangoy','sing-sing|singsing','pa-yong|payong','ma-i-ngay|maingay',
+           'ping-gan|pinggan','ma-ngga|mangga','sa-ging|saging','kang-kong|kangkong'],
+  tandaan:['lang','ngunit'],
+  pangungusap:['Malinis ang tenga ko.','Ngayon ako aalis.','Mabango ang bulaklak.',
+               'Nakangiti si Mam Kim.','Bumangon ka na!','Malungkot ang babae.',
+               'Ako ay isang batang matapang.','Magkikita kami sa Linggo.','Masaya lumangoy!',
+               'Malinis na ang pinggan.','Mag-isa ka lang ba? Oo, mag-isa lang ako.',
+               'Maglalaba sana ako ngunit umulan.','Isa lang ang baon ko ngunit masarap.'],
+  tula:['Ngiti||Laging nakangiti si Aling Puring. Nakangiti siya sa mga batang naglalaro. Nakangiti siya sa mga tao sa palengke.\nNgunit iba siya ngayon. Malungkot siya ngayon.\nNilapitan ko siya. Ngumiti ako kagaya ng ngiti niya sakin noon.\nO laking saya ko! Napangiti ko siya!'],
+  tanong:['Ano ang pangalan ng babaeng laging nakangiti?|Aling Puring',
+          'Ano ang ginawa ng nagkukuwento nang malungkot si Aling Puring?|Nginitian niya ito',
+          'Ano sa tingin mo ang naidudulot ng pagngiti?|Nakagagaan ito ng pakiramdam'] })},
 
- {id:'fi15', mode:'reading', sound:'r', letter:'Rr', title:'Tunog /r/', items:_rd({
-   tunog:['r','R'],
-   pantig:['ra','ri','ro','re','ru'],
-   salita:['oras','rosas','sira','marumi','sarili','bakuran'],
-   pangungusap:['Marumi ang kamay.','Ang rosas ay malaki.'] })},
+{id:'fi15', book:4, letter:'Dd', sound:'d', title:'Tunog /d/', items:_L({
+  tunog:['d','D'],
+  pantig:_tab1('d'),
+  salita:['da-la-ga|dalaga','na-da-pa|nadapa','da-mit|damit','bal-de|balde','du-mi-la|dumila',
+          'kan-di-la|kandila','Do-ra|Dora','ma-gan-da|maganda','du-mu-go|dumugo'],
+  pantig2:_tab2('d'),
+  salita2:['ka-pa-tid|kapatid','dib-dib|dibdib','na-pa-god|napagod','lu-mun-dag|lumundag',
+           'lu-ma-kad|lumakad','li-kod|likod','su-man-dal|sumandal','ding-ding|dingding',
+           'nag-dik-dik|nagdikdik','da-lan-dan|dalandan'],
+  tandaan:['saan','dito','rin','din'],
+  pangungusap:['Aba! Dalaga na siya.','Masikip ang damit ko.','Puno na ang balde.',
+               'Patayin mo ang kandila.','Maganda ang dalaga.','Maganda ang kapatid ko.',
+               'Napagod ka ba kanina?','Lumakad na sila.',
+               'Saan tayo maglalaro? Dito sa labas.','Saan tayo lalangoy? Dito sa dagat.',
+               'Siya rin ay mabait.','Si Dondon din ay sasama.','Masarap din magluto si nanay.'],
+  tula:['Sa Dalampasigan||Sumama ako sa kaibigan ko sa dalampasigan. Siya si Dodong.\nNagdala si Dodong ng mga dalandan. Napakaasim!\nNagtakbuhan, lumundag, dumapa at lumangoy kami. Napakasaya!\nNgunit madilim na ang langit.\nNagpaalam na kami sa dalampasigan.\nBukas ulit!'],
+  tanong:['Saan pumunta ang magkaibigan?|Sa dalampasigan',
+          'Alin ang hindi nila ginawa?|Nangisda',
+          'Bakit kailangan na silang umuwi?|Gabi na at delikado na',
+          'Bakit sila babalik at magsasama pa ng kaibigan?|Gusto nilang magsaya rin ang mga kaibigan nila'] })},
 
- {id:'fi16', mode:'reading', sound:'d', letter:'Dd', title:'Tunog /d/', items:_rd({
-   tunog:['d','D'],
-   pantig:['da','di','do','de','du'],
-   salita:['daga','dila','dagat','maganda','dalaga','madilim'],
-   pangungusap:['Maganda ang dagat.','Madilim na gabi.'] })},
+{id:'fi16', book:4, letter:'Hh', sound:'h', title:'Tunog /h/', items:_L({
+  tunog:['h','H'],
+  pantig:_tab1('h'),
+  salita:['ha-ri|hari','ma-ha-ba|mahaba','ha-la-man|halaman','hi-pon|hipon',
+          'ka-ha-pon|kahapon','ta-ho|taho','ma-ba-ho|mabaho','ti-na-hi|tinahi',
+          'hu-mu-la|humula'],
+  pantig2:_tab2('h'),
+  salita2:['a-has|ahas','bu-hok|buhok','ma-hal|mahal','ba-hag-ha-ri|bahaghari','la-hat|lahat',
+           'u-ma-hon|umahon','ma-ang-hang|maanghang','ta-hong|tahong','hu-li-han|hulihan'],
+  tandaan:['hindi'],
+  pangungusap:['Mabait ang ating hari.','Mahaba pa ang lalakarin.','Nagtanim sila ng halaman.',
+               'Niluto ni tito ang hipon.','Umalis kami kahapon.','Mainit pa ang taho.',
+               'Kinagat siya ng ahas.','Mahaba ang buhok ko.','Mahal kita!',
+               'Makulay ang bahaghari.','Kasama ang lahat.','Maanghang ang pagkain.',
+               'Kumain ka na ba? Hindi pa.','Galit ka pa ba nanay? Hindi na.'],
+  tula:['Ang Batang Hindi Sumusuko||Si Hasan ay hirap sa pagbasa. Pero si Hasan ay hindi sumusuko. Palagi siyang pumapasok. Lagi siyang nakikinig sa kanyang guro.\nMahirap man at nakakapagod man ay hindi siya sumuko.\nPagkalipas ng ilang linggo, nakapagbabasa na si Hasan!\nMasayang-masaya siya. Masayang-masaya rin ang kanyang mga magulang at mga guro.'],
+  tanong:['Sino ang batang hindi sumusuko?|Si Hasan','Ano ang naging pagsubok niya?|Nahihirapan siyang magbasa',
+          'Alin ang hindi niya ginawa?|Lagi siyang hindi pumapasok',
+          'Bakit mahalaga ang matutong makabasa?|Para matupad ang mga pangarap'] })},
 
- {id:'fi17', mode:'reading', sound:'p', letter:'Pp', title:'Tunog /p/', items:_rd({
-   tunog:['p','P'],
-   pantig:['pa','pi','po','pe','pu'],
-   salita:['papa','pusa','paa','apoy','puno','pinto'],
-   pangungusap:['Ang pusa ay maliit.','Nasa pinto si Papa.'] })},
+{id:'fi17', book:4, letter:'Ww', sound:'w', title:'Tunog /w/', items:_L({
+  tunog:['w','W'],
+  pantig:_tab1('w'),
+  salita:['wa-lo|walo','da-la-wa|dalawa','ka-wa-li|kawali','sa-wi|sawi','wa-lis|walis',
+          'wa-ling-wa-ling|waling-waling','wi-ka|wika','wa-kas|wakas','na-wa-sak|nawasak'],
+  pantig2:_tab2('w'),
+  salita2:['a-raw|araw','ka-la-baw|kalabaw','hu-wag|huwag','a-yaw|ayaw',
+           'ka-la-wang|kalawang','wel-ga|welga','hi-kaw|hikaw','wa-ta-wat|watawat',
+           'ma-gi-liw|magiliw'],
+  tandaan:['raw','daw','huwag'],
+  pangungusap:['Walo ang paa ng gagamba.','Kaming dalawa lang.','Gamit ko ang kawali.',
+               'Ano ang wika mo?','Wakas na. Tapos na.','Mataas ang sikat ng araw.',
+               'Malakas ang kalabaw.','Huwag mo akong saktan.','Kay ganda ng hikaw mo.',
+               'Watawat ito ng Pilipinas.','Madali raw mag-aral.','Mahirap daw mag-aral.',
+               'Huwag mong hawakan!','Huwag na tayong maglaro.'],
+  tula:['Wilma Wala||Ina: Wilma, heto ang pakwan. Kumain ka muna.\nWilma: Pakwan na naman? Wala na bang iba?\nAma: Meron ditong mani. Marami ang bawang.\nWilma: May mani wala namang inumin. Wala na bang iba?\nAte: Halika, Wilma. Maglaro na lang tayo ng luto-lutuan.\nWilma: Hay! Ayoko. Wala na bang iba?\nKuya: Wilma, ang hirap mo naman pasayahin.'],
+  tanong:['Sino ang batang hindi makuntento?|Si Wilma','Ano ang lagi niyang sinasabi?|Wala na bang iba?',
+          'Bakit mahirap pasayahin si Wilma?|Dahil hindi siya makuntento'],
+  dila:['dati bati pati','lawa tawa sawa','bangon bangin banga','sangga mangga bangga',
+        'hala wala dala'] })},
 
- {id:'fi18', mode:'reading', sound:'h', letter:'Hh', title:'Tunog /h/', items:_rd({
-   tunog:['h','H'],
-   pantig:['ha','hi','ho','he','hu'],
-   salita:['bahay','buhay','hipon','mahal','hangin','hugasan'],
-   pangungusap:['Mahal ko ang bahay.','Malamig ang hangin.'] })},
+/* ---------------- BOOKLET 5: MGA HIRAM NA TITIK ---------------- */
+{id:'fi18', book:5, letter:'Cc', sound:'c', title:'Hiram: Cc', items:_L({
+  tunog:['c','C'],
+  salita:['can-ton|canton','ca-me-ra|camera','ca-bi-net|cabinet','cac-tus|cactus',
+          'co-mics|comics','ma-ca-pu-no|macapuno','doc-tor|doctor'],
+  tandaan:['isang'],
+  pangungusap:['Kain ka na ng canton habang mainit pa.','Kuhanan mo ako ng litrato gamit ang camera mo.',
+               'Ano ang laman ng iyong cabinet?','Nakakatuwang magbasa ng comics.',
+               'May macapuno sa halu-halo.','Si Carmen ay isang doctor.'],
+  tula:['Pupunta kami sa Ilocos!||Mamasyal kaming pamilya\nSa Ilocos kami ay pupunta\nDala ni ate Cara ang kanyang camera\nPupunuin daw niya ng magagandang ala-ala\nMahaba raw ang biyahe sabi ni kuya Rico\nKaya comics ay bitbit niyang sigurado'],
+  tanong:['Saan pupunta ang pamilya?|Sa Ilocos','Ano ang dadalhin ni ate Cara?|Camera',
+          'Bakit nagdala si kuya Rico ng comics?|Para hindi mabagot sa mahabang biyahe'] })},
 
- {id:'fi19', mode:'reading', sound:'w', letter:'Ww', title:'Tunog /w/', items:_rd({
-   tunog:['w','W'],
-   pantig:['wa','wi','aw','iw'],
-   salita:['araw','walis','wala','sariwa','bawang','liwanag'],
-   pangungusap:['Maliwanag ang araw.','Wala si Nanay.'] })},
+{id:'fi19', book:5, letter:'Ff', sound:'f', title:'Hiram: Ff', items:_L({
+  tunog:['f','F'],
+  salita:['fan|fan','fol-der|folder','Fi-li-pi-no|Filipino','Fe-li-pe|Felipe',
+          'Fa-ti-ma|Fatima','Fer-nan-do|Fernando','Af-ri-ca|Africa'],
+  tandaan:['kailan'],
+  pangungusap:['Ako ay fan ni Alden.','Nasa loob ng folder ang mga resibo.',
+               'Ang wika namin ay Filipino.','Si Felipe ay magalang.',
+               'Nagbabasa si Fatima ng aklat.','Maraming hayop sa bansang Africa.',
+               'Kailan mo sinimulan ang paggawa ng upuan?'],
+  tula:['Isang Linggo ng Pagbuo ng Upuan||Lunes ko ginuhit ang disenyo.\nDumating ang materyales noong Martes.\nNilagari ko ang kahoy noong Miyerkules.\nHuwebes ay tapos nang maipako.\nNoong Biyernes inukit ang mga disenyo.\nNatapos kong pinturahan noong Sabado.\nLinggo ay naupuan na namin ito.'],
+  tanong:['Ano ang unang hakbang sa pagbuo ng upuan?|Gumuhit ng disenyo',
+          'Bakit mahalaga ang pagguhit ng disenyo?|Para maiwasan ang magkamali'] })},
 
- {id:'fi20', mode:'reading', sound:'ng', letter:'NGng', title:'Tunog /ng/', items:_rd({
-   tunog:['ng','Ng'],
-   pantig:['nga','ngi','ngo','nge','ngu'],
-   salita:['ngipin','ngayon','sanga','bangka','ilong','pangalan'],
-   pangungusap:['Ano ang pangalan mo?','Ngayon ay masaya ako.'] })},
+{id:'fi20', book:5, letter:'Jj', sound:'j', title:'Hiram: Jj', items:_L({
+  tunog:['j','J'],
+  salita:['jam|jam','jet|jet','nin-ja|ninja','Jor-dan|Jordan','Joy|Joy','Ja-net|Janet','Ja-pan|Japan'],
+  tandaan:['anong'],
+  pangungusap:['Ang palaman ay jam.','Ang bilis ng jet!','Sumipa ang ninja.',
+               'Ako ay fan ni Jordan.','Masipag si Joy.','Si Janet ay mapagbigay.',
+               'Nais kong pumunta sa Japan.','Anong nararamdaman ni Jena?'],
+  tula:['Ang Tiyan ni Tatay||Sa ospital, nakahiga si Jojo.\nJojo: Aray! Ang sakit! Masakit talaga.\nJanet: Itay, sana ay gumaling ka na.\nFe: Itay, ano pong masakit?\nJojo: Ang tiyan ko, anak.\nDoctor: Wala naman siyang sakit. Gutom lang.\nDoctor: Heto ang tinapay. Lagyan mo ng jam.\nTumawa ang lahat!'],
+  tanong:['Saan naganap ang kuwento?|Sa ospital','Bakit napa-aray si tatay?|Masakit ang tiyan niya',
+          'Ano ang dahilan ng sakit ng tiyan niya?|Nagugutom siya'] })},
+
+{id:'fi21', book:5, letter:'Ññ', sound:'ñ', title:'Hiram: Ññ', items:_L({
+  tunog:['ñ','Ñ'],
+  salita:['San-to Ni-ño|Santo Niño','Ni-ña|Niña','ca-ri-ño-sa|cariñosa',
+          'do-ña|doña','pi-ña|piña','Ma-la-ca-ñang|Malacañang','Das-ma-ri-ñas|Dasmariñas'],
+  tandaan:['naman'],
+  pangungusap:['May Santo Niño sa kuwarto ni lola.','Kulot ang buhok ni Niña.',
+               'Sumayaw kami ng cariñosa noong pista.','Maraming alahas ang doña.',
+               'Ang piña ay maasim at matamis.','Ang pangulo ay nakatira sa Malacañang.',
+               'Ang lungsod ng Dasmariñas ay malayo.'],
+  tula:['Si Niño at Si Niña||Si Niño at si Niña ay magkamukhang-magkamukha\nKambal na tila pinagbiyak na bunga\nMahilig maglaro si Niño, mahilig naman si Niña na magbasa\nPagsayaw ang hilig ni Niño, kay Niña naman ay pagkanta\nMagkaiba ang gustong meryenda\nNgunit nagbabati rin naman'],
+  tanong:['Ano ang relasyon nina Niño at Niña?|Magkapatid (kambal)',
+          'Ano ang ibig sabihin ng "pinagbiyak na bunga"?|Magkamukha',
+          'Bakit sila madalas mag-away?|Dahil marami silang pagkakaiba'] })},
+
+{id:'fi22', book:5, letter:'Vv', sound:'v', title:'Hiram: Vv', items:_L({
+  tunog:['v','V'],
+  salita:['van|van','vet|vet','vin-ta|vinta','Vic-tor|Victor','Vic|Vic','Vil-ma|Vilma',
+          'Ca-vi-te|Cavite','Vi-sa-yas|Visayas','a-vo-ca-do|avocado'],
+  tandaan:['tawag'],
+  pangungusap:['Sumakay kami sa van.','Dinala namin ang aso sa vet.',
+               'Ang vinta ay isang bangkang makulay.','Nakakatawa talaga si Vic.',
+               'Si Vilma ay artista.','Nakatira ako sa Dasmariñas, Cavite.',
+               'Hindi pa ako nakapunta sa Visayas.','Masarap ang avocado na may gatas.'],
+  tula:['Ang Libangan ni Nanay||Fan si nanay ni Vic at Vilma\nPaborito niyang mga artista\nKay Vic siya ay tawang-tawa\nPuro iyak naman siya kay Vilma\nIsang gabing maulan ng malakas\nKumulog at kumidlat\nKuryente sa bahay ay biglang nawala'],
+  tanong:['Ano ang libangan ni nanay?|Panonood ng telebisyon',
+          'Sino ang mga paborito niyang artista?|Vic at Vilma',
+          'Bakit nalungkot ang nanay?|Hindi siya makakapanood ng mga palabas'] })},
+
+{id:'fi23', book:5, letter:'Xx', sound:'x', title:'Hiram: Xx', items:_L({
+  tunog:['x','X'],
+  salita:['e-xit|exit','e-xam|exam','wax|wax','ta-xi|taxi','Rex|Rex','Fe-lix|Felix',
+          'Dex-ter|Dexter','Me-xi-co|Mexico'],
+  tandaan:['kaysa'],
+  pangungusap:['Sa exit tayo lalabas.','Madali lang ang exam.',
+               'Makintab ang buhok na may wax.','Sumakay kami sa taxi.','Busog na si Rex.',
+               'Si Felix ay isang pusa.','Si Dexter ay mahilig mag-imbento.',
+               'Mas malaki ang van kaysa taxi.','Mas malayo ang Mexico kaysa Japan.'],
+  tula:['Ang Tatlong Magkakapatid||May tatlong lalaking magkakapatid. Magkakalapit lang ang kanilang mga edad kaya madalas silang paghambingin.\nPinakamatalino daw si Dexter.\nSi Felix naman daw ang pinakamabait.\nSi Rex daw ang pinakatalentado.\nNgunit may iba’t-iba silang galing kaya hindi dapat sila paghambingin.'],
+  tanong:['Sino daw sa kanila ang pinakamabait?|Si Felix',
+          'Bakit madalas silang paghambingin?|Dahil magkakalapit sila ng edad',
+          'Bakit hindi dapat paghambingin ang mga tao?|Dahil lahat tayo ay may angking galing'] })},
+
+{id:'fi24', book:5, letter:'Zz', sound:'z', title:'Hiram: Zz', items:_L({
+  tunog:['z','Z'],
+  salita:['zig-zag|zigzag','zum-ba|zumba','zip-per|zipper','Ri-zal|Rizal','Zo-ren|Zoren',
+          'Zam-ba-les|Zambales','Lu-zon|Luzon'],
+  tandaan:['kanan','kaliwa'],
+  pangungusap:['Ang daan ay zigzag.','Sumayaw kami ng zumba.','Ay! Nakabukas ang zipper!',
+               'Si Rizal ang pambansang bayani.','Si Zoren ay mabait na ama.',
+               'Masayang mamasyal sa Zambales.','Ang Luzon ay malaking isla.'],
+  tula:['Zumba||Itaas ang kamay! Iwagayway!\nHakbang pakanan, kanan, kanan\nHakbang pakaliwa, kaliwa, kaliwa\nKembot sa kanan, kembot sa kaliwa\nTalon! Ulitin!'],
+  tanong:['Puwede ba ang pagzuzumba sa mga bata?|Oo',
+          'Paano napapatibay ng pagzuzumba ang puso?|Bumibilis ang tibok nito',
+          'Bakit mabuti ang pagpapawis?|Dahil natutunaw ang taba'] })},
+
+{id:'fi25', book:5, letter:'Qu qu', sound:'qu', title:'Hiram: Qu qu', items:_L({
+  tunog:['qu','Qu'],
+  salita:['A-qui-no|Aquino','Que-zon|Quezon','En-ri-que|Enrique','Ra-quel|Raquel',
+          'An-ti-que|Antique','Pa-ra-ña-que|Parañaque','Qui-ri-no|Quirino'],
+  tandaan:['kaniya'],
+  pangungusap:['Si Aquino ay dating pangulo.','Si Quezon ay makikita sa pera.',
+               'Si Enrique ay matalik kong kaibigan.','Mahaba ang buhok ni Raquel.',
+               'Maraming bundok sa Antique.','Sa Parañaque ako pupunta.',
+               'Malinis ang dagat sa Quirino.'],
+  tula:['Ang Batang Dayuhan||Si Quintin ay isang batang dayuhan\nPilipinas na ang kaniyang bagong tahanan\nBuhok niya ay dilaw ang kulay\nMga mata niya ay asul na mapungay\nIba ang kaniyang pananalita\nKaya nilapitan ko siya at nginitian\nNgumiti rin siya na parang isang kaibigan'],
+  tanong:['Ano ang pangalan ng batang dayuhan?|Si Quintin','Ano ang kulay ng kanyang mata?|Asul',
+          'Anong ginawa ng bata para magkaintindihan sila?|Nginitian niya ito'] })},
 ];
+MARUNGKO_LESSONS.forEach(function(L){ L.mode='reading'; });
 
 /* extra icons for the parent's read / not-yet controls */
 IC.cross=()=>`<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#E2574C"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 IC.tick=()=>`<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#27C28B"/><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-IC.book=()=>`<svg viewBox="0 0 48 48" fill="none"><path d="M6 10c6-3 12-3 18 1v29c-6-4-12-4-18-1z" fill="#FF6B1A"/><path d="M42 10c-6-3-12-3-18 1v29c6-4 12-4 18-1z" fill="#C4540F"/></svg>`;
 
-/* ===================== PARENT-ASSESSED READING PLAYER =====================
-   R = {world, mission, i, correct, misses[]}                                */
+/* ===================== PARENT-ASSESSED READING PLAYER ===================== */
 var R=null;
-/* a successful parent gate unlocks the read/not-yet controls for a while, so a
-   grown-up doing three lessons back to back is not re-challenged every time.
+/* a successful parent gate unlocks the read / not-yet controls for a while, so a
+   grown-up doing several lessons back to back is not re-challenged every time.
    In-memory only — closing the app always re-gates. */
-var parentUnlockUntil=0;
+var parentUnlockUntil=0, pendingReading=null;
 function parentUnlocked(){ return Date.now()<parentUnlockUntil; }
 
 function startReadingGated(k,mid){
@@ -1002,34 +1372,51 @@ function startReadingGated(k,mid){
   if(parentUnlocked()){ startReading(k,mid); return; }
   pendingGate='reading'; openGate();
 }
-var pendingReading=null;
-
 function startReading(k,mid){
   var m=missionsOf(k).filter(function(x){return x.id===mid;})[0]; if(!m)return;
+  var c=curChild();
   R={world:k,mission:m,i:0,correct:0,misses:[]};
-  document.getElementById('rdStars').innerHTML=starChip(curChild());
+  // booklet lessons run long (some are 40+ items), so pick up where the last sitting stopped
+  var rs=c&&c.resume&&c.resume[mid];
+  if(rs&&rs.i>0&&rs.i<m.items.length){ R.i=rs.i; R.correct=rs.correct||0; R.misses=(rs.misses||[]).slice(); }
+  document.getElementById('rdStars').innerHTML=starChip(c);
   renderReadItem();
   go('reading');
 }
 function renderReadItem(){
   var it=R.mission.items[R.i], n=R.mission.items.length;
-  var d=document.getElementById('rdDots');
-  d.innerHTML='<i style="width:'+Math.round((R.i/n)*100)+'%"></i>';
+  document.getElementById('rdDots').innerHTML='<i style="width:'+Math.round((R.i/n)*100)+'%"></i>';
   document.getElementById('rdKind').textContent=RD_KIND[it.k]||'';
+
+  var syl=document.getElementById('rdSyl');
+  syl.textContent=it.syl||it.ttl||'';
+  syl.style.display=(it.syl||it.ttl)?'block':'none';
+
   var t=document.getElementById('rdText');
   t.textContent=it.r;
-  // scale down as the item gets longer so sentences still fit one screen
-  var len=it.r.length;
-  t.className='rd-text'+(len<=4?' xl':(len<=12?' lg':(len<=22?' md':' sm')));
+  if(it.k==='tula'){ t.className='rd-text passage'; }
+  else {
+    var len=it.r.length;
+    t.className='rd-text'+(len<=4?' xl':(len<=12?' lg':(len<=22?' md':' sm')));
+  }
+  var a=document.getElementById('rdAns');
+  a.textContent=it.ans?('Sagot: '+it.ans):'';
+  a.style.display=it.ans?'block':'none';
+
+  document.getElementById('rdPrompt').textContent=
+    it.k==='tanong'?'PARA SA MAGULANG — NASAGOT BA?':'PARA SA MAGULANG — NABASA BA ITO?';
   document.getElementById('rdCount').textContent=(R.i+1)+' / '+n;
 }
 function markRead(ok){
-  var it=R.mission.items[R.i];
+  var it=R.mission.items[R.i], c=curChild();
   if(ok) R.correct++; else R.misses.push(it.r);
-  if(R.i<R.mission.items.length-1){ R.i++; renderReadItem(); }
-  else finishReading();
+  if(R.i<R.mission.items.length-1){
+    R.i++;
+    if(c){ if(!c.resume)c.resume={}; c.resume[R.mission.id]={i:R.i,correct:R.correct,misses:R.misses.slice(0,30)}; save(S); }
+    renderReadItem();
+  } else finishReading();
 }
-/* reading lessons are longer than quiz missions, so normalise to the same
+/* reading lessons are far longer than quiz missions, so normalise to the same
    0-3 star scale the rest of the app uses */
 function starsForReading(correct,total){
   if(!total)return 0;
@@ -1042,7 +1429,8 @@ function finishReading(){
   var stars=starsForReading(R.correct,total);
   var prev=bestOf(c,m.id), gained=Math.max(0,stars-prev);
   if(!c.progress)c.progress={};
-  c.progress[m.id]={done:1,best:Math.max(prev,stars),read:R.correct,total:total,practice:R.misses.slice(0,20)};
+  c.progress[m.id]={done:1,best:Math.max(prev,stars),read:R.correct,total:total,practice:R.misses.slice(0,24)};
+  if(c.resume) delete c.resume[m.id];
   c.stars=(c.stars||0)+gained;
   var newBadges=awardBadges(c);
   save(S);
@@ -1054,14 +1442,11 @@ function finishReading(){
     +(gained?('  ·  +'+gained+' bituin'):'  ·  walang bagong bituin');
   var e=document.getElementById('rdDoneStars'); e.innerHTML='';
   for(var i=0;i<3;i++) e.innerHTML+=(i<stars?IC.star():IC.starOff());
-  var pr=document.getElementById('rdDonePractice');
-  pr.innerHTML=R.misses.length
-    ? '<div class="rd-prac"><b>Balikan natin:</b> '+R.misses.map(esc).join(', ')+'</div>'
-    : '';
-  var nb=document.getElementById('rdDoneBadge');
-  nb.innerHTML=newBadges.length
-    ? '<p style="font-weight:800;color:#12805C;font-size:14px;margin-top:10px">Bagong badge: '+newBadges.map(function(b){return b.name;}).join(', ')+'</p>'
-    : '';
+  document.getElementById('rdDonePractice').innerHTML=R.misses.length
+    ? '<div class="rd-prac"><b>Balikan natin:</b> '+R.misses.map(esc).join(', ')+'</div>' : '';
+  document.getElementById('rdDoneBadge').innerHTML=newBadges.length
+    ? '<p style="font-weight:800;color:#12805C;font-size:14px;margin-top:10px">Bagong badge: '
+      +newBadges.map(function(b){return b.name;}).join(', ')+'</p>' : '';
   document.getElementById('rdDoneOverlay').classList.add('show');
 }
 function afterReading(){ closeOverlay('rdDoneOverlay'); var k=R?R.world:curWorld; R=null; openWorld(k); }
