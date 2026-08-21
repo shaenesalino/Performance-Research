@@ -50,6 +50,22 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Fixed cream cover behind the iOS notch / status bar. Without this, when
+     the user scrolls, page content bleeds into the safe-area at the top and
+     shows through the (transparent) status bar. Because `viewport-fit=cover`
+     lets our content extend under the notch, we need to explicitly paint it. */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background: var(--cream);
+    z-index: 100;
+    pointer-events: none;
+  }
+
   .app {
     max-width: 480px;
     margin: 0 auto;
@@ -2902,74 +2918,72 @@
   /* ==============================
      HOME — REMINDERS
      ============================== */
-  /* Coming-Up notification pill on Home. Single glance-able row that
-     opens a bottom sheet listing the actual reminders when tapped. Accent
-     color shifts based on urgency (overdue = error, today = orange,
-     future = teal). */
+  /* Coming-Up notification pill on Home. Sits at the very top with a solid
+     color background so it's the first thing users see. Colour set by
+     urgency (red overdue, orange today, blue for future items). Opens a
+     bottom sheet listing the reminders. */
   .reminders-pill {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
-    background: var(--white);
-    border: 1.5px solid var(--sand);
-    border-radius: 999px;
-    padding: 10px 16px 10px 12px;
-    margin-top: 20px;
-    box-shadow: 0 4px 14px rgba(10, 37, 64, 0.05);
+    background: var(--blue);
+    border: none;
+    border-radius: 16px;
+    padding: 12px 18px 12px 14px;
+    margin-top: 4px;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 16px rgba(26, 71, 214, 0.22);
     cursor: pointer;
     text-align: left;
     font-family: inherit;
-    transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    color: var(--white);
+    transition: transform 0.12s ease, box-shadow 0.15s ease;
     -webkit-tap-highlight-color: transparent;
   }
-  .reminders-pill:hover  { border-color: var(--muted); box-shadow: 0 6px 18px rgba(10, 37, 64, 0.08); }
+  .reminders-pill:hover  { box-shadow: 0 8px 22px rgba(26, 71, 214, 0.28); }
   .reminders-pill:active { transform: scale(0.99); }
   .reminders-pill .rp-icon {
-    width: 36px; height: 36px;
+    width: 40px; height: 40px;
     border-radius: 50%;
     display: grid; place-items: center;
-    background: rgba(44, 188, 177, 0.14);
-    color: var(--teal);
-    font-size: 16px;
+    background: rgba(255, 255, 255, 0.18);
+    color: var(--white);
+    font-size: 18px;
     flex-shrink: 0;
   }
   .reminders-pill .rp-body { flex: 1; min-width: 0; }
   .reminders-pill .rp-title {
     font-family: 'Fraunces', serif;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
-    color: var(--navy);
+    color: var(--white);
     line-height: 1.1;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
   }
   .reminders-pill .rp-sub {
     font-family: 'Inter', sans-serif;
     font-size: 12px;
-    color: var(--muted);
+    color: rgba(255, 255, 255, 0.85);
     font-weight: 500;
   }
   .reminders-pill .rp-chev {
-    color: var(--muted);
-    font-size: 18px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 20px;
     font-weight: 400;
     flex-shrink: 0;
   }
-  /* Urgency accents — subtly recolor the icon circle + border tint */
+  /* Urgency accents — override the default blue with a stronger signal */
   .reminders-pill[data-urgency="overdue"] {
-    border-color: rgba(214, 69, 69, 0.4);
+    background: var(--error);
+    box-shadow: 0 6px 16px rgba(214, 69, 69, 0.28);
   }
-  .reminders-pill[data-urgency="overdue"] .rp-icon {
-    background: rgba(214, 69, 69, 0.14);
-    color: var(--error);
-  }
+  .reminders-pill[data-urgency="overdue"]:hover { box-shadow: 0 8px 22px rgba(214, 69, 69, 0.35); }
   .reminders-pill[data-urgency="today"] {
-    border-color: rgba(242, 114, 49, 0.4);
+    background: var(--orange);
+    box-shadow: 0 6px 16px rgba(242, 114, 49, 0.28);
   }
-  .reminders-pill[data-urgency="today"] .rp-icon {
-    background: rgba(242, 114, 49, 0.14);
-    color: var(--orange);
-  }
+  .reminders-pill[data-urgency="today"]:hover { box-shadow: 0 8px 22px rgba(242, 114, 49, 0.35); }
 
   /* Reminders bottom sheet — slides up from the bottom, contains the actual
      notification-style cards for each upcoming bill. */
@@ -3036,7 +3050,7 @@
   /* Individual notification-style reminder card inside the sheet */
   .reminder-notif {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr auto auto;
     gap: 12px;
     align-items: center;
     background: var(--white);
@@ -3045,12 +3059,10 @@
     padding: 14px 16px;
     text-align: left;
     font-family: inherit;
-    cursor: pointer;
     transition: transform 0.12s ease, border-color 0.15s ease;
     box-shadow: 0 2px 8px rgba(10, 37, 64, 0.04);
   }
   .reminder-notif:hover  { border-color: var(--muted); }
-  .reminder-notif:active { transform: scale(0.99); }
   .reminder-notif.overdue { border-left: 4px solid var(--error); }
   .reminder-notif.today   { border-left: 4px solid var(--orange); }
   .reminder-notif.soon    { border-left: 4px solid var(--yellow); }
@@ -3092,6 +3104,46 @@
     color: var(--navy);
     text-align: right;
     white-space: nowrap;
+  }
+  /* Actions column: Log + Skip stacked or side-by-side */
+  .reminder-notif .rn-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .reminder-notif .rn-log {
+    background: var(--blue);
+    color: var(--white);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.2px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .reminder-notif .rn-log:hover { background: var(--navy); }
+  .reminder-notif .rn-skip {
+    background: var(--cream-2);
+    color: var(--muted);
+    border: 1px solid var(--sand);
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .reminder-notif .rn-skip:hover {
+    background: var(--sand);
+    color: var(--navy);
+  }
+  @keyframes reminderFadeOut {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(20px); }
   }
 
   /* Action row on income / budget / goals / wallet / loan tiles.
@@ -7224,6 +7276,20 @@
       <button type="button" id="updateReloadBtn" class="ub-btn">Refresh now</button>
     </div>
 
+    <!-- Coming Up — notification pill. Sits at the very top of Home so
+         upcoming/overdue bills are the first thing users see. Tap opens a
+         bottom sheet listing all reminders. Hidden entirely when there's
+         nothing coming up. Color shifts by urgency (red overdue, orange
+         today, blue for future items). -->
+    <button type="button" class="reminders-pill" id="remindersPill" style="display:none;">
+      <div class="rp-icon" id="remindersPillIcon">🔔</div>
+      <div class="rp-body">
+        <div class="rp-title" id="remindersPillTitle">Coming up</div>
+        <div class="rp-sub" id="remindersPillSub">—</div>
+      </div>
+      <div class="rp-chev">→</div>
+    </button>
+
     <!-- Financial Health Score — dashboard's focal point -->
     <div class="health-card" id="healthCard" style="display:none;">
       <div class="hs-head">
@@ -7385,18 +7451,7 @@
       </div>
     </button>
 
-    <!-- Coming Up — notification pill. Compact glance-able summary that
-         opens a bottom sheet listing all upcoming/overdue bills when tapped.
-         Colored accent shifts with urgency (red = overdue, orange = today,
-         teal = future). Hidden entirely when there's nothing coming up. -->
-    <button type="button" class="reminders-pill" id="remindersPill" style="display:none;">
-      <div class="rp-icon" id="remindersPillIcon">🔔</div>
-      <div class="rp-body">
-        <div class="rp-title" id="remindersPillTitle">Coming up</div>
-        <div class="rp-sub" id="remindersPillSub">—</div>
-      </div>
-      <div class="rp-chev">→</div>
-    </button>
+    <!-- Coming Up pill lives up top now, right after the update banner. -->
   </section>
 
   <!-- Reminders bottom sheet — opens when the pill is tapped. Modal built
@@ -8436,7 +8491,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.46';
+  const APP_VERSION = '2026-08-10.48';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9706,6 +9761,7 @@
       timing: 'due-month',
       sinkingFundGoalId: null,   // when timing='sinking-fund', the paired goal
       tagIds: [],                // user-picked colored tags for slicing
+      skippedDueDates: [],       // ISO YYYY-MM-DD dates dismissed from Coming Up
       ...overrides,
     };
   }
@@ -10303,6 +10359,7 @@
         timing: exp.timing || 'sinking-fund',
         sinkingFundGoalId: exp.sinkingFundGoalId,
         tagIds: Array.isArray(exp.tagIds) ? exp.tagIds : [],
+        skippedDueDates: Array.isArray(exp.skippedDueDates) ? exp.skippedDueDates : [],
       };
       const newExpenses = mergeSingle(u.expenses, cleanedExpense, isNewExpense);
       const newGoals = [...(u.goals || []), goal];
@@ -10414,6 +10471,7 @@
         timing: e.timing || 'smooth',
         sinkingFundGoalId: e.sinkingFundGoalId || null,
         tagIds: Array.isArray(e.tagIds) ? e.tagIds : [],
+        skippedDueDates: Array.isArray(e.skippedDueDates) ? e.skippedDueDates : [],
       }));
 
     if (cleaned.length === 0 && expenseDraft.length > 0) {
@@ -11379,7 +11437,11 @@
     const results = [];
     expenses.forEach(exp => {
       const dates = computeDueDatesInMonth(exp, y, m);
+      const skipSet = new Set(Array.isArray(exp.skippedDueDates) ? exp.skippedDueDates : []);
       dates.forEach(dueDate => {
+        // ISO YYYY-MM-DD key for matching against expense.skippedDueDates
+        const iso = dueDate.toISOString().slice(0, 10);
+        if (skipSet.has(iso)) return;   // user dismissed this specific date
         if (isDuePaid(exp, dueDate, user.transactions)) return;
         const daysDiff = Math.round((dueDate - now) / (24 * 60 * 60 * 1000));
         results.push({ exp, dueDate, daysDiff });
@@ -11454,10 +11516,9 @@
       const catIcon = CATEGORY_ICONS[exp.category] || svgIcon('box');
       const dateStr = dueDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
       const rel = relativeDueLabel(daysDiff);
-      const row = document.createElement('button');
+      const isoDate = dueDate.toISOString().slice(0, 10);
+      const row = document.createElement('div');
       row.className = 'reminder-notif ' + cls;
-      row.type = 'button';
-      row.setAttribute('data-remind-expense', exp.id);
       row.innerHTML = `
         <div class="rn-icon">${catIcon}</div>
         <div class="rn-body">
@@ -11465,8 +11526,13 @@
           <div class="rn-meta">Due ${dateStr} · <span class="rel">${rel}</span></div>
         </div>
         <div class="rn-amt">${peso(exp.amount)}</div>
+        <div class="rn-actions">
+          <button type="button" class="rn-skip" data-skip-date="${isoDate}" data-skip-expense="${exp.id}" title="Skip — don't need to record this one">✕</button>
+          <button type="button" class="rn-log">Log →</button>
+        </div>
       `;
-      row.addEventListener('click', async () => {
+      // Log button (or the whole body): open transaction form pre-filled
+      const openLog = async () => {
         closeRemindersModal();
         const { data } = await auth.getSession();
         if (!data.session) return;
@@ -11475,6 +11541,39 @@
           source: 'set',
           linkedId: exp.id,
         });
+      };
+      row.querySelector('.rn-log').addEventListener('click', openLog);
+      row.querySelector('.rn-body').addEventListener('click', openLog);
+      row.querySelector('.rn-body').style.cursor = 'pointer';
+      // Skip button — mark this specific due date as skipped for this expense
+      // so it disappears from Coming Up without needing a transaction. Handy
+      // for old dues that predate when the user started recording.
+      row.querySelector('.rn-skip').addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const { data: sess } = await auth.getSession();
+        if (!sess.session) return;
+        const u = sess.session.user;
+        const expenses = (u.expenses || []).map(e => {
+          if (e.id !== exp.id) return e;
+          const skipped = Array.isArray(e.skippedDueDates) ? [...e.skippedDueDates] : [];
+          if (!skipped.includes(isoDate)) skipped.push(isoDate);
+          return { ...e, skippedDueDates: skipped };
+        });
+        const { data, error } = await auth.updateUser({ data: { expenses } });
+        if (error) { toast(error.message, 'error'); return; }
+        userCache = data.user;
+        row.style.animation = 'reminderFadeOut 0.22s ease forwards';
+        setTimeout(() => {
+          row.remove();
+          // Recompute remaining, close modal + refresh pill if empty
+          const remaining = getUpcomingDueThisMonth(data.user);
+          if (remaining.length === 0) {
+            closeRemindersModal();
+          } else {
+            subEl.textContent = `${remaining.length} bill${remaining.length !== 1 ? 's' : ''} · ${peso(remaining.reduce((s, r) => s + (Number(r.exp.amount) || 0), 0))}`;
+          }
+          renderReminders(data.user);
+        }, 220);
       });
       listEl.appendChild(row);
     });
@@ -14265,6 +14364,7 @@
         timing: e.timing || 'smooth',
         sinkingFundGoalId: e.sinkingFundGoalId || null,
         tagIds: Array.isArray(e.tagIds) ? e.tagIds : [],
+        skippedDueDates: Array.isArray(e.skippedDueDates) ? e.skippedDueDates : [],
       }));
     if (cleaned.length === 0 && expenseDraft.length > 0) {
       toast('Add a name and amount to each expense first.', 'error');
