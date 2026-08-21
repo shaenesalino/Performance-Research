@@ -8536,7 +8536,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.49';
+  const APP_VERSION = '2026-08-10.50';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -15539,7 +15539,7 @@
 
   // ---- Undo toast for newly-saved transactions ----
   let lastSavedTxId = null;
-  let undoToastTimer = null;
+  // undoToastTimer already declared globally with the toast helpers up top.
 
   function showUndoToast(message) {
     const el = document.getElementById('toast');
