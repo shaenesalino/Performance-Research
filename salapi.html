@@ -498,7 +498,29 @@
   .toast-wrap.success { background: var(--teal); color: var(--white); }
   .toast-wrap.error   { background: var(--error); color: var(--white); }
   .toast-wrap.has-action { pointer-events: auto; padding: 10px 8px 10px 20px; display: flex; align-items: center; gap: 4px; }
+  .toast-wrap.with-action {
+    pointer-events: auto;
+    padding: 10px 8px 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .toast-wrap .toast-msg { padding-right: 8px; }
+  .toast-wrap .toast-undo {
+    background: rgba(255, 255, 255, 0.24);
+    color: inherit;
+    border: 0;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .toast-wrap .toast-undo:hover { background: rgba(255, 255, 255, 0.38); }
   .toast-wrap .toast-action {
     background: rgba(255,255,255,0.2);
     color: inherit;
@@ -2689,7 +2711,10 @@
   /* Filter dropdown — replaces the tab strip */
   .txh-filter-wrap {
     margin-bottom: 20px;
+    display: flex;
+    gap: 8px;
   }
+  .txh-filter-wrap .select-wrap { flex: 1; min-width: 0; }
   .txh-filter-select {
     font-weight: 700;
     font-size: 14px;
@@ -6242,6 +6267,20 @@
   .view-goal.sinking-fund .view-goal-mini-bar > div {
     background: linear-gradient(to right, #C48E00, #8B6400);
   }
+
+  /* Pay now button — appears on sinking-fund tiles when there's an accumulated
+     balance ready to pay the bill. Uses a distinct gold+navy treatment so it
+     stands out from Edit/+Saved. */
+  .row-edit-btn.pay-now {
+    background: linear-gradient(135deg, #C48E00, #8B6400);
+    color: var(--white);
+    border-color: #8B6400;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+  }
+  .row-edit-btn.pay-now:hover {
+    background: linear-gradient(135deg, #B37F00, #6B4F00);
+  }
   .ipon-budget-tile.sinking-fund .ipon-budget-footer .link {
     color: #C48E00;
   }
@@ -8422,6 +8461,12 @@
           </select>
           <span class="select-caret">▾</span>
         </div>
+        <div class="select-wrap" id="txhTagFilterWrap" style="display:none;">
+          <select class="input select txh-filter-select" id="txhTagFilterSelect">
+            <option value="all">All tags</option>
+          </select>
+          <span class="select-caret">▾</span>
+        </div>
       </div>
     </div>
 
@@ -8491,7 +8536,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.48';
+  const APP_VERSION = '2026-08-10.49';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -8767,13 +8812,49 @@
   // TOAST
   // =========================================================================
   let toastTimer;
+  let undoToastTimer;
   function toast(message, kind = '') {
     const el = document.getElementById('toast');
     el.className = 'toast-wrap show ' + kind;
     el.textContent = message;
     clearTimeout(toastTimer);
-    if (typeof undoToastTimer !== 'undefined') clearTimeout(undoToastTimer);
+    clearTimeout(undoToastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  }
+
+  // Undo-capable toast — used after deletes to give the user a 6-second
+  // window to revert. Pass a callback that reverses the delete; clicking
+  // "Undo" fires it. If the timer expires, the delete stays permanent.
+  function undoToast(message, onUndo, kind = 'success') {
+    const el = document.getElementById('toast');
+    el.className = 'toast-wrap show ' + kind + ' with-action';
+    el.innerHTML = '';
+    const msg = document.createElement('span');
+    msg.className = 'toast-msg';
+    msg.textContent = message;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-undo';
+    btn.textContent = 'Undo';
+    let done = false;
+    const dismiss = () => {
+      if (done) return;
+      done = true;
+      el.classList.remove('show');
+    };
+    btn.addEventListener('click', async () => {
+      if (done) return;
+      done = true;
+      clearTimeout(toastTimer);
+      clearTimeout(undoToastTimer);
+      el.classList.remove('show');
+      try { await onUndo(); } catch (e) { console.error('Undo failed:', e); }
+    });
+    el.appendChild(msg);
+    el.appendChild(btn);
+    clearTimeout(toastTimer);
+    clearTimeout(undoToastTimer);
+    undoToastTimer = setTimeout(dismiss, 6000);
   }
 
   // =========================================================================
@@ -10535,6 +10616,7 @@
       contribMonth: null,// annually only (1-12)
       manualPayFrom: null,   // {incomeId, payday} — overrides auto paycheck assignment
       tagIds: [],            // user-picked colored tags for slicing (same system as expenses)
+      cycleStartedAt: null,  // sinking-fund cycles: only contributions on/after this date count
       ...overrides,
     };
   }
@@ -11318,19 +11400,17 @@
 
   // Total contributed to a goal from all "From goals" transactions (all-time)
   function totalContributedTo(goalId, transactions, goal) {
-    // For sinking-fund goals with a destination wallet, ONLY transfers count.
-    // Saving-type transactions on those goals were pre-fix leftovers — they
-    // silently drained the destination wallet instead of adding to it, so
-    // counting them would inflate the "saved" total and mismatch reality.
-    // (Users can review/delete those old tx from Transactions history.)
     const isSinkingWithDestWallet = goal && !!goal.pairedExpenseId && !!goal.walletId;
+    // Sinking-fund goals track cycles: after a "Pay now" action, cycleStartedAt
+    // is set to that day so the goal resets to 0 for the next cycle. Only
+    // contributions ON OR AFTER cycleStartedAt count.
+    const cycleStart = goal && goal.cycleStartedAt ? new Date(goal.cycleStartedAt) : null;
     return (transactions || [])
       .filter(t => {
+        if (cycleStart && new Date(t.date) < cycleStart) return false;
         if (isSinkingWithDestWallet) {
           return t.type === 'transfer' && t.linkedId === goalId;
         }
-        // Standard: saving-type (classic/asset-linked/unlinked) OR transfer-type
-        // with linkedId matching (wallet-linked contributions).
         if (t.type === 'saving' && t.source === 'set' && t.linkedId === goalId) return true;
         if (t.type === 'transfer' && t.linkedId === goalId) return true;
         return false;
@@ -13444,14 +13524,16 @@
         card.dataset.tapDetail = 'goal';
         card.dataset.entryId = g.id;
         // Every non-Sinking goal gets the standard Edit + Saved buttons.
-        // Sinking-fund goals: Edit is routed to the paired Budget expense
-        // (see click handler below), but + Saved works normally — you're
-        // recording money you set aside toward the upcoming bill.
+        // Sinking-fund goals: same two buttons PLUS a "Pay now" button when
+        // there's a saved balance ready to spend — that action records the
+        // actual bill payment and resets the goal for the next cycle.
         // Asset-linked goals: + Saved records a contribution and ALSO
         // increments the tracked asset's value (see tx save handler).
+        const showPayNow = isSinking && saved > 0 && linkedName && g.pairedExpenseId;
         const actionButtons = `<div class="view-item-action">
           <button class="row-edit-btn" type="button" data-edit-goal="${g.id}">Edit</button>
           <button class="row-edit-btn primary" type="button" data-log-goal="${g.id}">+ Saved</button>
+          ${showPayNow ? `<button class="row-edit-btn pay-now" type="button" data-pay-goal="${g.id}">Pay now</button>` : ''}
         </div>`;
         card.innerHTML = `
           <div class="view-goal-head">
@@ -13536,6 +13618,73 @@
             if (!data.session) return;
             singleEditMode = { type: 'savings', id: g.id };
             openSavingsScreen(data.session.user);
+          });
+        }
+        // Pay now — sinking-fund goals with money accumulated. Records the
+        // actual bill payment (expense tx from the destination wallet, linked
+        // to the paired Budget expense) and resets the goal by setting
+        // cycleStartedAt to tomorrow so this cycle's contributions no longer
+        // count. Money flow: goal saved → wallet → paid out.
+        const payBtn = card.querySelector('[data-pay-goal]');
+        if (payBtn) {
+          payBtn.addEventListener('click', async ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const { data: sess } = await auth.getSession();
+            if (!sess.session) return;
+            const u = sess.session.user;
+            const pairedExp = (u.expenses || []).find(e => e.id === g.pairedExpenseId);
+            const walletObj = (u.wallets || []).find(w => w.id === g.walletId);
+            const walletName = walletObj ? (walletObj.label || PAYMENT_NAME[walletObj.method] || 'wallet') : 'the linked wallet';
+            const payAmount = Math.min(saved, target);
+            const ok = await showConfirm({
+              icon: '💰',
+              title: `Pay ${peso(payAmount)} for ${escapeAttr(g.name)}?`,
+              bodyHtml: `
+                This will:<br>
+                • Record a <strong>${peso(payAmount)}</strong> expense on <strong>${escapeAttr(pairedExp?.name || g.name)}</strong><br>
+                • Withdraw from <strong>${escapeAttr(walletName)}</strong><br>
+                • Reset this sinking fund to <strong>₱0</strong> for the next cycle<br>
+                <br>
+                Previous contributions stay in your transaction history for reference.
+              `,
+              okText: 'Pay now',
+              cancelText: 'Cancel',
+            });
+            if (!ok) return;
+            // Build the expense transaction
+            const now = new Date().toISOString();
+            const today = now.slice(0, 10);
+            const newTx = {
+              id: 'tx_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+              type: 'expense',
+              source: 'set',
+              amount: payAmount,
+              date: today,
+              note: `Sinking fund payment — ${g.name}`,
+              paymentMethod: walletObj ? walletObj.method : 'cash',
+              wallet: g.walletId,
+              linkedId: g.pairedExpenseId,
+              category: pairedExp?.category || 'other',
+              label: '',
+              tagIds: [],
+              createdAt: now,
+            };
+            // Set cycleStartedAt to tomorrow so today's payment doesn't count
+            // in the RESET period (contributions before today still don't
+            // count either — clean slate).
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const nextCycleStart = tomorrow.toISOString().slice(0, 10);
+            const goals = (u.goals || []).map(x =>
+              x.id === g.id ? { ...x, cycleStartedAt: nextCycleStart } : x
+            );
+            const transactions = [...(u.transactions || []), newTx];
+            const { data, error } = await auth.updateUser({ data: { transactions, goals } });
+            if (error) { toast(error.message, 'error'); return; }
+            userCache = data.user;
+            toast(`Paid ${peso(payAmount)} · ${g.name} reset ✦`, 'success');
+            showSavingsView(data.user);
           });
         }
       });
@@ -14407,6 +14556,7 @@
         contribDay: g.contribDay, contribDay2: g.contribDay2, contribMonth: g.contribMonth,
         manualPayFrom: g.manualPayFrom || null,
         pairedExpenseId: g.pairedExpenseId || null,
+        cycleStartedAt: g.cycleStartedAt || null,
         tagIds: Array.isArray(g.tagIds) ? g.tagIds : [],
       }));
     if (cleaned.length === 0 && goalDraft.length > 0) {
@@ -14469,31 +14619,43 @@
   document.getElementById('deleteBudgetBtn').addEventListener('click', async () => {
     if (!singleEditMode || singleEditMode.type !== 'budget' || !singleEditMode.id) return;
     if (!confirm('Delete this expense? This can\'t be undone.')) return;
-    // Find the expense we're deleting so we can check for a paired sinking-fund goal
-    const exp = (userCache.expenses || []).find(e => e.id === singleEditMode.id);
-    const goalIdToRemove = exp && exp.sinkingFundGoalId;
+    // Snapshot what we're about to remove so undo can put it back exactly
+    const oldExpense = (userCache.expenses || []).find(e => e.id === singleEditMode.id);
+    const oldGoalsSnap = JSON.parse(JSON.stringify(userCache.goals || []));
+    const goalIdToRemove = oldExpense && oldExpense.sinkingFundGoalId;
     const newExpenses = (userCache.expenses || []).filter(e => e.id !== singleEditMode.id);
-    // Also purge any paired sinking-fund goal (tightly coupled — a sinking
-    // fund exists solely because of its paired expense). Also sweep any
-    // orphaned sinking-fund goals for extra safety.
+    // Also purge any paired sinking-fund goal (tightly coupled) + orphans.
     const newGoals = (userCache.goals || [])
       .filter(g => g.id !== goalIdToRemove)
       .filter(g => !isSinkingFundGoal(g) || newExpenses.some(e => e.id === g.pairedExpenseId));
     const { data, error } = await auth.updateUser({ data: { expenses: newExpenses, goals: newGoals } });
     if (error) { toast(error.message, 'error'); return; }
-    toast('Expense deleted', 'success');
     singleEditMode = null;
+    undoToast('Expense deleted', async () => {
+      const restore = { expenses: [...(data.user.expenses || []), oldExpense], goals: oldGoalsSnap };
+      const { data: restored, error: err2 } = await auth.updateUser({ data: restore });
+      if (err2) { toast(err2.message, 'error'); return; }
+      toast('Expense restored', 'success');
+      showBudgetView(restored.user);
+    });
     showBudgetView(data.user);
   });
 
   document.getElementById('deleteGoalBtn').addEventListener('click', async () => {
     if (!singleEditMode || singleEditMode.type !== 'savings' || !singleEditMode.id) return;
     if (!confirm('Delete this savings goal? Contributions already logged will stay in your transaction history but won\'t be tied to any goal.')) return;
+    const oldGoal = (userCache.goals || []).find(g => g.id === singleEditMode.id);
     const list = (userCache.goals || []).filter(g => g.id !== singleEditMode.id);
     const { data, error } = await auth.updateUser({ data: { goals: list } });
     if (error) { toast(error.message, 'error'); return; }
-    toast('Goal deleted', 'success');
     singleEditMode = null;
+    undoToast('Goal deleted', async () => {
+      const restore = { goals: [...(data.user.goals || []), oldGoal] };
+      const { data: restored, error: err2 } = await auth.updateUser({ data: restore });
+      if (err2) { toast(err2.message, 'error'); return; }
+      toast('Goal restored', 'success');
+      showSavingsView(restored.user);
+    });
     showSavingsView(data.user);
   });
 
@@ -15414,7 +15576,10 @@
     if (!confirm('Delete this transaction? This can\'t be undone.')) return;
     const { data: sess } = await auth.getSession();
     const user = sess.session.user;
+    // Snapshot for undo — restore both the tx and any asset-value delta
+    // if the tx was an asset-linked saving contribution.
     const oldTx = (user.transactions || []).find(t => t.id === editingTxId);
+    const oldAssets = user.assets ? JSON.parse(JSON.stringify(user.assets)) : null;
     const list = (user.transactions || []).filter(t => t.id !== editingTxId);
     const updates = { transactions: list };
     // Asset-linked reversal: if the deleted tx was a saving contribution
@@ -15432,7 +15597,15 @@
     const { data, error } = await auth.updateUser({ data: updates });
     if (error) { toast(error.message, 'error'); return; }
     editingTxId = null;
-    toast('Transaction deleted', 'success');
+    undoToast('Transaction deleted', async () => {
+      // Restore: put the tx back in place + restore assets if we changed them
+      const restore = { transactions: [...(data.user.transactions || []), oldTx] };
+      if (oldAssets) restore.assets = oldAssets;
+      const { data: restored, error: err2 } = await auth.updateUser({ data: restore });
+      if (err2) { toast(err2.message, 'error'); return; }
+      toast('Transaction restored', 'success');
+      showTransactionsScreen(restored.user);
+    });
     showTransactionsScreen(data.user);
   });
 
@@ -15443,6 +15616,7 @@
   const PAYMENT_LABEL  = Object.fromEntries(PAYMENT_METHODS.map(p => [p.v, `${p.icon} ${p.label}`]));
 
   let txhFilter = 'all';
+  let txhTagFilter = 'all';   // 'all' | tagId | '__untagged__'
 
   function resolveTxName(tx, user) {
     // Returns a human-readable name for the transaction
@@ -15523,6 +15697,7 @@
       if (_bar) _bar.style.display = 'none';
     }
     renderTxhContent();
+    refreshTxhTagFilter(user);
     goto('transactions');
   }
   // Alias — other call sites use showTransactionsScreen
@@ -15538,6 +15713,37 @@
     txhFilterSelect.setAttribute('data-filter', txhFilter);
     renderTxhContent();
   });
+
+  // Tag filter — populated with the user's tag pool each time the screen
+  // opens (tags can be added/removed at any time). Hidden entirely when
+  // the user has no tags.
+  const txhTagFilterWrap = document.getElementById('txhTagFilterWrap');
+  const txhTagFilterSelect = document.getElementById('txhTagFilterSelect');
+  txhTagFilterSelect.addEventListener('change', () => {
+    txhTagFilter = txhTagFilterSelect.value;
+    renderTxhContent();
+  });
+
+  function refreshTxhTagFilter(user) {
+    const tags = getAllTags(user);
+    if (tags.length === 0) {
+      txhTagFilterWrap.style.display = 'none';
+      txhTagFilter = 'all';
+      return;
+    }
+    txhTagFilterWrap.style.display = '';
+    txhTagFilterSelect.innerHTML = `
+      <option value="all">All tags</option>
+      ${tags.map(t => `<option value="${t.id}" ${txhTagFilter === t.id ? 'selected' : ''}>${escapeAttr(t.name)}</option>`).join('')}
+      <option value="__untagged__" ${txhTagFilter === '__untagged__' ? 'selected' : ''}>Untagged</option>
+    `;
+    // If the previously-selected tag was deleted, fall back to All
+    const validValues = new Set(['all', '__untagged__', ...tags.map(t => t.id)]);
+    if (!validValues.has(txhTagFilter)) {
+      txhTagFilter = 'all';
+      txhTagFilterSelect.value = 'all';
+    }
+  }
 
   // Search input — live-filter as you type, with a clear button
   const searchInput = document.getElementById('txhSearch');
@@ -15630,6 +15836,16 @@
 
     // Filter by type
     let filtered = txhFilter === 'all' ? all : all.filter(t => t.type === txhFilter);
+
+    // Filter by tag — "__untagged__" matches transactions with no tags at all,
+    // any specific tagId matches transactions containing that tag id.
+    if (txhTagFilter !== 'all') {
+      if (txhTagFilter === '__untagged__') {
+        filtered = filtered.filter(t => !Array.isArray(t.tagIds) || t.tagIds.length === 0);
+      } else {
+        filtered = filtered.filter(t => Array.isArray(t.tagIds) && t.tagIds.includes(txhTagFilter));
+      }
+    }
 
     // Filter by search query (name/note/amount/wallet/payment method)
     const q = txhSearchQuery.trim().toLowerCase();
@@ -17252,11 +17468,18 @@
     if (!editingWalletId) return;
     if (!confirm('Delete this wallet? Transactions linked to it stay in your history — just the balance tracking goes away.')) return;
     const { data: sess } = await auth.getSession();
+    const oldWallet = (sess.session.user.wallets || []).find(w => w.id === editingWalletId);
     const wallets = (sess.session.user.wallets || []).filter(w => w.id !== editingWalletId);
     const { data, error } = await auth.updateUser({ data: { wallets } });
     if (error) { toast(error.message, 'error'); return; }
     editingWalletId = null;
-    toast('Wallet deleted', 'success');
+    undoToast('Wallet deleted', async () => {
+      const restore = { wallets: [...(data.user.wallets || []), oldWallet] };
+      const { data: restored, error: err2 } = await auth.updateUser({ data: restore });
+      if (err2) { toast(err2.message, 'error'); return; }
+      toast('Wallet restored', 'success');
+      showWalletsScreen(restored.user);
+    });
     showWalletsScreen(data.user);
   });
 
@@ -18565,11 +18788,18 @@
     if (!editingLoanId) return;
     if (!confirm('Delete this loan? Its payment history will be lost.')) return;
     const { data: sess } = await auth.getSession();
+    const oldLoan = (sess.session.user.loans || []).find(l => l.id === editingLoanId);
     const loans = (sess.session.user.loans || []).filter(l => l.id !== editingLoanId);
     const { data, error } = await auth.updateUser({ data: { loans } });
     if (error) { toast(error.message, 'error'); return; }
     editingLoanId = null;
-    toast('Loan deleted', 'success');
+    undoToast('Loan deleted', async () => {
+      const restore = { loans: [...(data.user.loans || []), oldLoan] };
+      const { data: restored, error: err2 } = await auth.updateUser({ data: restore });
+      if (err2) { toast(err2.message, 'error'); return; }
+      toast('Loan restored', 'success');
+      showLoansScreen(restored.user);
+    });
     showLoansScreen(data.user);
   });
 
