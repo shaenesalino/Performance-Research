@@ -8844,7 +8844,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.54';
+  const APP_VERSION = '2026-08-10.55';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -13398,13 +13398,17 @@
   }
 
   // Generic in-place filter that hides tiles in `listSelector` when their
-  // text content doesn't include `query`. Toggles group heads based on
-  // whether any child is still visible. Shows a "no matches" node when
-  // everything's hidden.
+  // text content doesn't include `query`. Also handles hiding group heads
+  // whose child tiles are all filtered out. Two group-head models supported:
+  //   - Wrapping: header is a child of a container `.budget-group`
+  //   - Sibling: header sits inline with tiles as a sibling (Budget page
+  //     uses this — `.budget-group-head` divs interleaved with tiles)
+  // Shows a "no matches" node when everything's hidden.
   function applyListSearchFilter(listSelector, query, opts = {}) {
     const {
       tileSelector = '.view-item, .view-goal, .ipon-budget-tile, .loan-card',
       groupSelector = '.budget-group',
+      siblingGroupHeadSelector = '.budget-group-head',
       emptyLabel = 'items',
     } = opts;
     const listEl = document.querySelector(listSelector);
@@ -13413,12 +13417,14 @@
     const stale = listEl.querySelector('[data-search-empty]');
     if (stale) stale.remove();
     if (!q) {
+      // Show everything back
       listEl.querySelectorAll('[data-hidden-by-search]').forEach(el => {
         el.style.display = '';
         el.removeAttribute('data-hidden-by-search');
       });
       return;
     }
+    // Match tiles by text content
     const tiles = listEl.querySelectorAll(tileSelector);
     let matchCount = 0;
     tiles.forEach(tile => {
@@ -13432,12 +13438,30 @@
         tile.setAttribute('data-hidden-by-search', '1');
       }
     });
+    // Wrapping-style groups: hide entire wrapper when no visible child
     listEl.querySelectorAll(groupSelector).forEach(group => {
       const anyVisible = [...group.querySelectorAll(tileSelector)]
         .some(t => t.style.display !== 'none');
       group.style.display = anyVisible ? '' : 'none';
       if (!anyVisible) group.setAttribute('data-hidden-by-search', '1');
     });
+    // Sibling-style group heads: for each head, look forward through siblings
+    // until the next head. If none of the tiles in that run are visible, hide
+    // the head. Applied to Budget page since headers there are siblings.
+    listEl.querySelectorAll(siblingGroupHeadSelector).forEach(head => {
+      let anyVisible = false;
+      let sibling = head.nextElementSibling;
+      while (sibling && !sibling.matches(siblingGroupHeadSelector)) {
+        if (sibling.matches(tileSelector) && sibling.style.display !== 'none') {
+          anyVisible = true;
+          break;
+        }
+        sibling = sibling.nextElementSibling;
+      }
+      head.style.display = anyVisible ? '' : 'none';
+      if (!anyVisible) head.setAttribute('data-hidden-by-search', '1');
+    });
+    // No matches state
     if (matchCount === 0) {
       const empty = document.createElement('div');
       empty.className = 'view-empty';
