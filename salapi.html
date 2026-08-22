@@ -7598,8 +7598,11 @@
     <!-- Monthly Review card — shows during the first ~10 days of a new month
          as a compact snapshot of the previous month's activity. Emotional
          payoff for consistent logging; dismissible per month. Tap to see
-         the full breakdown in a modal. -->
-    <button type="button" class="monthly-review-card" id="monthlyReviewCard" style="display:none;">
+         the full breakdown in a modal.
+         (Uses div+role="button" rather than <button> so the inner dismiss
+         <button> isn't nested — nested buttons are invalid HTML and the
+         browser auto-closes the outer one, breaking the layout.) -->
+    <div class="monthly-review-card" role="button" tabindex="0" id="monthlyReviewCard" style="display:none;">
       <div class="mr-head">
         <span class="mr-eyebrow">Your last month</span>
         <button type="button" class="mr-dismiss" id="monthlyReviewDismiss" aria-label="Dismiss">✕</button>
@@ -7607,7 +7610,7 @@
       <div class="mr-headline" id="monthlyReviewHeadline">—</div>
       <div class="mr-stats" id="monthlyReviewStats"></div>
       <div class="mr-cta">View full review →</div>
-    </button>
+    </div>
 
     <!-- Financial Health Score — dashboard's focal point -->
     <div class="health-card" id="healthCard" style="display:none;">
@@ -8841,7 +8844,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.53';
+  const APP_VERSION = '2026-08-10.54';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -12423,6 +12426,14 @@
     const { data: sess } = await auth.getSession();
     if (!sess?.session) return;
     openMonthlyReviewDetail(sess.session.user, monthKey);
+  });
+  // Keyboard support — since we use div+role="button", we need to handle
+  // Enter/Space ourselves for accessibility parity with a real button.
+  document.getElementById('monthlyReviewCard').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.target.closest('#monthlyReviewDismiss')) return;
+    e.preventDefault();
+    e.currentTarget.click();
   });
 
   function openMonthlyReviewDetail(user, yyyyMm) {
