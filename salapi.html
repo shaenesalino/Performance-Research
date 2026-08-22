@@ -2568,7 +2568,15 @@
     position: relative;
     margin-bottom: 12px;
   }
-  .txh-search-wrap input {
+  /* Reusable list-search — same visual pattern as txh-search but usable on
+     other pages (Budget, Ipon, Loans). Kept as its own class so future
+     changes don't accidentally regress the History screen. */
+  .list-search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+  .txh-search-wrap input,
+  .list-search-wrap input {
     width: 100%;
     padding: 12px 40px 12px 40px;
     border: 1.5px solid var(--sand);
@@ -2582,12 +2590,15 @@
     box-sizing: border-box;
     transition: border-color 0.15s;
   }
-  .txh-search-wrap input:focus {
+  .txh-search-wrap input:focus,
+  .list-search-wrap input:focus {
     outline: none;
     border-color: var(--blue);
   }
-  .txh-search-wrap input::placeholder { color: var(--muted); }
-  .txh-search-icon {
+  .txh-search-wrap input::placeholder,
+  .list-search-wrap input::placeholder { color: var(--muted); }
+  .txh-search-icon,
+  .list-search-icon {
     position: absolute;
     left: 14px; top: 50%;
     transform: translateY(-50%);
@@ -2595,7 +2606,8 @@
     opacity: 0.55;
     pointer-events: none;
   }
-  .txh-search-clear {
+  .txh-search-clear,
+  .list-search-clear {
     position: absolute;
     right: 8px; top: 50%;
     transform: translateY(-50%);
@@ -2610,7 +2622,8 @@
     cursor: pointer;
     padding: 0;
   }
-  .txh-search-clear:hover { background: var(--muted); color: var(--white); }
+  .txh-search-clear:hover,
+  .list-search-clear:hover { background: var(--muted); color: var(--white); }
 
   /* Selection mode: row shows a checkbox on the left */
   .txh-row .txh-check {
@@ -6295,6 +6308,221 @@
     font-weight: 500;
   }
 
+  /* Monthly Review card on Home. Compact snapshot of the previous month
+     that shows during the first ~10 days of a new month. Bold gradient
+     background so it feels like a moment, not just another list row. */
+  .monthly-review-card {
+    display: block;
+    width: 100%;
+    background: linear-gradient(135deg, #2C7B85 0%, #1F5A73 100%);
+    border: 0;
+    border-radius: 20px;
+    padding: 18px 20px 16px;
+    margin-bottom: 20px;
+    color: var(--white);
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(31, 90, 115, 0.25);
+    transition: transform 0.12s ease, box-shadow 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+  .monthly-review-card:hover  { box-shadow: 0 10px 30px rgba(31, 90, 115, 0.32); }
+  .monthly-review-card:active { transform: scale(0.99); }
+  .monthly-review-card .mr-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .monthly-review-card .mr-eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.75);
+  }
+  .monthly-review-card .mr-dismiss {
+    background: rgba(255, 255, 255, 0.16);
+    border: 0;
+    color: var(--white);
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .monthly-review-card .mr-dismiss:hover { background: rgba(255, 255, 255, 0.28); }
+  .monthly-review-card .mr-headline {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    line-height: 1.15;
+    margin-bottom: 10px;
+    color: var(--white);
+  }
+  .monthly-review-card .mr-stats {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .monthly-review-card .mr-stats > div {
+    min-width: 0;
+  }
+  .monthly-review-card .mr-stat-lbl {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 2px;
+  }
+  .monthly-review-card .mr-stat-val {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: -0.2px;
+  }
+  .monthly-review-card .mr-cta {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 0.3px;
+  }
+
+  /* Detail modal — full breakdown of the reviewed month */
+  .mr-modal-hero {
+    text-align: center;
+    padding: 0 4px 16px;
+    border-bottom: 1px solid var(--sand);
+    margin-bottom: 20px;
+  }
+  .mr-modal-eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .mr-modal-savings-rate {
+    display: inline-block;
+    margin-top: 10px;
+    background: rgba(44, 188, 177, 0.14);
+    color: var(--teal);
+    font-family: 'Fraunces', serif;
+    font-size: 34px;
+    font-weight: 700;
+    padding: 4px 22px;
+    border-radius: 999px;
+    letter-spacing: -0.5px;
+  }
+  .mr-modal-savings-rate.negative {
+    background: rgba(214, 69, 69, 0.14);
+    color: var(--error);
+  }
+  .mr-modal-savings-rate.zero {
+    background: rgba(10, 37, 64, 0.08);
+    color: var(--navy);
+  }
+  .mr-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--sand);
+  }
+  .mr-detail-row:last-child { border-bottom: 0; }
+  .mr-detail-row .mr-lbl {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .mr-detail-row .mr-val {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+  }
+  .mr-detail-row .mr-val.positive { color: var(--teal); }
+  .mr-detail-row .mr-val.negative { color: var(--error); }
+  .mr-detail-section {
+    margin-top: 18px;
+  }
+  .mr-detail-section .mr-section-title {
+    font-family: 'Fraunces', serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    letter-spacing: -0.1px;
+  }
+  .mr-cat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--navy);
+  }
+  .mr-cat-row .mr-cat-amt {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+
+  /* Category-limits warning banner on Budget page. Amber for ≥80% used,
+     red for ≥100%. Compact, dismissible-feeling (not sticky). */
+  .category-limit-warn {
+    background: rgba(242, 114, 49, 0.10);
+    border: 1px solid rgba(242, 114, 49, 0.35);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: -6px 0 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: #8A4200;
+    line-height: 1.5;
+  }
+  .category-limit-warn.over {
+    background: rgba(214, 69, 69, 0.10);
+    border-color: rgba(214, 69, 69, 0.35);
+    color: #7A1F1F;
+  }
+  .category-limit-warn .cl-title {
+    font-family: 'Fraunces', serif;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .category-limit-warn .cl-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+  }
+  .category-limit-warn .cl-item .cl-pct {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Sinking-fund banner at the top of the goal edit form. Tells the user
      that most fields sync from the paired Budget expense, and that the
      wallet field acts as the destination for + Saved transfers. */
@@ -6814,6 +7042,44 @@
     </div>
   </div>
 
+  <!-- Category limits modal: per-category monthly cap. Set 0 or blank to
+       remove a limit. Warns on Budget when a category is 80%+ used. -->
+  <div class="confirm-modal" id="categoryLimitsModal" aria-hidden="true">
+    <div class="confirm-modal-backdrop" data-limitsmodal-cancel></div>
+    <div class="confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="categoryLimitsTitle" style="max-width: 440px;">
+      <h3 class="confirm-modal-title" id="categoryLimitsTitle">Category spending limits</h3>
+      <div class="confirm-modal-body">
+        <p style="font-size:12px; color:var(--muted); line-height:1.5; margin: 0 0 16px;">
+          Optional monthly cap per category. Blank or 0 = no limit. When actual spending crosses 80% of a cap, a warning shows on your Budget page.
+        </p>
+        <div id="categoryLimitsList" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn btn-ghost" data-limitsmodal-cancel>Cancel</button>
+        <button type="button" class="btn btn-primary" id="categoryLimitsSaveBtn">Save limits</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monthly Review detail modal — full breakdown of the previous month.
+       Populated by openMonthlyReviewDetail(). -->
+  <div class="confirm-modal" id="monthlyReviewModal" aria-hidden="true">
+    <div class="confirm-modal-backdrop" data-mrmodal-cancel></div>
+    <div class="confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="monthlyReviewModalTitle" style="max-width: 440px;">
+      <div class="mr-modal-hero">
+        <div class="mr-modal-eyebrow" id="monthlyReviewModalEyebrow">Your month in review</div>
+        <h3 class="confirm-modal-title" id="monthlyReviewModalTitle" style="margin-top:4px;">—</h3>
+        <div class="mr-modal-savings-rate" id="monthlyReviewModalSavingsRate"></div>
+      </div>
+      <div class="confirm-modal-body">
+        <div id="monthlyReviewModalContent"></div>
+      </div>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn btn-primary" data-mrmodal-cancel style="max-width:200px; margin:0 auto;">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="drawer-backdrop" id="drawerBackdrop"></div>
   <aside class="drawer" id="drawer" aria-hidden="true">
     <button type="button" class="drawer-header" data-nav="profile" aria-label="Open profile">
@@ -7329,6 +7595,20 @@
       <div class="rp-chev">→</div>
     </button>
 
+    <!-- Monthly Review card — shows during the first ~10 days of a new month
+         as a compact snapshot of the previous month's activity. Emotional
+         payoff for consistent logging; dismissible per month. Tap to see
+         the full breakdown in a modal. -->
+    <button type="button" class="monthly-review-card" id="monthlyReviewCard" style="display:none;">
+      <div class="mr-head">
+        <span class="mr-eyebrow">Your last month</span>
+        <button type="button" class="mr-dismiss" id="monthlyReviewDismiss" aria-label="Dismiss">✕</button>
+      </div>
+      <div class="mr-headline" id="monthlyReviewHeadline">—</div>
+      <div class="mr-stats" id="monthlyReviewStats"></div>
+      <div class="mr-cta">View full review →</div>
+    </button>
+
     <!-- Financial Health Score — dashboard's focal point -->
     <div class="health-card" id="healthCard" style="display:none;">
       <div class="hs-head">
@@ -7559,6 +7839,11 @@
       <div class="compare" id="budgetViewCompare"></div>
     </div>
 
+    <!-- Category-limits warning — shown when one or more categories are at
+         80%+ of their monthly cap. Populated by showBudgetView. Hidden when
+         no categories are at risk (or no limits set at all). -->
+    <div class="category-limit-warn" id="categoryLimitWarn" style="display:none;"></div>
+
     <!-- Sticky sort/select controls — pin below the banner so they stay
          visible + interactive while the expense list scrolls. Rendered by
          showBudgetView(); starts empty and hidden until there's more than
@@ -7592,6 +7877,9 @@
         <div class="side" id="savingsViewSide"></div>
       </div>
     </div>
+
+    <!-- Search — populated by showSavingsView when there are enough goals -->
+    <div id="savingsSearchWrap"></div>
 
     <div id="savingsViewList"></div>
     <div class="view-empty" id="savingsViewEmpty" style="display:none;">
@@ -7843,6 +8131,9 @@
       <div class="ico">💳</div>
       <span id="loansEmptyText">Nothing here yet. Add an utang you owe, or a pautang someone owes you.</span>
     </div>
+
+    <!-- Search — populated by showLoansScreen when there are enough loans -->
+    <div id="loansSearchWrap"></div>
 
     <div id="loansList"></div>
 
@@ -8269,6 +8560,20 @@
       <span class="pa-chev">›</span>
     </button>
 
+    <!-- Category spending limits — optional monthly caps per category. When
+         a category's month-to-date spending crosses 80% or 100% of the cap,
+         a warning banner shows on the Budget page. -->
+    <button type="button" class="profile-action-card" id="categoryLimitsCard">
+      <div class="pa-icon" style="background: rgba(242, 114, 49, 0.14); color: var(--orange);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title">Category spending limits</div>
+        <div class="pa-sub" id="categoryLimitsSub">Set optional monthly caps per category — get warned when close.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
     <div class="profile-section-head">Backup &amp; restore</div>
 
     <button type="button" class="profile-action-card" id="exportJsonCard">
@@ -8536,7 +8841,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.50';
+  const APP_VERSION = '2026-08-10.53';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -9993,6 +10298,8 @@
 
       ${renderTagsSection(exp)}
 
+      ${renderSkippedDuesSection(exp)}
+
       <div class="month-eq">
         <span>Monthly equivalent</span>
         <span class="val" data-eq>${peso(expenseMonthly(exp))}</span>
@@ -10068,6 +10375,46 @@
         wireTagsSection(card, exp);
       });
     }
+  }
+
+  // Skipped Dues section — lists the specific due dates the user tapped ✕
+  // on in the Coming Up sheet. Renders a small pill per date with a ✕ that
+  // un-skips (returns the date to Coming Up). Hidden when there are none.
+  function renderSkippedDuesSection(exp) {
+    const list = Array.isArray(exp.skippedDueDates) ? exp.skippedDueDates : [];
+    if (list.length === 0) return '<div data-skipped-section></div>';
+    return `
+      <div class="tags-section" data-skipped-section>
+        <label class="paycheck-label">Skipped due dates <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0; font-size:11px;">(tap ✕ to bring back)</span></label>
+        <div class="tag-chips">
+          ${list.slice().sort().map(iso => {
+            const d = new Date(iso + 'T00:00:00');
+            const label = d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+            return `
+              <span class="tag-chip" style="background:rgba(214,69,69,0.10); color:var(--error); border-color:rgba(214,69,69,0.35);">
+                ${escapeAttr(label)}
+                <button type="button" class="tag-chip-remove" data-unskip="${iso}" aria-label="Un-skip">✕</button>
+              </span>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function wireSkippedDuesSection(card, exp) {
+    const section = card.querySelector('[data-skipped-section]');
+    if (!section) return;
+    section.querySelectorAll('[data-unskip]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const iso = btn.dataset.unskip;
+        exp.skippedDueDates = (exp.skippedDueDates || []).filter(x => x !== iso);
+        section.outerHTML = renderSkippedDuesSection(exp);
+        wireSkippedDuesSection(card, exp);
+      });
+    });
   }
 
   // Timing picker — only meaningful for quarterly/annual expenses. Always
@@ -10202,6 +10549,8 @@
   }
 
   function wireExpenseCard(card, exp) {
+    // Skipped-dues chips (rendered above the month-eq strip)
+    wireSkippedDuesSection(card, exp);
     // Name
     const nameInp = card.querySelector('[data-field="name"]');
     nameInp.addEventListener('input', () => { exp.name = nameInp.value; });
@@ -11829,6 +12178,7 @@
     document.getElementById('home-date').textContent = now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
     // Render each dashboard card. Order matters for scroll flow (health = top attention).
+    renderMonthlyReview(user);
     renderThisMonthCard(user);
     renderInsights(user);
     renderGoalsCarousel(user);
@@ -11924,6 +12274,223 @@
   // set-asides, not aspirational savings. The user sees them on Budget +
   // Ipon pages already; showing them here would clutter the "progress"
   // signal for actual goals like Family Travel, Emergency Fund, etc.
+  // -------- Monthly Review --------
+  // Compact snapshot of the previous month, shown on Home during the first
+  // ~10 days of a new month. Emotional payoff for consistent logging;
+  // dismissible per-month via user.dismissedMonthReviews.
+
+  // Aggregate one month's activity into a summary object. `yyyyMm` is a
+  // key like '2026-07' — returned object includes totals, savings rate,
+  // biggest expense category, and goals-completed count.
+  function getMonthSummary(user, yyyyMm) {
+    const [y, m] = yyyyMm.split('-').map(Number);
+    const first = new Date(y, m - 1, 1);
+    const last = new Date(y, m, 0, 23, 59, 59, 999);
+    const period = { start: first, end: last };
+    const txs = (user.transactions || []).filter(t => isDateInPeriod(t.date, period));
+    const nonLoan = txs.filter(t => !isLoanPaymentTx(t));
+    const income = nonLoan.filter(t => t.type === 'income').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const spent  = nonLoan.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const saved  = nonLoan.filter(t => t.type === 'saving').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Savings rate = (income - spent) / income. Positive % means you kept some.
+    const netFlow = income - spent;
+    const savingsRate = income > 0 ? Math.round((netFlow / income) * 100) : 0;
+    // Biggest expense category in the month
+    const catTotals = {};
+    nonLoan.filter(t => t.type === 'expense').forEach(t => {
+      let cat = t.category;
+      if (!cat && t.linkedId) {
+        const exp = (user.expenses || []).find(e => e.id === t.linkedId);
+        cat = exp?.category;
+      }
+      if (!cat) return;
+      catTotals[cat] = (catTotals[cat] || 0) + (Number(t.amount) || 0);
+    });
+    const topCats = Object.entries(catTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([v, amt]) => ({ v, label: getCategoryLabel(user, v), amount: amt }));
+    // Goals completed within the month (sinking funds paying out don't count
+    // — those are recurring, not one-time wins)
+    const goalsCompletedCount = (user.goals || []).filter(g => {
+      if (isSinkingFundGoal(g)) return false;
+      const target = Number(g.target) || 0;
+      if (target <= 0) return false;
+      // Was it hit during this month? Look at contributions up to end-of-month.
+      // Approximation: if target reached now AND at least one contribution in this month, count it.
+      const savedNow = totalSavedFor(g, user.transactions);
+      if (savedNow < target) return false;
+      const hadMonthContrib = (user.transactions || []).some(t => t.linkedId === g.id && isDateInPeriod(t.date, period));
+      return hadMonthContrib;
+    }).length;
+    // Transaction count (a proxy for how active they were)
+    const txCount = txs.length;
+    return {
+      yyyyMm, income, spent, saved, netFlow, savingsRate,
+      topCats, goalsCompletedCount, txCount,
+    };
+  }
+
+  // Format 'YYYY-MM' → 'July 2026' for display
+  function formatMonthLabel(yyyyMm) {
+    const [y, m] = yyyyMm.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  }
+
+  // Compute the previous month's YYYY-MM key relative to today
+  function getPreviousMonthKey() {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function renderMonthlyReview(user) {
+    const card = document.getElementById('monthlyReviewCard');
+    if (!card) return;
+    const prevKey = getPreviousMonthKey();
+    // Only show during the first 10 days of the new month — after that the
+    // "review" moment has passed and the card would just be clutter.
+    const dayOfMonth = new Date().getDate();
+    if (dayOfMonth > 10) { card.style.display = 'none'; return; }
+    // Dismissed for this month? Don't show again until next month rolls around.
+    const dismissed = Array.isArray(user.dismissedMonthReviews) ? user.dismissedMonthReviews : [];
+    if (dismissed.includes(prevKey)) { card.style.display = 'none'; return; }
+    // Need enough data to be meaningful — skip if fewer than 3 transactions.
+    const summary = getMonthSummary(user, prevKey);
+    if (summary.txCount < 3) { card.style.display = 'none'; return; }
+    // Populate
+    const monthLabel = formatMonthLabel(prevKey);
+    const eyebrowEl = card.querySelector('.mr-eyebrow');
+    if (eyebrowEl) eyebrowEl.textContent = `Your ${monthLabel.split(' ')[0]}`;
+    const headlineEl = document.getElementById('monthlyReviewHeadline');
+    // Headline chooses the most emotionally resonant single stat
+    let headline;
+    if (summary.savingsRate >= 20) {
+      headline = `You saved ${summary.savingsRate}% of what came in 🎉`;
+    } else if (summary.savingsRate > 0) {
+      headline = `You kept ${summary.savingsRate}% of what came in`;
+    } else if (summary.savingsRate === 0) {
+      headline = `You broke even ⚖️`;
+    } else {
+      headline = `You spent ${Math.abs(summary.savingsRate)}% more than you earned`;
+    }
+    headlineEl.textContent = headline;
+    // Two secondary stats
+    const statsEl = document.getElementById('monthlyReviewStats');
+    statsEl.innerHTML = `
+      <div>
+        <div class="mr-stat-lbl">In</div>
+        <div class="mr-stat-val">${peso(summary.income)}</div>
+      </div>
+      <div>
+        <div class="mr-stat-lbl">Out</div>
+        <div class="mr-stat-val">${peso(summary.spent)}</div>
+      </div>
+      ${summary.goalsCompletedCount > 0 ? `
+        <div>
+          <div class="mr-stat-lbl">Goals hit</div>
+          <div class="mr-stat-val">${summary.goalsCompletedCount}</div>
+        </div>
+      ` : ''}
+    `;
+    card.style.display = 'block';
+    card.dataset.monthKey = prevKey;
+  }
+
+  // Dismiss button — persists the dismissal so the card doesn't return
+  // until next month.
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#monthlyReviewDismiss');
+    if (!btn) return;
+    e.stopPropagation();
+    const card = document.getElementById('monthlyReviewCard');
+    const monthKey = card?.dataset?.monthKey;
+    if (!monthKey) return;
+    card.style.display = 'none';
+    const { data: sess } = await auth.getSession();
+    if (!sess?.session) return;
+    const list = Array.isArray(sess.session.user.dismissedMonthReviews) ? [...sess.session.user.dismissedMonthReviews] : [];
+    if (!list.includes(monthKey)) list.push(monthKey);
+    await auth.updateUser({ data: { dismissedMonthReviews: list } });
+  });
+
+  // Card tap (excluding the × button) → open the detail modal.
+  document.getElementById('monthlyReviewCard').addEventListener('click', async (e) => {
+    if (e.target.closest('#monthlyReviewDismiss')) return;
+    const monthKey = e.currentTarget.dataset.monthKey;
+    if (!monthKey) return;
+    const { data: sess } = await auth.getSession();
+    if (!sess?.session) return;
+    openMonthlyReviewDetail(sess.session.user, monthKey);
+  });
+
+  function openMonthlyReviewDetail(user, yyyyMm) {
+    const summary = getMonthSummary(user, yyyyMm);
+    const modal = document.getElementById('monthlyReviewModal');
+    document.getElementById('monthlyReviewModalTitle').textContent = formatMonthLabel(yyyyMm);
+    // Big savings rate pill
+    const rateEl = document.getElementById('monthlyReviewModalSavingsRate');
+    rateEl.textContent = `${summary.savingsRate >= 0 ? '+' : ''}${summary.savingsRate}% saved`;
+    rateEl.className = 'mr-modal-savings-rate';
+    if (summary.savingsRate < 0) rateEl.classList.add('negative');
+    else if (summary.savingsRate === 0) rateEl.classList.add('zero');
+
+    const contentEl = document.getElementById('monthlyReviewModalContent');
+    const topCatsHtml = summary.topCats.length > 0 ? `
+      <div class="mr-detail-section">
+        <div class="mr-section-title">Top spending categories</div>
+        ${summary.topCats.map(c => `
+          <div class="mr-cat-row">
+            <span>${escapeAttr(c.label)}</span>
+            <span class="mr-cat-amt">${peso(c.amount)}</span>
+          </div>
+        `).join('')}
+      </div>
+    ` : '';
+    contentEl.innerHTML = `
+      <div class="mr-detail-row">
+        <span class="mr-lbl">Money in</span>
+        <span class="mr-val positive">+${peso(summary.income)}</span>
+      </div>
+      <div class="mr-detail-row">
+        <span class="mr-lbl">Money out</span>
+        <span class="mr-val negative">−${peso(summary.spent)}</span>
+      </div>
+      <div class="mr-detail-row">
+        <span class="mr-lbl">Set aside for savings</span>
+        <span class="mr-val">${peso(summary.saved)}</span>
+      </div>
+      <div class="mr-detail-row">
+        <span class="mr-lbl">Net flow</span>
+        <span class="mr-val ${summary.netFlow > 0 ? 'positive' : summary.netFlow < 0 ? 'negative' : ''}">${summary.netFlow >= 0 ? '+' : '−'}${peso(Math.abs(summary.netFlow))}</span>
+      </div>
+      ${summary.goalsCompletedCount > 0 ? `
+        <div class="mr-detail-row">
+          <span class="mr-lbl">Goals completed</span>
+          <span class="mr-val positive">${summary.goalsCompletedCount} 🎉</span>
+        </div>
+      ` : ''}
+      <div class="mr-detail-row">
+        <span class="mr-lbl">Transactions logged</span>
+        <span class="mr-val">${summary.txCount}</span>
+      </div>
+      ${topCatsHtml}
+    `;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    const closers = modal.querySelectorAll('[data-mrmodal-cancel]');
+    const close = () => {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      closers.forEach(el => el.removeEventListener('click', close));
+      document.removeEventListener('keydown', onKey);
+    };
+    const onKey = (ev) => { if (ev.key === 'Escape') close(); };
+    closers.forEach(el => el.addEventListener('click', close));
+    document.addEventListener('keydown', onKey);
+  }
+
   function renderGoalsCarousel(user) {
     const head = document.getElementById('goalsHead');
     const wrap = document.getElementById('goalsCarousel');
@@ -12629,6 +13196,11 @@
   // bar shows above the list summing the selected items' monthly load.
   let budgetSelectMode = false;
   let budgetSelectedIds = new Set();
+  // Live-search state for list pages. Reset when the screen (re)opens
+  // via the search input's own reset, or when the user clears the field.
+  let budgetSearchQuery = '';
+  let iponSearchQuery   = '';
+  let loansSearchQuery  = '';
 
   // Empty-state "Add X" buttons on view screens
   document.addEventListener('click', async e => {
@@ -12769,6 +13341,156 @@
     goto('income-view');
   }
 
+  // Renders a search input into the given container. Wires up filter to
+  // call `onFilter(query)` whenever the query changes. Threshold = min
+  // number of items before search appears (default 4). Reads/writes the
+  // module-level query variable via `getQuery`/`setQuery` accessors.
+  function renderListSearch(containerId, opts) {
+    const {
+      itemCount, threshold = 4, placeholder,
+      getQuery, setQuery, onFilter,
+    } = opts;
+    const host = document.getElementById(containerId);
+    if (!host) return;
+    host.innerHTML = '';
+    if (itemCount < threshold) {
+      // Not enough items to warrant search — reset any stale query and bail
+      if (getQuery()) { setQuery(''); onFilter(''); }
+      return;
+    }
+    const currentQuery = getQuery();
+    const wrap = document.createElement('div');
+    wrap.className = 'list-search-wrap';
+    wrap.innerHTML = `
+      <span class="list-search-icon" aria-hidden="true">🔍</span>
+      <input type="search" placeholder="${escapeAttr(placeholder || 'Search…')}" autocomplete="off" spellcheck="false" value="${escapeAttr(currentQuery)}" />
+      <button type="button" class="list-search-clear" aria-label="Clear search" style="display:${currentQuery ? 'grid' : 'none'};">×</button>
+    `;
+    host.appendChild(wrap);
+    const inp = wrap.querySelector('input');
+    const clr = wrap.querySelector('.list-search-clear');
+    inp.addEventListener('input', () => {
+      setQuery(inp.value);
+      clr.style.display = inp.value ? 'grid' : 'none';
+      onFilter(inp.value);
+    });
+    clr.addEventListener('click', () => {
+      setQuery('');
+      inp.value = '';
+      clr.style.display = 'none';
+      inp.focus();
+      onFilter('');
+    });
+    // Reapply the current filter on render (in case tiles were re-created
+    // by the caller's full re-render).
+    if (currentQuery) onFilter(currentQuery);
+  }
+
+  // Generic in-place filter that hides tiles in `listSelector` when their
+  // text content doesn't include `query`. Toggles group heads based on
+  // whether any child is still visible. Shows a "no matches" node when
+  // everything's hidden.
+  function applyListSearchFilter(listSelector, query, opts = {}) {
+    const {
+      tileSelector = '.view-item, .view-goal, .ipon-budget-tile, .loan-card',
+      groupSelector = '.budget-group',
+      emptyLabel = 'items',
+    } = opts;
+    const listEl = document.querySelector(listSelector);
+    if (!listEl) return;
+    const q = (query || '').trim().toLowerCase();
+    const stale = listEl.querySelector('[data-search-empty]');
+    if (stale) stale.remove();
+    if (!q) {
+      listEl.querySelectorAll('[data-hidden-by-search]').forEach(el => {
+        el.style.display = '';
+        el.removeAttribute('data-hidden-by-search');
+      });
+      return;
+    }
+    const tiles = listEl.querySelectorAll(tileSelector);
+    let matchCount = 0;
+    tiles.forEach(tile => {
+      const text = (tile.textContent || '').toLowerCase();
+      if (text.includes(q)) {
+        tile.style.display = '';
+        tile.removeAttribute('data-hidden-by-search');
+        matchCount++;
+      } else {
+        tile.style.display = 'none';
+        tile.setAttribute('data-hidden-by-search', '1');
+      }
+    });
+    listEl.querySelectorAll(groupSelector).forEach(group => {
+      const anyVisible = [...group.querySelectorAll(tileSelector)]
+        .some(t => t.style.display !== 'none');
+      group.style.display = anyVisible ? '' : 'none';
+      if (!anyVisible) group.setAttribute('data-hidden-by-search', '1');
+    });
+    if (matchCount === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'view-empty';
+      empty.setAttribute('data-search-empty', '1');
+      empty.innerHTML = `
+        <div class="ico">🔍</div>
+        <p>No ${escapeAttr(emptyLabel)} match "<strong>${escapeAttr(query)}</strong>"</p>
+      `;
+      listEl.appendChild(empty);
+    }
+  }
+
+  // Category-limits warning for the Budget page. Iterates the user's caps,
+  // sums this month's actual expense spending per category (from real
+  // transactions, not budgeted amounts), and surfaces any category at 80%+
+  // of its cap. Amber for 80-99%, red for 100%+.
+  function renderCategoryLimitWarning(user) {
+    const warnEl = document.getElementById('categoryLimitWarn');
+    if (!warnEl) return;
+    const limits = (user.categoryLimits && typeof user.categoryLimits === 'object') ? user.categoryLimits : {};
+    const activeLimits = Object.entries(limits).filter(([, v]) => Number(v) > 0);
+    if (activeLimits.length === 0) { warnEl.style.display = 'none'; return; }
+    // Sum this-month expense transactions by category
+    const period = getCurrentPeriod('monthly');
+    const spendByCat = {};
+    (user.transactions || []).forEach(t => {
+      if (t.type !== 'expense') return;
+      if (isLoanPaymentTx(t)) return;
+      if (!isDateInPeriod(t.date, period)) return;
+      // Category comes from tx.category (set on outside/new sources) or from
+      // the linked budget item for 'set' source.
+      let cat = t.category;
+      if (!cat && t.linkedId) {
+        const exp = (user.expenses || []).find(e => e.id === t.linkedId);
+        cat = exp?.category;
+      }
+      if (!cat) return;
+      spendByCat[cat] = (spendByCat[cat] || 0) + (Number(t.amount) || 0);
+    });
+    // Compare
+    const atRisk = [];
+    activeLimits.forEach(([catV, capRaw]) => {
+      const cap = Number(capRaw);
+      const spent = Number(spendByCat[catV]) || 0;
+      const pct = cap > 0 ? Math.round((spent / cap) * 100) : 0;
+      if (pct >= 80) atRisk.push({ catV, cap, spent, pct });
+    });
+    if (atRisk.length === 0) { warnEl.style.display = 'none'; return; }
+    // Sort worst offender first
+    atRisk.sort((a, b) => b.pct - a.pct);
+    const anyOver = atRisk.some(x => x.pct >= 100);
+    warnEl.classList.toggle('over', anyOver);
+    warnEl.style.display = 'block';
+    warnEl.innerHTML = `
+      <div class="cl-title">${anyOver ? '⚠ Over category limit' : '⚠ Approaching category limit'}</div>
+      ${atRisk.map(x => `
+        <div class="cl-item">
+          <span>${escapeAttr(getCategoryLabel(user, x.catV))} · ${peso(x.spent)} of ${peso(x.cap)}</span>
+          <span class="cl-pct">${x.pct}%</span>
+        </div>
+      `).join('')}
+    `;
+  }
+
   function showBudgetView(user) {
     purgeOrphanedSinkingFundGoals(user);
     refreshDrawerUser(user);
@@ -12784,11 +13506,17 @@
       if (!hasContributingGoals) {
         emptyEl.style.display = 'block';
         banner.style.display = 'none';
+        const warnEl = document.getElementById('categoryLimitWarn');
+        if (warnEl) warnEl.style.display = 'none';
         goto('budget-view');
         return;
       }
     }
     emptyEl.style.display = 'none';
+
+    // Category-limits warning — computed against this month's actual spending
+    // per category. Only categories at 80%+ of their cap surface here.
+    renderCategoryLimitWarning(user);
 
     // -------- Totals --------
     // Expenses: monthly-equivalent, respecting each item's timing (this-month
@@ -13061,10 +13789,25 @@
       ];
       // Render sort/select into the dedicated sticky container (outside the
       // scrolling list) so they stay pinned under the banner + selection
-      // subtotal is always visible while scrolling through tiles.
+      // subtotal is always visible while scrolling through tiles. The
+      // search input is rendered first so users can filter without hunting.
       const controlsHost = document.getElementById('budgetControlsSticky');
       controlsHost.innerHTML = '';
       const anyItemCount = (user.expenses || []).length + contributingGoals.length;
+
+      // Search — appears once there are enough items to warrant hunting
+      const searchHost = document.createElement('div');
+      searchHost.id = 'budgetSearchHost';
+      controlsHost.appendChild(searchHost);
+      renderListSearch('budgetSearchHost', {
+        itemCount: anyItemCount,
+        threshold: 4,
+        placeholder: 'Search budget by name or amount…',
+        getQuery: () => budgetSearchQuery,
+        setQuery: v => { budgetSearchQuery = v; },
+        onFilter: q => applyListSearchFilter('#budgetViewList', q, { emptyLabel: 'budget items' }),
+      });
+
       if (anyItemCount > 1) {
         const sortRow = document.createElement('div');
         sortRow.className = 'budget-sort-row';
@@ -13358,6 +14101,9 @@
         list.appendChild(card);
       }
     goto('budget-view');
+    // Re-apply any active search so filter state survives full re-renders
+    // (e.g. after saving an edit that returns to this screen).
+    applyListSearchFilter('#budgetViewList', budgetSearchQuery, { emptyLabel: 'budget items' });
     // Fulfill any pending scroll-to-expense request (e.g. from tapping a
     // sinking-fund goal on the Ipon page). Do it on the next paint so the
     // DOM has settled and the view is visible.
@@ -13480,8 +14226,25 @@
     if (!Array.isArray(user.goals) || user.goals.length === 0) {
       emptyEl.style.display = 'block';
       banner.style.display = 'none';
+      // No goals → no need for search either
+      renderListSearch('savingsSearchWrap', {
+        itemCount: 0, threshold: 4,
+        placeholder: '',
+        getQuery: () => iponSearchQuery,
+        setQuery: v => { iponSearchQuery = v; },
+        onFilter: q => applyListSearchFilter('#savingsViewList', q, { emptyLabel: 'goals' }),
+      });
     } else {
       emptyEl.style.display = 'none';
+      // Search — appears once there are enough goals to warrant it
+      renderListSearch('savingsSearchWrap', {
+        itemCount: user.goals.length,
+        threshold: 4,
+        placeholder: 'Search goals by name or amount…',
+        getQuery: () => iponSearchQuery,
+        setQuery: v => { iponSearchQuery = v; },
+        onFilter: q => applyListSearchFilter('#savingsViewList', q, { emptyLabel: 'goals' }),
+      });
       const total = sumMonthlySavings(user);
       document.getElementById('savingsViewTotal').textContent = peso(total);
       const c = user.goals.length;
@@ -13636,22 +14399,23 @@
             const pairedExp = (u.expenses || []).find(e => e.id === g.pairedExpenseId);
             const walletObj = (u.wallets || []).find(w => w.id === g.walletId);
             const walletName = walletObj ? (walletObj.label || PAYMENT_NAME[walletObj.method] || 'wallet') : 'the linked wallet';
-            const payAmount = Math.min(saved, target);
-            const ok = await showConfirm({
-              icon: '💰',
-              title: `Pay ${peso(payAmount)} for ${escapeAttr(g.name)}?`,
-              bodyHtml: `
-                This will:<br>
-                • Record a <strong>${peso(payAmount)}</strong> expense on <strong>${escapeAttr(pairedExp?.name || g.name)}</strong><br>
-                • Withdraw from <strong>${escapeAttr(walletName)}</strong><br>
-                • Reset this sinking fund to <strong>₱0</strong> for the next cycle<br>
-                <br>
-                Previous contributions stay in your transaction history for reference.
-              `,
-              okText: 'Pay now',
-              cancelText: 'Cancel',
+            const walletBalance = walletObj ? computeWalletBalance(walletObj, u.transactions) : 0;
+            const suggestedAmount = Math.min(saved, target);
+            // Prompt with editable amount — defaults to min(saved, target)
+            // but the user can override for partial payments or when the
+            // actual bill differs from the target.
+            const result = await showPayNowPrompt({
+              goalName: g.name,
+              expenseName: pairedExp?.name || g.name,
+              walletName,
+              suggestedAmount,
+              savedAmount: saved,
+              targetAmount: target,
+              walletBalance,
             });
-            if (!ok) return;
+            if (!result || !result.confirmed) return;
+            const payAmount = Number(result.amount) || 0;
+            if (payAmount <= 0) { toast('Amount must be greater than zero.', 'error'); return; }
             // Build the expense transaction
             const now = new Date().toISOString();
             const today = now.slice(0, 10);
@@ -13690,6 +14454,7 @@
       });
     }
     goto('savings-view');
+    applyListSearchFilter('#savingsViewList', iponSearchQuery, { emptyLabel: 'goals' });
   }
 
   function showProfile(user) {
@@ -13712,6 +14477,15 @@
     document.getElementById('recoveryCardSub').textContent = backups.length > 0
       ? `${backups.length} snapshot${backups.length !== 1 ? 's' : ''} available — tap to browse and restore.`
       : 'Restore from a recent auto-backup snapshot if something goes wrong.';
+    // Category limits sub — count categories with a cap set
+    const limitsObj = (user.categoryLimits && typeof user.categoryLimits === 'object') ? user.categoryLimits : {};
+    const limitCount = Object.values(limitsObj).filter(v => Number(v) > 0).length;
+    const limitsSub = document.getElementById('categoryLimitsSub');
+    if (limitsSub) {
+      limitsSub.textContent = limitCount > 0
+        ? `${limitCount} categor${limitCount !== 1 ? 'ies' : 'y'} with a monthly cap`
+        : 'Set optional monthly caps per category — get warned when close.';
+    }
     goto('profile');
   }
 
@@ -13763,6 +14537,87 @@
       const onKey    = (e) => {
         if (e.key === 'Escape') cleanup(false);
         else if (e.key === 'Enter') cleanup(true);
+      };
+      okBtn.addEventListener('click', onOk);
+      cancels.forEach(el => el.addEventListener('click', onCancel));
+      document.addEventListener('keydown', onKey);
+    });
+  }
+
+  // Pay-now prompt — dedicated modal for the sinking-fund "Pay now" action
+  // where the user can override the amount before confirming. Reuses the
+  // confirmModal shell (icon + title + body + ok/cancel) but injects an
+  // amount input into the body. Resolves with { confirmed, amount }.
+  function showPayNowPrompt(opts) {
+    const {
+      goalName, expenseName, walletName,
+      suggestedAmount, savedAmount, targetAmount, walletBalance,
+    } = opts;
+    const modal   = document.getElementById('confirmModal');
+    const iconEl  = document.getElementById('confirmModalIcon');
+    const titleEl = document.getElementById('confirmModalTitle');
+    const bodyEl  = document.getElementById('confirmModalBody');
+    const okBtn   = document.getElementById('confirmModalOk');
+    const cancels = modal.querySelectorAll('[data-confirm-cancel]');
+
+    iconEl.textContent  = '💰';
+    titleEl.textContent = `Pay ${escapeAttr(goalName)}`;
+    // Build the body: a short explainer + amount input + live "leftover" hint
+    const inputId = 'payNowAmountInput_' + Date.now().toString(36);
+    bodyEl.innerHTML = `
+      <div style="font-size:13px; color:var(--muted); line-height:1.5; margin-bottom:14px;">
+        Records an expense on <strong>${escapeAttr(expenseName)}</strong>, withdraws from <strong>${escapeAttr(walletName)}</strong>, and resets this fund to ₱0 for the next cycle.
+      </div>
+      <label style="display:block; font-family:'Inter',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--muted); margin-bottom:6px;">Amount to pay</label>
+      <div class="amount-input-wrap" style="margin-bottom:6px;">
+        <span class="peso">₱</span>
+        <input class="input" type="number" min="0" step="0.01" id="${inputId}" value="${suggestedAmount}" style="text-align:right; font-family:'Fraunces',serif; font-size:22px; font-weight:700;" />
+      </div>
+      <div id="${inputId}_hint" style="font-size:11px; color:var(--muted); line-height:1.5;"></div>
+    `;
+    okBtn.textContent = 'Pay now';
+    okBtn.className = 'btn btn-primary';
+
+    const amountInput = document.getElementById(inputId);
+    const hintEl = document.getElementById(inputId + '_hint');
+    const updateHint = () => {
+      const v = Number(amountInput.value) || 0;
+      const leftoverInFund = savedAmount - v;
+      const walletAfter = walletBalance - v;
+      const parts = [];
+      parts.push(`Suggested: ${peso(suggestedAmount)} (min of saved / target)`);
+      if (v > 0) {
+        if (leftoverInFund > 0) parts.push(`Leftover in fund: ${peso(leftoverInFund)} (still counts toward the goal until the fund resets)`);
+        else if (leftoverInFund < 0) parts.push(`⚠ Overpay: ${peso(-leftoverInFund)} more than saved. The rest is a normal expense on the wallet.`);
+        if (walletAfter < 0) parts.push(`⚠ ${escapeAttr(walletName)} would go to ${peso(walletAfter)} — you don't have enough there.`);
+      }
+      hintEl.innerHTML = parts.join('<br>');
+    };
+    amountInput.addEventListener('input', updateHint);
+    updateHint();
+    // Auto-focus + select the amount so users can just type the new value
+    setTimeout(() => { amountInput.focus(); amountInput.select(); }, 60);
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+
+    return new Promise(resolve => {
+      const cleanup = (result) => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        okBtn.removeEventListener('click', onOk);
+        cancels.forEach(el => el.removeEventListener('click', onCancel));
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      const onOk = () => {
+        const amount = Number(amountInput.value) || 0;
+        cleanup({ confirmed: true, amount });
+      };
+      const onCancel = () => cleanup({ confirmed: false });
+      const onKey = (e) => {
+        if (e.key === 'Escape') cleanup({ confirmed: false });
+        else if (e.key === 'Enter') { e.preventDefault(); onOk(); }
       };
       okBtn.addEventListener('click', onOk);
       cancels.forEach(el => el.addEventListener('click', onCancel));
@@ -15384,6 +16239,35 @@
     const { data: sess } = await auth.getSession();
     const user = sess.session.user;
     const transactions = Array.isArray(user.transactions) ? [...user.transactions] : [];
+
+    // Duplicate detection — only when creating a new tx (edits are always
+    // intentional). Look for a transaction with the same day/amount/wallet/type
+    // that was created in the last few minutes. If found, prompt the user
+    // before creating a second one. Catches the "double-tap save" mistake.
+    if (!editingTxId) {
+      const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+      const dupe = transactions.find(t =>
+        t.type === txDraft.type &&
+        t.date === txDraft.date &&
+        Number(t.amount) === Number(txDraft.amount) &&
+        t.wallet === txDraft.wallet &&
+        // Same "target" — linked expense/income/goal, or same source when not linked
+        (t.linkedId || null) === (txDraft.linkedId || null) &&
+        // Recently added (avoids nagging on legitimate future repeats)
+        t.createdAt && new Date(t.createdAt).getTime() > fiveMinAgo
+      );
+      if (dupe) {
+        const name = resolveTxName(dupe, user);
+        const ok = await showConfirm({
+          icon: '🔁',
+          title: 'Looks like a duplicate',
+          bodyHtml: `You just logged <strong>${peso(dupe.amount)}</strong> for <strong>${escapeAttr(name)}</strong> a moment ago. Save this one anyway?`,
+          okText: 'Save anyway',
+          cancelText: 'Cancel',
+        });
+        if (!ok) return;
+      }
+    }
 
     let savedTxId;
     if (editingTxId) {
@@ -18215,11 +19099,29 @@
         : loansFilter === 'receivable'
         ? 'No pautang yet. Track money others owe you — friends, family, or unpaid invoices.'
         : 'Nothing here yet. Add an utang you owe, or a pautang someone owes you.';
+      // No results → clear any search input too
+      renderListSearch('loansSearchWrap', {
+        itemCount: 0, threshold: 4,
+        placeholder: '',
+        getQuery: () => loansSearchQuery,
+        setQuery: v => { loansSearchQuery = v; },
+        onFilter: q => applyListSearchFilter('#loansList', q, { tileSelector: '.loan-card', emptyLabel: 'loans' }),
+      });
       return;
     }
 
     empty.style.display = 'none';
     summary.style.display = 'grid';
+
+    // Search — appears once there are enough loans to warrant it
+    renderListSearch('loansSearchWrap', {
+      itemCount: filtered.length,
+      threshold: 4,
+      placeholder: 'Search loans by name or amount…',
+      getQuery: () => loansSearchQuery,
+      setQuery: v => { loansSearchQuery = v; },
+      onFilter: q => applyListSearchFilter('#loansList', q, { tileSelector: '.loan-card', emptyLabel: 'loans' }),
+    });
 
     // Summary — content changes with the active tab
     const active = filtered.filter(l => l.status !== 'paid');
@@ -18367,6 +19269,8 @@
       });
       list.appendChild(card);
     });
+    // Reapply active search so filter persists across re-renders
+    applyListSearchFilter('#loansList', loansSearchQuery, { tileSelector: '.loan-card', emptyLabel: 'loans' });
   }
 
   // Filter tabs — All / Utang / Pautang
@@ -20125,6 +21029,62 @@
       await auth.updateUser({ data: { tags: nextTags, expenses: nextExpenses, goals: nextGoals, loans: nextLoans, transactions: nextTransactions } });
       toast('Tag deleted', 'success');
     }
+  });
+
+  // Category spending limits — opens a modal listing every category with an
+  // input for its monthly cap. Stored on user.categoryLimits as
+  // { [categoryValue]: amount }. Empty/0 means no limit.
+  document.getElementById('categoryLimitsCard').addEventListener('click', async () => {
+    const { data: sess } = await auth.getSession();
+    if (!sess?.session) return;
+    const u = sess.session.user;
+    const cats = getAllCategories(u);
+    const limits = (u.categoryLimits && typeof u.categoryLimits === 'object') ? u.categoryLimits : {};
+    const modal = document.getElementById('categoryLimitsModal');
+    const listEl = document.getElementById('categoryLimitsList');
+    listEl.innerHTML = cats.map(c => {
+      const val = Number(limits[c.v]) || 0;
+      return `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="flex:1; font-family:'Inter',sans-serif; font-size:14px; color:var(--navy); font-weight:600;">${escapeAttr(c.label)}</div>
+          <div class="amount-input-wrap" style="width:140px;">
+            <span class="peso">₱</span>
+            <input type="number" class="input" min="0" step="1" placeholder="0" value="${val || ''}" data-cat-limit="${c.v}" style="text-align:right;" />
+          </div>
+        </div>
+      `;
+    }).join('');
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    // Wire cancel/save
+    const cancels = modal.querySelectorAll('[data-limitsmodal-cancel]');
+    const closeModal = () => {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      cancels.forEach(el => el.removeEventListener('click', closeModal));
+      document.getElementById('categoryLimitsSaveBtn').removeEventListener('click', onSave);
+    };
+    const onSave = async () => {
+      const nextLimits = {};
+      listEl.querySelectorAll('[data-cat-limit]').forEach(input => {
+        const v = Number(input.value) || 0;
+        if (v > 0) nextLimits[input.dataset.catLimit] = v;
+      });
+      const { data, error } = await auth.updateUser({ data: { categoryLimits: nextLimits } });
+      if (error) { toast(error.message, 'error'); return; }
+      const count = Object.keys(nextLimits).length;
+      toast(count > 0 ? `${count} limit${count !== 1 ? 's' : ''} saved ✦` : 'Limits cleared', 'success');
+      closeModal();
+      // Refresh profile sub-line if we're on that screen
+      const sub = document.getElementById('categoryLimitsSub');
+      if (sub) {
+        sub.textContent = count > 0
+          ? `${count} categor${count !== 1 ? 'ies' : 'y'} with a monthly cap`
+          : 'Set optional monthly caps per category — get warned when close.';
+      }
+    };
+    cancels.forEach(el => el.addEventListener('click', closeModal));
+    document.getElementById('categoryLimitsSaveBtn').addEventListener('click', onSave);
   });
 
   // Recovery card in Profile — lists auto-backup snapshots and lets user
