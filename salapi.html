@@ -8838,30 +8838,30 @@
   // Configuration to your GitHub Pages URL (e.g. https://silakstudio.github.io/salapi).
   // =========================================================================
   const SUPABASE_URL      = 'https://tdzbuxgqmduastaxggac.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_YsdD0xesIl5AN9yAvJnE9w_B4i-tooz';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkemJ1eGdxbWR1YXN0YXhnZ2FjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5OTU1MjYsImV4cCI6MjA5MjU3MTUyNn0.xQapc_Y5jEhDfT5vG1htvYwQnucuvDYLZbl0JwxGCuw';
 
   // -------------------------------------------------------------------------
   // DEV AUTO-LOGIN — set to false before showing this to anyone else.
-  // Auto-signs in with these hardcoded creds on load. Creates the account
-  // on first run if it doesn't exist yet (requires email confirmation OFF
-  // in the Supabase dashboard).
+  // When true, auto-signs in with hardcoded creds on load (creates account on
+  // first run). Handy for fast iteration; MUST be false in production so real
+  // users see the normal login flow.
   // -------------------------------------------------------------------------
-  const DEV_AUTO_LOGIN = true;
+  const DEV_AUTO_LOGIN = false;
   const DEV_EMAIL      = 'shaene@silaksalapi.app';
   const DEV_PASSWORD   = 'silaksalapi';
 
   // -------------------------------------------------------------------------
   // DEV OFFLINE MODE — when true, Supabase is bypassed entirely. All data
   // lives in localStorage on this device. Use this for fast iteration without
-  // any network dependency. Flip to false to switch back to real Supabase.
+  // any network dependency. Flip to false to persist to real Supabase.
   // -------------------------------------------------------------------------
-  const DEV_OFFLINE_MODE = true;
+  const DEV_OFFLINE_MODE = false;
   const DEV_LOCAL_KEY    = 'silak-salapi-local-user';
 
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.56';
+  const APP_VERSION = '2026-08-10.57';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
