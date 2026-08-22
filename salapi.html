@@ -8861,7 +8861,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.57';
+  const APP_VERSION = '2026-08-10.58';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -8899,21 +8899,24 @@
     if (error) throw error;
   }
 
-  // Combine Supabase auth user + our JSONB app data into the single user object the rest of the app uses
+  // Combine Supabase auth user + our JSONB app data into the single user
+  // object the rest of the app uses. IMPORTANT: pass through every field
+  // the app persists — anything omitted here silently disappears from the
+  // in-memory user after each save (data on the server stays intact, but
+  // screens render as if the fields don't exist). Spread appData so future
+  // fields we forget to list here still flow through by default.
   function mergeUser(authUser, appData) {
     appData = appData || {};
     return {
+      // Spread all persisted app data first so nothing gets accidentally dropped
+      ...appData,
+      // Auth-managed identity fields (always sourced from Supabase, not appData)
       id:         authUser.id,
       email:      authUser.email,
       created_at: authUser.created_at,
       provider:   (authUser.app_metadata && authUser.app_metadata.provider) || 'email',
       // Prefer app-data name (last saved), fall back to Supabase user_metadata (OAuth-provided)
-      name:         appData.name != null ? appData.name : (authUser.user_metadata && authUser.user_metadata.name) || null,
-      incomes:      appData.incomes,
-      expenses:     appData.expenses,
-      goals:        appData.goals,
-      wallets:      appData.wallets,
-      transactions: appData.transactions,
+      name: appData.name != null ? appData.name : (authUser.user_metadata && authUser.user_metadata.name) || null,
     };
   }
 
