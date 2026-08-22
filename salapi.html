@@ -8577,6 +8577,23 @@
       <span class="pa-chev">›</span>
     </button>
 
+    <!-- Notification test — validates that this device / browser / iOS PWA
+         setup can actually deliver system notifications. Not real push yet
+         (that needs a service worker + backend); this is just a local
+         Notification() call. If this works, real push will too — if not,
+         we know the setup needs adjusting (iOS: Add to Home Screen first,
+         permission denied → System Settings, etc.). -->
+    <button type="button" class="profile-action-card" id="notificationsTestCard">
+      <div class="pa-icon" style="background: rgba(26, 71, 214, 0.14); color: var(--blue);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title">Notifications <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0; font-size:11px;">(beta)</span></div>
+        <div class="pa-sub" id="notificationsCardSub">Tap to send a test notification and see if your device supports it.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
     <div class="profile-section-head">Backup &amp; restore</div>
 
     <button type="button" class="profile-action-card" id="exportJsonCard">
@@ -8844,7 +8861,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.55';
+  const APP_VERSION = '2026-08-10.56';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -14520,6 +14537,25 @@
       limitsSub.textContent = limitCount > 0
         ? `${limitCount} categor${limitCount !== 1 ? 'ies' : 'y'} with a monthly cap`
         : 'Set optional monthly caps per category — get warned when close.';
+    }
+    // Notifications card sub — reflect current permission so the user sees
+    // where they stand without having to tap
+    const notifSub = document.getElementById('notificationsCardSub');
+    if (notifSub) {
+      if (typeof Notification === 'undefined' || !('Notification' in window)) {
+        const isIos = /iP(hone|ad|od)/.test(navigator.userAgent);
+        const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches
+          || window.navigator.standalone === true;
+        notifSub.textContent = isIos && !isStandalone
+          ? 'Not available in Safari tab. Add to Home Screen first.'
+          : 'Not supported by this browser.';
+      } else if (Notification.permission === 'granted') {
+        notifSub.textContent = '✓ Enabled — tap to send a test notification.';
+      } else if (Notification.permission === 'denied') {
+        notifSub.textContent = 'Blocked — enable in system settings.';
+      } else {
+        notifSub.textContent = 'Tap to enable and send a test notification.';
+      }
     }
     goto('profile');
   }
@@ -21120,6 +21156,82 @@
     };
     cancels.forEach(el => el.addEventListener('click', closeModal));
     document.getElementById('categoryLimitsSaveBtn').addEventListener('click', onSave);
+  });
+
+  // Notifications test — runs through the full flow of "can this device
+  // actually deliver a notification?" and reports back plainly. Splits into
+  // three cases:
+  //   - Not supported (old browser, or iOS Safari tab-not-PWA) → hint to
+  //     Add to Home Screen
+  //   - Permission denied → hint to enable in system settings
+  //   - Permission granted or default → request if needed, then fire a
+  //     real notification the user can see. This is a LOCAL notification
+  //     (fired via new Notification(...)), not push — but it validates
+  //     the same iOS/browser plumbing that push would need.
+  document.getElementById('notificationsTestCard').addEventListener('click', async () => {
+    // Feature detection: some very old browsers or non-PWA iOS Safari
+    // don't have the Notification constructor at all.
+    if (typeof Notification === 'undefined' || !('Notification' in window)) {
+      const isIos = /iP(hone|ad|od)/.test(navigator.userAgent);
+      const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+      const msg = isIos && !isStandalone
+        ? 'This device supports notifications, but only when the app is added to your Home Screen. Tap the share icon in Safari → Add to Home Screen, then reopen the app from your Home Screen.'
+        : 'Your browser doesn\'t support notifications. Try a different browser or update to a newer version.';
+      await showConfirm({
+        icon: '🔕',
+        title: 'Notifications aren\'t available',
+        bodyHtml: msg,
+        okText: 'Got it',
+        cancelText: '',
+      });
+      return;
+    }
+
+    // Permission denied — can't request again from JS. User has to enable it
+    // in system settings (iOS Settings → Notifications → Silak Salapi).
+    if (Notification.permission === 'denied') {
+      const isIos = /iP(hone|ad|od)/.test(navigator.userAgent);
+      const hint = isIos
+        ? 'Notifications are blocked. To enable, go to iOS Settings → Notifications → Silak Salapi → Allow Notifications.'
+        : 'Notifications are blocked. Open your browser or system settings for this site and allow notifications.';
+      await showConfirm({
+        icon: '🔕',
+        title: 'Notifications are blocked',
+        bodyHtml: hint,
+        okText: 'Got it',
+        cancelText: '',
+      });
+      return;
+    }
+
+    // Permission not yet asked → prompt the user
+    if (Notification.permission === 'default') {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        toast('Permission not granted. Enable notifications in your device settings to retry.', 'error');
+        return;
+      }
+    }
+
+    // Permission granted — fire the test notification
+    try {
+      const n = new Notification('Silak Salapi test ✦', {
+        body: 'If you can see this, your device is ready for notifications. Real reminders will land the same way.',
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: 'silak-test',
+      });
+      // Optional: focus the app when the user taps the notification
+      n.onclick = () => { window.focus(); n.close(); };
+      // Update the sub-line to show it worked
+      const sub = document.getElementById('notificationsCardSub');
+      if (sub) sub.textContent = '✓ Sent a test notification. Check your notification tray or Home Screen.';
+      toast('Test notification sent ✦', 'success');
+    } catch (err) {
+      // Some browsers throw despite permission — usually iOS PWA specifics.
+      toast('Couldn\'t send: ' + (err.message || 'unknown error'), 'error');
+    }
   });
 
   // Recovery card in Profile — lists auto-backup snapshots and lets user
