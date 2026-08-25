@@ -79,10 +79,6 @@ header{position:sticky;top:0;z-index:50;background:var(--card);border-bottom:1.5
 .tab.on{background:var(--acc,var(--plum));border-color:var(--acc,var(--plum));color:#fff}
 
 .hint{margin:14px 0 6px;padding:10px 14px;background:var(--lav);border-radius:12px;font-size:15px;color:var(--plumd)}
-.note{font-size:13.5px;color:#6c5f72;margin:10px 0 4px;padding:12px;background:#fff8e6;
- border:1px solid #f0e0b0;border-radius:12px}
-.note:empty{display:none}
-
 /* ---------- panes ---------- */
 .pane{display:none}
 .pane.on{display:block}
@@ -250,7 +246,6 @@ input.num:focus,#rv-name:focus{outline:2px solid var(--acc,var(--plum));outline-
 
 <div class="wrap">
   <p class="hint">Pindutin ang patlang o ang sagot upang pumili. Kapag <b>tapos na ang lahat</b> ng gawain sa napiling linggo, bubukas ang <strong>Check Answers</strong> sa ibaba.</p>
-  <p class="note" id="nt"></p>
 </div>
 
 <main>
@@ -2859,7 +2854,8 @@ function makeItem(idx, it, bank) {
         wrap.appendChild(g.box);
         check = function () { return it.skip ? null : (g.sel() === it.a); };
         reveal = function () { if (it.a >= 0) g.btns[it.a].classList.add('gotit'); };
-        if (it.skip) wrap.appendChild(el('div', 'unscored', it.why || 'Hindi ito binibigyan ng puntos \u2014 tingnan ang paalala sa ibaba.'));
+        if (it.skip) wrap.appendChild(el('div', 'unscored',
+          it.why || 'Hindi ito binibigyan ng puntos.'));
       })();
       break;
     case 'mcqfig':
@@ -3171,6 +3167,7 @@ var LESSONS = {
     ['VIII. Paglutas ng Suliranin sa Pagdaragdag', [
       'Term 1 Week 9 \u2013 Paglutas ng suliranin sa pagdaragdag hanggang 20']],
     ['IX. Paghahambing ng Haba', [
+      'Term 1 Week 10 \u2013 Pagtutugma ng bagay sa tamang sukat',
       'Term 1 Week 10 \u2013 Paghahambing ng haba (paper clips)',
       'Term 1 Week 10 \u2013 Paghahambing ng haba (paper clips), ipagpatuloy',
       'Term 1 Week 10 \u2013 Paghahambing ng haba (sitwasyon)']]
@@ -3395,38 +3392,6 @@ build('read', RD, document.getElementById('build-read'), F.read);
     mk: 'Makabansa \u00b7 Weeks 1\u201310',
     gm: 'GMRC \u00b7 Weeks 1\u201310'
   };
-  var NOTE = {
-    mt: '<b>Paalala \u2014 Math, Linggo 7 (bilang 4).</b> Ang tanong sa orihinal ay &ldquo;What position is the apple?&rdquo; ' +
-        'ngunit ang mansanas ay nasa <b>2nd</b> at wala itong pagpipilian (1st / 3rd / 5th) \u2014 mali ang orihinal. ' +
-        'Ginawa itong &ldquo;What position is the tree?&rdquo; dahil ang puno ay nasa <b>5th</b>, na isa sa mga pagpipilian.<br><br>' +
-        '<b>Paalala \u2014 &ldquo;Putting Together&rdquo;.</b> May mga bilang na hindi kasama dahil hindi mabilang nang tiyak ' +
-        'ang mga bagay sa larawan: bilang 5, 6, 8, 10 sa dalawahang pagsasama at bilang 1, 3, 4, 5 sa tatluhan.<br><br>' +
-        '<b>Paalala \u2014 commutative sheet.</b> Walang nakasulat na panuto sa orihinal, kaya ito ay ginawang ' +
-        '&ldquo;palitan ang puwesto ng dalawang bilang&rdquo; (hal. 5 + 3 = 3 + 5). Anim na linya ang nasa pahina kahit ' +
-        'ang marka ay 5.<br><br>' +
-        '<b>Paalala \u2014 Linggo 10, pagtutugma sa tamang sukat.</b> Bawat guhit ay <b>10 blocks</b> ang haba, ' +
-        'at ang bagay ay tumatakip lamang ng ilan dito: lapis 4, gunting 5, ruler 6, krayola 3, at rolling pin 7. ' +
-        'Ang gagawin ng bata ay bilangin kung ilang blocks ang haba ng bagay.',
-    mk: '<b>Paalala.</b> Dalawang bilang ay iba sa nakasulat sa orihinal na sheet dahil minarkahang mali ng guro: ' +
-        'Linggo 1 WS2 bilang 5 ay malungkot na mukha, at Linggo 2 WS2 bilang 3 ay Mangga at bilang 5 ay Kanin.',
-    gm: '<b>Paalala.</b> Linggo 1 WS1 bilang 5 (&ldquo;Ang petsa ng kapanganakan ay araw ng pagsilang ng tao&rdquo;) ay ' +
-        'kinuhang \u2713 \u2014 \u2717 ang nasa orihinal at minarkahang mali ng guro.<br><br>' +
-        '<b>Paalala \u2014 Linggo 7 Recycle.</b> Ginamit na ngayon ang tunay na larawan mula sa worksheet. ' +
-        'Sa unang transkripsiyon, ang <b>D</b> ay nakasulat na &ldquo;planggana&rdquo; (\u2713) at ang <b>G</b> ay ' +
-        '&ldquo;basag na plato&rdquo;; sa larawan, ang D ay <b>diaper</b> (\u2717) at ang G ay <b>balat ng itlog</b> ' +
-        '(\u2717). Naitama na ito.<br><br>' +
-        '<b>Paalala.</b> Ang Linggo 8 at Linggo 10 ay gumagamit pa rin ng may-label na kahon dahil wala pang ' +
-        'larawan para sa mga ito.',
-    lang: '<b>Paalala.</b> Ang Gawain 1\u201329 ay galing sa naka-print na reviewer. Ang huling bahagi ' +
-          '(Linggo 10 \u2014 Pakikinig sa Kuwento) ay galing sa hiwalay na worksheet.<br><br>' +
-          '<b>Gawain 18, bilang 3.</b> &ldquo;Nabasag ang baso kaya naglinis si Nanay.&rdquo; Ang bilang na ito ay ' +
-          'hindi tugma sa pattern ng iba pang bilang sa set, kaya tinatanggap ang <b>S</b> at ang <b>B</b>. ' +
-          'Mabuting itsek sa orihinal na worksheet kung alin ang tama.',
-    read: '<b>Paalala.</b> Ang mga gawaing pagbakat ay ginawang pag-type dito, at ang mga <b>\u00f1</b> na bilang ay ' +
-          'humihingi ng buong salita para masuri ang sagot. Tinatanggap ang sagot kahit walang tilde \u2014 ang ' +
-          '<i>senorita</i> ay pareho ng <i>se\u00f1orita</i>. Ang pangalan ng mga larawan ay nakasulat sa italiko.'
-  };
-
   /* ---------- week metadata for every card / lesson ---------- */
   function cardWeeks(card) {
     var got = card.getAttribute('data-weeks');
@@ -3611,7 +3576,6 @@ build('read', RD, document.getElementById('build-read'), F.read);
       document.getElementById('tab-' + x).classList.toggle('on', x === k);
     });
     document.getElementById('subt').innerHTML = SUB[k];
-    document.getElementById('nt').innerHTML = NOTE[k] || '';
     scoreShown = false;
     try { localStorage.setItem(STORE + '-tab', k); } catch (e) {}
     updateReady();
