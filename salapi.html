@@ -3560,6 +3560,97 @@
   .profile-reset-btn:hover  { background: var(--error); color: var(--white); }
   .profile-reset-btn:active { transform: scale(0.97); }
 
+  /* Danger zone section header on Profile — separates destructive actions
+     (reset, delete account) from the normal profile controls so users know
+     they're crossing a line. */
+  .danger-zone-head {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--error);
+    margin: 32px 0 12px;
+    padding-top: 20px;
+    border-top: 1px solid var(--sand);
+    opacity: 0.75;
+  }
+
+  /* Legal links row — small text buttons for Privacy / Terms. Shown on
+     Profile (below Log out) and on the landing screen. */
+  .legal-links-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0 4px;
+  }
+  .legal-link {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    padding: 4px 6px;
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .legal-link:hover {
+    color: var(--navy);
+    text-decoration-color: var(--muted);
+  }
+  .legal-link-sep {
+    color: var(--muted);
+    opacity: 0.5;
+    font-size: 12px;
+  }
+
+  /* Legal screens — Privacy Policy + Terms of Service. Long-form prose
+     content, so type sizes bump up and line-height gets breathing room. */
+  .legal-screen .legal-body {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 8px 0 40px;
+    font-family: 'Inter', sans-serif;
+    color: var(--navy);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+  .legal-screen .legal-body p {
+    margin: 0 0 14px;
+  }
+  .legal-screen .legal-body h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 28px 0 10px;
+    letter-spacing: -0.2px;
+  }
+  .legal-screen .legal-body ul {
+    margin: 0 0 14px;
+    padding-left: 20px;
+  }
+  .legal-screen .legal-body li {
+    margin-bottom: 6px;
+  }
+  .legal-screen .legal-body strong {
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .legal-screen .legal-updated {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--sand);
+  }
+
   /* Reusable confirm modal — used for destructive actions like Reset all data */
   .confirm-modal {
     position: fixed;
@@ -5608,14 +5699,25 @@
   .recent-tx-row .rt-amt.saving  { color: var(--teal); }
   .recent-tx-row .rt-amt.transfer{ color: var(--navy); }
 
-  /* Quick Actions grid */
-  .quick-actions {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+  /* Quick Actions — customizable horizontal-scroll strip. Each tile is a
+     user-defined shortcut (edit via Profile → Manage Quick Actions). Fixed
+     width per tile so users can see about 4 at a time with a peek of the
+     next one, hinting at scrollability. */
+  .quick-actions-scroll {
+    display: flex;
     gap: 10px;
-    margin-bottom: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 24px 12px;      /* horizontal padding matches screen padding so tiles align */
+    margin: 0 -24px 24px;         /* negative margin bleeds scroll to screen edges */
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .quick-actions-scroll::-webkit-scrollbar { display: none; }
   .qa-tile {
+    flex: 0 0 auto;
+    width: 88px;
     background: var(--white);
     border: 1.5px solid var(--sand);
     border-radius: 16px;
@@ -5626,16 +5728,31 @@
     gap: 8px;
     cursor: pointer;
     font-family: inherit;
-    transition: transform 0.15s, border-color 0.15s;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
     -webkit-tap-highlight-color: transparent;
+    scroll-snap-align: start;
+    position: relative;
   }
   .qa-tile:hover  { border-color: var(--muted); }
   .qa-tile:active { transform: scale(0.97); }
+  /* Primary Add Transaction tile — subtle orange outline + shadow so users'
+     eyes are drawn to the fastest logging path. Applied to the first tile
+     via [data-qa-primary]. */
+  .qa-tile[data-qa-primary] {
+    border-color: rgba(242, 114, 49, 0.55);
+    box-shadow: 0 4px 14px rgba(242, 114, 49, 0.14);
+  }
+  .qa-tile[data-qa-primary]:hover {
+    border-color: var(--orange);
+    box-shadow: 0 6px 20px rgba(242, 114, 49, 0.22);
+  }
   .qa-tile .qa-icon {
     width: 42px; height: 42px;
     border-radius: 12px;
     display: grid; place-items: center;
     box-shadow: 0 2px 6px rgba(10, 37, 64, 0.06);
+    font-size: 22px;
+    line-height: 1;
   }
   .qa-tile .qa-label {
     font-family: 'Inter', sans-serif;
@@ -5644,7 +5761,133 @@
     font-weight: 700;
     text-align: center;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
+  /* Warning icon overlay for broken templates (referenced wallet/budget deleted) */
+  .qa-tile .qa-warn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--error);
+    color: var(--white);
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    font-size: 10px;
+    display: grid; place-items: center;
+    font-weight: 700;
+  }
+  /* "+ Add" tile — dashed border, muted icon, sits at the end of the strip */
+  .qa-tile.qa-add {
+    border-style: dashed;
+    border-color: var(--muted);
+    background: transparent;
+  }
+  .qa-tile.qa-add .qa-icon {
+    background: transparent;
+    box-shadow: none;
+    color: var(--muted);
+  }
+  .qa-tile.qa-add .qa-label { color: var(--muted); }
+
+  /* Color swatches in the Quick Action editor */
+  .qa-color-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .qa-color-swatch {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: grid; place-items: center;
+    font-size: 18px;
+    padding: 0;
+    transition: transform 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .qa-color-swatch:hover  { transform: scale(1.08); }
+  .qa-color-swatch.selected {
+    border-color: var(--navy);
+    transform: scale(1.05);
+  }
+
+  /* Manage Quick Actions — row per shortcut with edit/delete/reorder buttons */
+  .manage-qa-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--white);
+    border: 1.5px solid var(--sand);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .manage-qa-row .mqa-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .manage-qa-row .mqa-info {
+    flex: 1; min-width: 0;
+  }
+  .manage-qa-row .mqa-label {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .manage-qa-row .mqa-warn { color: var(--error); font-size: 13px; margin-left: 4px; }
+  .manage-qa-row .mqa-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .manage-qa-row .mqa-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: center;
+  }
+  .manage-qa-row .mqa-btn {
+    background: transparent;
+    border: 1.5px solid var(--sand);
+    color: var(--muted);
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 0;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .manage-qa-row .mqa-btn:hover:not([disabled]) { border-color: var(--navy); color: var(--navy); }
+  .manage-qa-row .mqa-btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+  .manage-qa-row .mqa-btn.primary {
+    width: auto;
+    padding: 0 12px;
+    color: var(--blue);
+    border-color: rgba(26, 71, 214, 0.35);
+    font-size: 12px;
+  }
+  .manage-qa-row .mqa-btn.primary:hover { background: var(--blue); color: var(--white); border-color: var(--blue); }
+  .manage-qa-row .mqa-btn.danger:hover  { background: var(--error); color: var(--white); border-color: var(--error); }
 
   /* Net Worth footer card */
   .nw-footer-card {
@@ -7154,6 +7397,12 @@
       </button>
       <button class="btn btn-primary" data-goto="register">Get started</button>
       <button class="btn btn-outline" data-goto="login">I already have an account</button>
+      <!-- Legal links — small, unobtrusive, always accessible from the front door -->
+      <div class="legal-links-row" style="margin-top: 20px;">
+        <button type="button" class="legal-link" data-goto="privacy">Privacy Policy</button>
+        <span class="legal-link-sep">·</span>
+        <button type="button" class="legal-link" data-goto="terms">Terms of Service</button>
+      </div>
     </div>
   </section>
 
@@ -7595,6 +7844,15 @@
       <div class="rp-chev">→</div>
     </button>
 
+    <!-- Quick Actions — customizable, one-tap shortcuts. Rendered dynamically
+         from user.quickActions. Default seeds: Add Transaction, Transfer,
+         Pay Bill. User can edit / add / remove via Profile → Manage Quick
+         Actions. Horizontal scroll so unlimited templates fit; last tile
+         is always the + Add button. -->
+    <div class="quick-actions-scroll" id="quickActionsHost">
+      <!-- populated by renderQuickActions(user) -->
+    </div>
+
     <!-- Monthly Review card — shows during the first ~10 days of a new month
          as a compact snapshot of the previous month's activity. Emotional
          payoff for consistent logging; dismissible per month. Tap to see
@@ -7704,49 +7962,6 @@
       <button type="button" class="link-btn" data-nav="transactions">View all</button>
     </div>
     <div class="recent-tx-list" id="recentTxList" style="display:none;"></div>
-
-    <!-- Quick Actions — 2×3 grid -->
-    <div class="home-section-head">
-      <span class="title">Quick Actions</span>
-    </div>
-    <div class="quick-actions">
-      <button type="button" class="qa-tile" data-qa="add-tx">
-        <div class="qa-icon" style="background: var(--orange);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        </div>
-        <div class="qa-label">Add<br>Transaction</div>
-      </button>
-      <button type="button" class="qa-tile" data-qa="transfer">
-        <div class="qa-icon" style="background: rgba(44, 188, 177, 0.15); color: var(--teal);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        </div>
-        <div class="qa-label">Transfer</div>
-      </button>
-      <button type="button" class="qa-tile" data-qa="pay-bill">
-        <div class="qa-icon" style="background: rgba(26, 71, 214, 0.12); color: var(--blue);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        </div>
-        <div class="qa-label">Pay Bill</div>
-      </button>
-      <button type="button" class="qa-tile" data-qa="add-goal">
-        <div class="qa-icon" style="background: rgba(245, 166, 35, 0.18); color: var(--yellow);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-        </div>
-        <div class="qa-label">Add Goal</div>
-      </button>
-      <button type="button" class="qa-tile" data-qa="add-asset">
-        <div class="qa-icon" style="background: rgba(102, 51, 204, 0.14); color: #6633CC;">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/></svg>
-        </div>
-        <div class="qa-label">Add Asset</div>
-      </button>
-      <button type="button" class="qa-tile" data-qa="add-loan">
-        <div class="qa-icon" style="background: rgba(214, 69, 69, 0.12); color: var(--error);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
-        </div>
-        <div class="qa-label">Add Loan</div>
-      </button>
-    </div>
 
     <!-- Net Worth footer — big final card -->
     <button type="button" class="nw-footer-card" id="nwFooterCard" style="display:none;" data-nav="networth">
@@ -8577,6 +8792,19 @@
       <span class="pa-chev">›</span>
     </button>
 
+    <!-- Manage Quick Actions — customize the one-tap shortcuts at the top
+         of Home. Setting-first entry point per user preference. -->
+    <button type="button" class="profile-action-card" id="manageQuickActionsCard">
+      <div class="pa-icon" style="background: rgba(44, 188, 177, 0.14); color: var(--teal);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <div class="pa-info">
+        <div class="pa-title">Manage Quick Actions</div>
+        <div class="pa-sub" id="manageQuickActionsSub">Customize your Home shortcuts — Shopee, Grab, buying for Mom.</div>
+      </div>
+      <span class="pa-chev">›</span>
+    </button>
+
     <!-- Notification test — validates that this device / browser / iOS PWA
          setup can actually deliver system notifications. Not real push yet
          (that needs a service worker + backend); this is just a local
@@ -8644,7 +8872,188 @@
     </button>
 
     <button class="btn btn-outline" type="button" id="profileLogoutBtn" style="margin-top:20px;">Log out</button>
+
+    <!-- Legal — Privacy Policy + Terms of Service. Kept as in-app screens
+         so users can review without leaving the app (works offline too). -->
+    <div class="legal-links-row">
+      <button type="button" class="legal-link" data-goto="privacy">Privacy Policy</button>
+      <span class="legal-link-sep">·</span>
+      <button type="button" class="legal-link" data-goto="terms">Terms of Service</button>
+    </div>
+
+    <!-- Danger zone — destructive actions that require extra confirmation.
+         Separated from the normal profile actions so they're obviously the
+         "point of no return" area. -->
+    <div class="danger-zone-head">Danger zone</div>
     <button type="button" id="profileResetBtn" class="profile-reset-btn">Reset all data</button>
+    <button type="button" id="profileDeleteAccountBtn" class="profile-reset-btn" style="margin-top:12px; border-color: var(--error); color: var(--error);">Delete my account</button>
+  </section>
+
+  <!-- ============ MANAGE QUICK ACTIONS ============ -->
+  <section class="screen" id="screen-manage-quick-actions" style="padding: 24px;">
+    <div class="view-header">
+      <button class="nav-back" data-goto="home" style="padding:0;">← Back</button>
+      <h1 style="margin-left:8px;">Quick Actions</h1>
+    </div>
+    <p style="font-size:13px; color:var(--muted); line-height:1.5; margin: 0 0 20px;">
+      One-tap shortcuts on your Home screen. Add your daily patterns (Shopee, Grab, buying for Mom) as templates so you can log them in seconds. Reorder with ↑↓; tap Edit to change a shortcut.
+    </p>
+
+    <div id="manageQuickActionsList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+      <!-- populated by showManageQuickActions -->
+    </div>
+
+    <button type="button" class="btn btn-primary" id="qaAddNewBtn" style="width:100%;">+ New shortcut</button>
+  </section>
+
+  <!-- ============ QUICK ACTION EDITOR ============ -->
+  <section class="screen" id="screen-quick-action-editor" style="padding: 24px;">
+    <div class="view-header">
+      <button class="nav-back" data-goto="manage-quick-actions" style="padding:0;">← Back</button>
+      <h1 id="qaEditorTitle" style="margin-left:8px;">New shortcut</h1>
+    </div>
+
+    <div class="field">
+      <label>Label</label>
+      <input class="input" type="text" id="qaEditLabel" maxlength="24" placeholder="e.g. Shopee Mom, Grab home" />
+    </div>
+
+    <div class="field">
+      <label>Emoji <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(paste any emoji)</span></label>
+      <input class="input" type="text" id="qaEditEmoji" maxlength="4" placeholder="✦" style="font-size:22px; text-align:center; width: 80px;" />
+    </div>
+
+    <div class="field">
+      <label>Color</label>
+      <div id="qaEditColorSwatches" class="qa-color-grid"></div>
+    </div>
+
+    <div class="field">
+      <label>What does this do?</label>
+      <div class="select-wrap">
+        <select class="input select" id="qaEditKind">
+          <optgroup label="Navigate">
+            <option value="nav-transaction">Open transaction form</option>
+            <option value="nav-transfer-form">Open transfer form</option>
+            <option value="nav-coming-up">Open Coming Up (bills due)</option>
+            <option value="nav-savings">Open Ipon (savings)</option>
+            <option value="nav-loans">Open Loans</option>
+            <option value="nav-assets">Open Net Worth</option>
+          </optgroup>
+          <optgroup label="One-tap log">
+            <option value="template-expense">Log an expense (template)</option>
+            <option value="template-income">Log income (template)</option>
+            <option value="template-saving">Add to a savings goal (template)</option>
+            <option value="template-transfer">Move money between wallets (template)</option>
+            <option value="template-pautang">Add to a pautang (template)</option>
+          </optgroup>
+        </select>
+        <span class="select-caret">▾</span>
+      </div>
+    </div>
+
+    <div id="qaEditConditional">
+      <!-- populated based on kind -->
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:24px;">
+      <button type="button" class="btn btn-outline" data-goto="manage-quick-actions" style="flex:1;">Cancel</button>
+      <button type="button" class="btn btn-primary" id="qaEditorSave" style="flex:2;">Save shortcut</button>
+    </div>
+    <button type="button" class="single-delete-btn" id="qaEditorDelete" style="display:none;">Delete this shortcut</button>
+  </section>
+  <section class="screen legal-screen" id="screen-privacy" style="padding: 24px;">
+    <div class="view-header">
+      <button class="nav-back" data-goto="profile" style="padding:0;">← Back</button>
+      <h1 style="margin-left:8px;">Privacy Policy</h1>
+    </div>
+    <div class="legal-body">
+      <p class="legal-updated">Last updated: <strong>August 2026</strong></p>
+
+      <p>This is a plain-English summary of how Silak Salapi handles your data. If anything here isn't clear, email us at <strong>silak.ph@gmail.com</strong>.</p>
+
+      <h2>What we collect</h2>
+      <p>When you sign up, we collect your <strong>email address</strong> and <strong>password</strong> (encrypted by our authentication provider). Everything else you enter — transactions, wallets, budgets, savings goals, loans, tags, categories, assets, notes — stays yours and is stored in your personal account.</p>
+      <p>We do <strong>not</strong> collect analytics, ad IDs, contacts, location, device identifiers, or usage tracking data.</p>
+
+      <h2>Where your data is stored</h2>
+      <p>Your account and data live in a database managed by <strong>Supabase</strong> (region: South Asia). Data in transit is encrypted (HTTPS/TLS). Data at rest is encrypted at the storage layer.</p>
+
+      <h2>Who can see your data</h2>
+      <p>Only you (via your login) and the app operator (for support / debugging when you email us). We do not sell, rent, share, or use your data for advertising. We will only disclose data when compelled by a lawful court order.</p>
+
+      <h2>Your rights</h2>
+      <ul>
+        <li><strong>Export</strong> — download all your data anytime from Profile → Export all data</li>
+        <li><strong>Delete</strong> — wipe your account and all data from Profile → Delete my account</li>
+        <li><strong>Correct</strong> — edit any transaction, budget, or profile detail directly in the app</li>
+        <li><strong>Ask</strong> — email <strong>silak.ph@gmail.com</strong> with any privacy question</li>
+      </ul>
+
+      <h2>Cookies &amp; local storage</h2>
+      <p>Silak Salapi uses your browser's local storage to remember your login session and cache backup snapshots. We do not use tracking cookies, analytics scripts, or third-party pixels.</p>
+
+      <h2>Children</h2>
+      <p>Silak Salapi is not intended for users under 13. If you're a parent and believe your child created an account, email us and we'll delete it.</p>
+
+      <h2>Changes to this policy</h2>
+      <p>If we update this policy in ways that materially affect what data we collect or how we use it, we'll let you know via the app before the change takes effect.</p>
+
+      <h2>Contact</h2>
+      <p>Questions, concerns, requests: <strong>silak.ph@gmail.com</strong></p>
+    </div>
+  </section>
+
+  <!-- ============ TERMS OF SERVICE ============ -->
+  <section class="screen legal-screen" id="screen-terms" style="padding: 24px;">
+    <div class="view-header">
+      <button class="nav-back" data-goto="profile" style="padding:0;">← Back</button>
+      <h1 style="margin-left:8px;">Terms of Service</h1>
+    </div>
+    <div class="legal-body">
+      <p class="legal-updated">Last updated: <strong>August 2026</strong></p>
+
+      <p>By using Silak Salapi, you agree to these terms. If you don't agree, please don't use the app.</p>
+
+      <h2>What Silak Salapi is</h2>
+      <p>Silak Salapi is a personal-finance tracking tool for Filipino users. It helps you record income, expenses, budgets, savings goals, and loans. It's a <strong>tracker</strong>, not a bank, broker, lender, or licensed financial advisor.</p>
+
+      <h2>Not financial advice</h2>
+      <p>Nothing in this app constitutes financial, investment, tax, or legal advice. Amounts, projections, and category insights shown are based on data you enter — treat them as informational only. For real-money decisions (loans, investments, insurance), consult a licensed professional.</p>
+
+      <h2>Your responsibility</h2>
+      <ul>
+        <li>Keep your login credentials secure. Anyone with your password can see and edit everything in your account.</li>
+        <li>You are responsible for the accuracy of the data you enter.</li>
+        <li>Regularly export your data (Profile → Export all data) for your own backup.</li>
+      </ul>
+
+      <h2>What we don't guarantee</h2>
+      <p>Silak Salapi is provided <strong>as-is, without warranty of any kind</strong>. We do our best to keep the app running smoothly and your data safe, but we can't promise 100% uptime, zero bugs, or that your data will never be lost due to unforeseen technical issues. Regular backups on your side are your responsibility.</p>
+
+      <h2>What you can't do</h2>
+      <ul>
+        <li>Reverse-engineer, decompile, or scrape the app in ways that violate applicable law</li>
+        <li>Use the app to store or transmit content that is illegal, infringing, or abusive</li>
+        <li>Attempt to access accounts other than your own</li>
+        <li>Automate mass account creation or interact with our systems in ways that degrade service for others</li>
+      </ul>
+
+      <h2>Ending your use</h2>
+      <p>You can delete your account and data anytime from Profile → Delete my account. We may suspend or terminate accounts that violate these terms.</p>
+
+      <h2>Limitation of liability</h2>
+      <p>To the maximum extent permitted by Philippine law, Silak Salapi and its operator are not liable for any indirect, incidental, consequential, or special damages arising from your use of the app — including but not limited to lost profits, lost data, or business interruption.</p>
+
+      <h2>Governing law</h2>
+      <p>These terms are governed by the laws of the Republic of the Philippines. Any disputes will be resolved in the courts of the Philippines.</p>
+
+      <h2>Changes to these terms</h2>
+      <p>If we update these terms in ways that materially affect your use of the app, we'll let you know via the app before the change takes effect.</p>
+
+      <h2>Contact</h2>
+      <p>Questions about these terms: <strong>silak.ph@gmail.com</strong></p>
+    </div>
   </section>
 
   <!-- ============ TRANSACTION ============ -->
@@ -8861,7 +9270,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.58';
+  const APP_VERSION = '2026-08-10.61';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -12201,6 +12610,7 @@
     document.getElementById('home-date').textContent = now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
     // Render each dashboard card. Order matters for scroll flow (health = top attention).
+    renderQuickActions(user);
     renderMonthlyReview(user);
     renderThisMonthCard(user);
     renderInsights(user);
@@ -12664,20 +13074,624 @@
     drawSparkline(document.getElementById('nwfSpark'), history.map(p => p.netWorth));
   }
 
-  // Quick Actions grid — each tile routes to the right place.
-  // Uses the same functions the drawer/nav uses so behavior stays consistent.
-  document.querySelectorAll('.qa-tile').forEach(tile => {
-    tile.addEventListener('click', () => {
-      const action = tile.dataset.qa;
-      switch (action) {
-        case 'add-tx':    openTransactionScreen(userCache, {}); break;
-        case 'transfer':  openTransactionScreen(userCache, { type: 'transfer' }); break;
-        case 'pay-bill':  openTransactionScreen(userCache, { type: 'expense', source: 'set' }); break;
-        case 'add-goal':  showSavingsView(userCache); break;   // savings screen has the "+ Add goal" inline
-        case 'add-asset': openAssetEdit(userCache, null); break;
-        case 'add-loan':  showLoansScreen(userCache); break;   // land on loans page — user picks Utang or Pautang there
-      }
+  // ===================== QUICK ACTIONS SYSTEM =====================
+  // User-customizable shortcuts at the top of Home. Data lives on
+  // user.quickActions (array of tile configs). Two flavors:
+  //   - kind: 'nav'      — opens a screen (tx form, coming-up sheet, etc.)
+  //   - kind: 'template' — pre-configured tx; prompts for amount, then saves
+  // First-time users get 3 seeded defaults: Add Transaction, Transfer, Pay Bill.
+  // Users can edit / add / remove via Profile → Manage Quick Actions.
+
+  // Default seed tiles for brand-new accounts (or after "Reset all data")
+  function defaultQuickActions() {
+    return [
+      { id: 'qa_add_tx',   label: 'Add\nTransaction', emoji: '➕',  color: 'orange', primary: true, kind: 'nav', navTarget: 'transaction' },
+      { id: 'qa_transfer', label: 'Transfer',         emoji: '🔄', color: 'teal',   kind: 'nav', navTarget: 'transaction', prefill: { type: 'transfer' } },
+      { id: 'qa_pay_bill', label: 'Pay Bill',         emoji: '📄', color: 'blue',   kind: 'nav', navTarget: 'coming-up' },
+    ];
+  }
+
+  // Small palette of tile colors — used by the icon background. Kept in sync
+  // with the editor's color picker so users see the same names.
+  const QA_COLORS = {
+    orange: { bg: 'var(--orange)',                     fg: 'var(--white)' },
+    teal:   { bg: 'rgba(44, 188, 177, 0.15)',          fg: 'var(--teal)' },
+    blue:   { bg: 'rgba(26, 71, 214, 0.12)',           fg: 'var(--blue)' },
+    yellow: { bg: 'rgba(245, 166, 35, 0.18)',          fg: '#B8850A' },
+    purple: { bg: 'rgba(102, 51, 204, 0.14)',          fg: '#6633CC' },
+    coral:  { bg: 'rgba(214, 69, 69, 0.12)',           fg: 'var(--error)' },
+    green:  { bg: 'rgba(76, 175, 80, 0.15)',           fg: '#3B8B3F' },
+    navy:   { bg: 'rgba(10, 37, 64, 0.10)',            fg: 'var(--navy)' },
+  };
+
+  // Get the user's tiles (or defaults if unset)
+  function getQuickActions(user) {
+    const list = Array.isArray(user?.quickActions) ? user.quickActions : null;
+    return (list && list.length > 0) ? list : defaultQuickActions();
+  }
+
+  // Check if a template still points to valid wallet/budget/goal/loan. Returns
+  // a reason string if broken, empty string if healthy.
+  function quickActionBrokenReason(qa, user) {
+    if (!qa || qa.kind !== 'template') return '';
+    const wallets = user.wallets || [];
+    if (qa.walletId && !wallets.some(w => w.id === qa.walletId)) return 'Wallet was deleted';
+    if (qa.txType === 'expense'  && qa.linkedId    && !(user.expenses || []).some(e => e.id === qa.linkedId))    return 'Budget item was deleted';
+    if (qa.txType === 'saving'   && qa.goalId      && !(user.goals    || []).some(g => g.id === qa.goalId))      return 'Goal was deleted';
+    if (qa.txType === 'pautang'  && qa.loanId      && !(user.loans    || []).some(l => l.id === qa.loanId))      return 'Loan was deleted';
+    if (qa.txType === 'transfer' && qa.toWalletId  && !wallets.some(w => w.id === qa.toWalletId))                return 'Destination wallet was deleted';
+    return '';
+  }
+
+  // Render the Quick Actions strip on Home
+  function renderQuickActions(user) {
+    const host = document.getElementById('quickActionsHost');
+    if (!host) return;
+    const tiles = getQuickActions(user);
+    host.innerHTML = '';
+    tiles.forEach(qa => {
+      const colors = QA_COLORS[qa.color] || QA_COLORS.navy;
+      const broken = quickActionBrokenReason(qa, user);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'qa-tile';
+      if (qa.primary) btn.setAttribute('data-qa-primary', '1');
+      btn.dataset.qaId = qa.id;
+      // Label may contain \n for stacked text ("Add\nTransaction")
+      const labelHtml = escapeAttr(qa.label || 'Untitled').replace(/\n/g, '<br>');
+      btn.innerHTML = `
+        <div class="qa-icon" style="background:${colors.bg}; color:${colors.fg};">
+          ${escapeAttr(qa.emoji || '✦')}
+        </div>
+        <div class="qa-label">${labelHtml}</div>
+        ${broken ? '<div class="qa-warn" title="' + escapeAttr(broken) + '">!</div>' : ''}
+      `;
+      btn.addEventListener('click', () => handleQuickActionTap(qa, user, broken));
+      host.appendChild(btn);
     });
+    // + Add tile — always at the end, opens the Manage Quick Actions screen
+    const addTile = document.createElement('button');
+    addTile.type = 'button';
+    addTile.className = 'qa-tile qa-add';
+    addTile.innerHTML = `
+      <div class="qa-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="qa-label">Manage</div>
+    `;
+    addTile.addEventListener('click', () => showManageQuickActions(user));
+    host.appendChild(addTile);
+  }
+
+  // What happens when a tile is tapped
+  async function handleQuickActionTap(qa, user, brokenReason) {
+    // Refresh user from the session so template execution sees latest data
+    const { data: sess } = await auth.getSession();
+    const freshUser = sess?.session?.user || user;
+    // If the referenced entity was deleted, prompt to fix instead of running
+    if (brokenReason) {
+      const fix = await showConfirm({
+        icon: '⚠️',
+        title: 'This shortcut is broken',
+        bodyHtml: `<strong>${escapeAttr(brokenReason)}.</strong><br><br>You can edit this shortcut to point at a different item, or delete it.`,
+        okText: 'Fix it',
+        cancelText: 'Close',
+      });
+      if (fix) showManageQuickActions(freshUser);
+      return;
+    }
+
+    if (qa.kind === 'nav') {
+      switch (qa.navTarget) {
+        case 'transaction':
+          openTransactionScreen(freshUser, qa.prefill || {});
+          break;
+        case 'coming-up':
+          openRemindersModal(freshUser);
+          break;
+        case 'savings':
+          showSavingsView(freshUser);
+          break;
+        case 'loans':
+          showLoansScreen(freshUser);
+          break;
+        case 'assets':
+          showNetWorth(freshUser);
+          break;
+        default:
+          openTransactionScreen(freshUser, {});
+      }
+      return;
+    }
+
+    if (qa.kind === 'template') {
+      await runTemplateQuickAction(qa, freshUser);
+      return;
+    }
+  }
+
+  // Execute a template (pre-configured tx). Prompts for amount if not preset,
+  // then creates the tx directly — no form open, minimum friction.
+  async function runTemplateQuickAction(qa, user) {
+    // Get amount — either preset or prompt for it
+    let amount = Number(qa.defaultAmount) || 0;
+    if (!amount) {
+      const result = await showAmountPrompt({
+        title: qa.label ? qa.label.replace(/\n/g, ' ') : 'Quick log',
+        emoji: qa.emoji || '✦',
+        placeholder: 'How much?',
+        okText: 'Save',
+      });
+      if (!result || !result.confirmed) return;
+      amount = result.amount;
+    }
+    if (amount <= 0) { toast('Enter an amount greater than zero.', 'error'); return; }
+
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+    const wallet = (user.wallets || []).find(w => w.id === qa.walletId);
+    const paymentMethod = wallet ? wallet.method : 'cash';
+    const txId = 'tx_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+    let newTx;
+    if (qa.txType === 'expense') {
+      const linkedExp = (user.expenses || []).find(e => e.id === qa.linkedId);
+      newTx = {
+        id: txId, type: 'expense',
+        source: qa.linkedId ? 'set' : 'outside',
+        amount, date: today, note: qa.note || '',
+        paymentMethod, wallet: qa.walletId,
+        linkedId: qa.linkedId || null,
+        category: linkedExp?.category || 'other',
+        label: '', tagIds: Array.isArray(qa.tagIds) ? qa.tagIds : [],
+        createdAt: now,
+      };
+    } else if (qa.txType === 'income') {
+      const linkedInc = (user.incomes || []).find(i => i.id === qa.linkedId);
+      newTx = {
+        id: txId, type: 'income',
+        source: qa.linkedId ? 'set' : 'extra',
+        amount, date: today, note: qa.note || '',
+        paymentMethod, wallet: qa.walletId,
+        linkedId: qa.linkedId || null,
+        category: linkedInc?.category || 'other',
+        label: '', tagIds: Array.isArray(qa.tagIds) ? qa.tagIds : [],
+        createdAt: now,
+      };
+    } else if (qa.txType === 'saving') {
+      newTx = {
+        id: txId, type: 'saving',
+        source: qa.goalId ? 'set' : 'other',
+        amount, date: today, note: qa.note || '',
+        paymentMethod, wallet: qa.walletId,
+        linkedId: qa.goalId || null,
+        category: 'other',
+        label: '', tagIds: Array.isArray(qa.tagIds) ? qa.tagIds : [],
+        createdAt: now,
+      };
+    } else if (qa.txType === 'transfer') {
+      newTx = {
+        id: txId, type: 'transfer',
+        source: 'set',
+        amount, date: today, note: qa.note || '',
+        paymentMethod, wallet: qa.walletId,
+        toWallet: qa.toWalletId,
+        linkedId: null, category: 'other', label: '',
+        tagIds: Array.isArray(qa.tagIds) ? qa.tagIds : [],
+        createdAt: now,
+      };
+    } else if (qa.txType === 'pautang') {
+      // Add to an existing pautang (receivable): money leaves your wallet,
+      // pautang balance grows. If no loanId is set, create a new pautang.
+      const loans = Array.isArray(user.loans) ? [...user.loans] : [];
+      let targetLoan = loans.find(l => l.id === qa.loanId);
+      if (!targetLoan && qa.loanId) {
+        toast('Pautang not found — edit this shortcut.', 'error');
+        return;
+      }
+      // Payment on receivable = additional lend (money OUT of your wallet,
+      // pautang balance grows). We record as an expense-type tx tagged with
+      // linkedLoanId so it's excluded from Home totals but affects the wallet.
+      newTx = {
+        id: txId, type: 'expense',
+        source: 'outside',
+        amount, date: today, note: qa.note || `Lent to ${targetLoan?.name || 'pautang'}`,
+        paymentMethod, wallet: qa.walletId,
+        linkedLoanId: qa.loanId,
+        category: 'other', label: '',
+        tagIds: Array.isArray(qa.tagIds) ? qa.tagIds : [],
+        createdAt: now,
+      };
+      // Also grow the pautang's currentBalance so it correctly shows the new owed amount
+      if (targetLoan) {
+        const idx = loans.findIndex(l => l.id === targetLoan.id);
+        loans[idx] = {
+          ...targetLoan,
+          currentBalance: (Number(targetLoan.currentBalance) || 0) + amount,
+          originalAmount: (Number(targetLoan.originalAmount) || 0) + amount,
+          updatedAt: now,
+        };
+        const transactions = [...(user.transactions || []), newTx];
+        const { data, error } = await auth.updateUser({ data: { transactions, loans } });
+        if (error) { toast(error.message, 'error'); return; }
+        toast(`Logged ${peso(amount)} lent to ${targetLoan.name} ✦`, 'success');
+        showHome(data.user);
+        return;
+      }
+    }
+
+    if (!newTx) { toast('Could not run this shortcut.', 'error'); return; }
+    const transactions = [...(user.transactions || []), newTx];
+    const { data, error } = await auth.updateUser({ data: { transactions } });
+    if (error) { toast(error.message, 'error'); return; }
+    toast(`Logged ${peso(amount)} · ${qa.label ? qa.label.replace(/\n/g, ' ') : 'Quick log'} ✦`, 'success');
+    showHome(data.user);
+  }
+
+  // Simple amount-prompt modal — reused by Quick Action templates
+  function showAmountPrompt(opts) {
+    const { title, emoji = '💰', placeholder = 'Amount', okText = 'Save' } = opts;
+    const modal   = document.getElementById('confirmModal');
+    const iconEl  = document.getElementById('confirmModalIcon');
+    const titleEl = document.getElementById('confirmModalTitle');
+    const bodyEl  = document.getElementById('confirmModalBody');
+    const okBtn   = document.getElementById('confirmModalOk');
+    const cancels = modal.querySelectorAll('[data-confirm-cancel]');
+
+    iconEl.textContent  = emoji;
+    titleEl.textContent = title;
+    const inputId = 'amtPrompt_' + Date.now().toString(36);
+    bodyEl.innerHTML = `
+      <div class="amount-input-wrap">
+        <span class="peso">₱</span>
+        <input class="input" type="number" min="0" step="0.01" id="${inputId}" placeholder="${escapeAttr(placeholder)}" style="text-align:right; font-family:'Fraunces',serif; font-size:24px; font-weight:700;" />
+      </div>
+    `;
+    okBtn.textContent = okText;
+    okBtn.className = 'btn btn-primary';
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    const input = document.getElementById(inputId);
+    setTimeout(() => input.focus(), 60);
+
+    return new Promise(resolve => {
+      const cleanup = (result) => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        okBtn.removeEventListener('click', onOk);
+        cancels.forEach(el => el.removeEventListener('click', onCancel));
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      const onOk = () => {
+        const amount = Number(input.value) || 0;
+        cleanup({ confirmed: true, amount });
+      };
+      const onCancel = () => cleanup({ confirmed: false });
+      const onKey = (e) => {
+        if (e.key === 'Escape') cleanup({ confirmed: false });
+        else if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+      };
+      okBtn.addEventListener('click', onOk);
+      cancels.forEach(el => el.addEventListener('click', onCancel));
+      document.addEventListener('keydown', onKey);
+    });
+  }
+
+  // ============ MANAGE QUICK ACTIONS SCREEN ============
+  // Full-screen list of the user's quick actions with edit/delete/reorder
+  // controls. Accessed via the Manage tile at the end of the Home strip,
+  // or from Profile.
+  function showManageQuickActions(user) {
+    userCache = user;
+    const list = getQuickActions(user);
+    const container = document.getElementById('manageQuickActionsList');
+    container.innerHTML = '';
+    list.forEach((qa, idx) => {
+      const colors = QA_COLORS[qa.color] || QA_COLORS.navy;
+      const broken = quickActionBrokenReason(qa, user);
+      const row = document.createElement('div');
+      row.className = 'manage-qa-row';
+      const kindDesc = describeQuickActionKind(qa);
+      row.innerHTML = `
+        <div class="mqa-icon" style="background:${colors.bg}; color:${colors.fg};">${escapeAttr(qa.emoji || '✦')}</div>
+        <div class="mqa-info">
+          <div class="mqa-label">${escapeAttr((qa.label || 'Untitled').replace(/\n/g, ' '))}${broken ? ' <span class="mqa-warn">⚠</span>' : ''}</div>
+          <div class="mqa-sub">${escapeAttr(kindDesc)}</div>
+        </div>
+        <div class="mqa-actions">
+          <button type="button" class="mqa-btn" data-qa-move-up   ${idx === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+          <button type="button" class="mqa-btn" data-qa-move-down ${idx === list.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+          <button type="button" class="mqa-btn primary" data-qa-edit>Edit</button>
+          <button type="button" class="mqa-btn danger" data-qa-delete aria-label="Delete">✕</button>
+        </div>
+      `;
+      row.querySelector('[data-qa-move-up]').addEventListener('click', () => reorderQuickAction(qa.id, -1));
+      row.querySelector('[data-qa-move-down]').addEventListener('click', () => reorderQuickAction(qa.id, 1));
+      row.querySelector('[data-qa-edit]').addEventListener('click', () => openQuickActionEditor(qa));
+      row.querySelector('[data-qa-delete]').addEventListener('click', () => deleteQuickAction(qa.id));
+      container.appendChild(row);
+    });
+    goto('manage-quick-actions');
+  }
+
+  function describeQuickActionKind(qa) {
+    if (qa.kind === 'nav') {
+      switch (qa.navTarget) {
+        case 'transaction': return qa.prefill?.type === 'transfer' ? 'Opens the transfer form' : 'Opens the transaction form';
+        case 'coming-up':   return 'Opens the Coming Up sheet';
+        case 'savings':     return 'Opens the Ipon screen';
+        case 'loans':       return 'Opens the Loans screen';
+        case 'assets':      return 'Opens the Net Worth screen';
+        default:            return 'Opens a screen';
+      }
+    }
+    if (qa.kind === 'template') {
+      switch (qa.txType) {
+        case 'expense':  return `Logs an expense${qa.defaultAmount ? ' of ' + peso(qa.defaultAmount) : ' (prompts for amount)'}`;
+        case 'income':   return `Logs income${qa.defaultAmount ? ' of ' + peso(qa.defaultAmount) : ' (prompts for amount)'}`;
+        case 'saving':   return `Adds to a savings goal${qa.defaultAmount ? ' — ' + peso(qa.defaultAmount) : ''}`;
+        case 'transfer': return `Transfers between wallets${qa.defaultAmount ? ' — ' + peso(qa.defaultAmount) : ''}`;
+        case 'pautang':  return `Adds to a pautang${qa.defaultAmount ? ' — ' + peso(qa.defaultAmount) : ''}`;
+      }
+    }
+    return 'Shortcut';
+  }
+
+  async function reorderQuickAction(id, delta) {
+    const { data: sess } = await auth.getSession();
+    const user = sess.session.user;
+    const list = getQuickActions(user).slice();
+    const idx = list.findIndex(q => q.id === id);
+    const target = idx + delta;
+    if (idx < 0 || target < 0 || target >= list.length) return;
+    [list[idx], list[target]] = [list[target], list[idx]];
+    const { data, error } = await auth.updateUser({ data: { quickActions: list } });
+    if (error) { toast(error.message, 'error'); return; }
+    showManageQuickActions(data.user);
+  }
+
+  async function deleteQuickAction(id) {
+    const ok = await showConfirm({
+      icon: '🗑️',
+      title: 'Delete this shortcut?',
+      body: 'You can always add it back later.',
+      okText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    const { data: sess } = await auth.getSession();
+    const list = getQuickActions(sess.session.user).filter(q => q.id !== id);
+    const { data, error } = await auth.updateUser({ data: { quickActions: list } });
+    if (error) { toast(error.message, 'error'); return; }
+    toast('Shortcut deleted', 'success');
+    showManageQuickActions(data.user);
+  }
+
+  // Editor for a single quick action — creates new if qa is null
+  let editingQuickAction = null;
+  function openQuickActionEditor(qa) {
+    editingQuickAction = qa ? JSON.parse(JSON.stringify(qa)) : {
+      id: 'qa_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      label: '', emoji: '✦', color: 'navy',
+      kind: 'template', txType: 'expense',
+      walletId: null, linkedId: null, defaultAmount: 0, note: '', tagIds: [],
+    };
+    document.getElementById('qaEditorTitle').textContent = qa ? 'Edit shortcut' : 'New shortcut';
+    document.getElementById('qaEditorDelete').style.display = qa ? '' : 'none';
+    renderQuickActionEditorFields();
+    goto('quick-action-editor');
+  }
+
+  function renderQuickActionEditorFields() {
+    const qa = editingQuickAction;
+    const user = userCache || {};
+
+    document.getElementById('qaEditLabel').value  = (qa.label || '').replace(/\n/g, ' ');
+    document.getElementById('qaEditEmoji').value  = qa.emoji || '✦';
+
+    // Color swatches
+    const swatches = document.getElementById('qaEditColorSwatches');
+    swatches.innerHTML = '';
+    Object.entries(QA_COLORS).forEach(([name, c]) => {
+      const sw = document.createElement('button');
+      sw.type = 'button';
+      sw.className = 'qa-color-swatch' + (qa.color === name ? ' selected' : '');
+      sw.style.background = c.bg;
+      sw.style.color = c.fg;
+      sw.textContent = '●';
+      sw.title = name;
+      sw.addEventListener('click', () => {
+        qa.color = name;
+        renderQuickActionEditorFields();
+      });
+      swatches.appendChild(sw);
+    });
+
+    // Kind picker
+    document.getElementById('qaEditKind').value = qa.kind === 'template' ? ('template-' + qa.txType) : ('nav-' + (qa.navTarget || 'transaction'));
+
+    // Conditional fields based on kind
+    const cond = document.getElementById('qaEditConditional');
+    cond.innerHTML = '';
+    if (qa.kind === 'template') {
+      // Wallet picker (always needed for templates)
+      const wallets = user.wallets || [];
+      cond.innerHTML += `
+        <div class="field">
+          <label>Wallet</label>
+          <div class="select-wrap">
+            <select class="input select" id="qaEditWallet">
+              <option value="">— Pick a wallet —</option>
+              ${wallets.map(w => `<option value="${w.id}" ${qa.walletId === w.id ? 'selected' : ''}>${escapeAttr((w.label && w.label.trim()) || PAYMENT_NAME[w.method] || 'Wallet')}</option>`).join('')}
+            </select>
+            <span class="select-caret">▾</span>
+          </div>
+        </div>
+      `;
+      // Linked entity picker (varies by txType)
+      if (qa.txType === 'expense') {
+        const exps = user.expenses || [];
+        cond.innerHTML += `
+          <div class="field">
+            <label>Link to budget item <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+            <div class="select-wrap">
+              <select class="input select" id="qaEditLinked">
+                <option value="">— One-off (no budget) —</option>
+                ${exps.map(e => `<option value="${e.id}" ${qa.linkedId === e.id ? 'selected' : ''}>${escapeAttr(e.name || 'Expense')}</option>`).join('')}
+              </select>
+              <span class="select-caret">▾</span>
+            </div>
+          </div>
+        `;
+      } else if (qa.txType === 'income') {
+        const incs = user.incomes || [];
+        cond.innerHTML += `
+          <div class="field">
+            <label>Link to income source <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+            <div class="select-wrap">
+              <select class="input select" id="qaEditLinked">
+                <option value="">— Extra income (no source) —</option>
+                ${incs.map(i => `<option value="${i.id}" ${qa.linkedId === i.id ? 'selected' : ''}>${escapeAttr(i.name || 'Income')}</option>`).join('')}
+              </select>
+              <span class="select-caret">▾</span>
+            </div>
+          </div>
+        `;
+      } else if (qa.txType === 'saving') {
+        const goals = (user.goals || []).filter(g => !g.pairedExpenseId);
+        cond.innerHTML += `
+          <div class="field">
+            <label>Save to goal</label>
+            <div class="select-wrap">
+              <select class="input select" id="qaEditGoal">
+                <option value="">— Pick a goal —</option>
+                ${goals.map(g => `<option value="${g.id}" ${qa.goalId === g.id ? 'selected' : ''}>${escapeAttr(g.name || 'Goal')}</option>`).join('')}
+              </select>
+              <span class="select-caret">▾</span>
+            </div>
+          </div>
+        `;
+      } else if (qa.txType === 'transfer') {
+        const wallets2 = user.wallets || [];
+        cond.innerHTML += `
+          <div class="field">
+            <label>Transfer to</label>
+            <div class="select-wrap">
+              <select class="input select" id="qaEditToWallet">
+                <option value="">— Pick destination —</option>
+                ${wallets2.map(w => `<option value="${w.id}" ${qa.toWalletId === w.id ? 'selected' : ''}>${escapeAttr((w.label && w.label.trim()) || PAYMENT_NAME[w.method] || 'Wallet')}</option>`).join('')}
+              </select>
+              <span class="select-caret">▾</span>
+            </div>
+          </div>
+        `;
+      } else if (qa.txType === 'pautang') {
+        const pautangs = (user.loans || []).filter(l => (l.direction || 'payable') === 'receivable');
+        cond.innerHTML += `
+          <div class="field">
+            <label>Pautang (money someone owes you)</label>
+            <div class="select-wrap">
+              <select class="input select" id="qaEditLoan">
+                <option value="">— Pick a pautang —</option>
+                ${pautangs.map(l => `<option value="${l.id}" ${qa.loanId === l.id ? 'selected' : ''}>${escapeAttr(l.name || 'Pautang')}</option>`).join('')}
+              </select>
+              <span class="select-caret">▾</span>
+            </div>
+            <div class="payday-hint">Each tap adds the amount to this pautang's balance. Perfect for "shopping for Mom" — accumulates until she pays.</div>
+          </div>
+        `;
+      }
+      // Default amount + note
+      cond.innerHTML += `
+        <div class="field">
+          <label>Default amount <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional — leave 0 to prompt each time)</span></label>
+          <div class="amount-input-wrap">
+            <span class="peso">₱</span>
+            <input class="input" type="number" min="0" step="0.01" id="qaEditAmount" value="${qa.defaultAmount || ''}" placeholder="0 — prompt each time" style="text-align:right;" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Note <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+          <input class="input" type="text" id="qaEditNote" value="${escapeAttr(qa.note || '')}" placeholder="Auto-added to every tx from this shortcut" maxlength="120" />
+        </div>
+      `;
+    }
+    // Rewire conditional field listeners
+    document.querySelectorAll('#qaEditConditional [id^="qaEdit"]').forEach(input => {
+      input.addEventListener('change', captureQuickActionEditor);
+      input.addEventListener('input', captureQuickActionEditor);
+    });
+  }
+
+  function captureQuickActionEditor() {
+    const qa = editingQuickAction;
+    qa.label = document.getElementById('qaEditLabel').value;
+    qa.emoji = document.getElementById('qaEditEmoji').value || '✦';
+    const kindVal = document.getElementById('qaEditKind').value;
+    if (kindVal.startsWith('nav-')) {
+      qa.kind = 'nav';
+      qa.navTarget = kindVal.replace('nav-', '');
+      if (qa.navTarget === 'transfer-form') { qa.navTarget = 'transaction'; qa.prefill = { type: 'transfer' }; }
+      else delete qa.prefill;
+    } else if (kindVal.startsWith('template-')) {
+      qa.kind = 'template';
+      qa.txType = kindVal.replace('template-', '');
+    }
+    if (qa.kind === 'template') {
+      const wSel = document.getElementById('qaEditWallet');
+      if (wSel) qa.walletId = wSel.value || null;
+      const lSel = document.getElementById('qaEditLinked');
+      if (lSel) qa.linkedId = lSel.value || null;
+      const gSel = document.getElementById('qaEditGoal');
+      if (gSel) qa.goalId = gSel.value || null;
+      const tSel = document.getElementById('qaEditToWallet');
+      if (tSel) qa.toWalletId = tSel.value || null;
+      const loanSel = document.getElementById('qaEditLoan');
+      if (loanSel) qa.loanId = loanSel.value || null;
+      const amt = document.getElementById('qaEditAmount');
+      if (amt) qa.defaultAmount = Number(amt.value) || 0;
+      const note = document.getElementById('qaEditNote');
+      if (note) qa.note = note.value;
+    }
+  }
+
+  // Kind picker — re-render the conditional fields when kind changes,
+  // then re-capture so the state matches
+  document.getElementById('qaEditKind').addEventListener('change', () => {
+    captureQuickActionEditor();
+    renderQuickActionEditorFields();
+  });
+  document.getElementById('qaEditLabel').addEventListener('input', captureQuickActionEditor);
+  document.getElementById('qaEditEmoji').addEventListener('input', captureQuickActionEditor);
+
+  // Save shortcut — validate + upsert into user.quickActions
+  document.getElementById('qaEditorSave').addEventListener('click', async () => {
+    captureQuickActionEditor();
+    const qa = editingQuickAction;
+    if (!qa.label || !qa.label.trim()) { toast('Give your shortcut a label.', 'error'); return; }
+    // For templates, ensure minimum required fields per txType are set
+    if (qa.kind === 'template') {
+      if (!qa.walletId) { toast('Pick a wallet.', 'error'); return; }
+      if (qa.txType === 'saving'   && !qa.goalId)     { toast('Pick a goal.', 'error'); return; }
+      if (qa.txType === 'transfer' && !qa.toWalletId) { toast('Pick a destination wallet.', 'error'); return; }
+      if (qa.txType === 'pautang'  && !qa.loanId)     { toast('Pick a pautang.', 'error'); return; }
+    }
+    const { data: sess } = await auth.getSession();
+    const list = getQuickActions(sess.session.user).slice();
+    const idx = list.findIndex(x => x.id === qa.id);
+    if (idx >= 0) list[idx] = qa;
+    else           list.push(qa);
+    const { data, error } = await auth.updateUser({ data: { quickActions: list } });
+    if (error) { toast(error.message, 'error'); return; }
+    toast(idx >= 0 ? 'Shortcut updated ✦' : 'Shortcut added ✦', 'success');
+    showManageQuickActions(data.user);
+  });
+
+  document.getElementById('qaAddNewBtn').addEventListener('click', () => openQuickActionEditor(null));
+
+  document.getElementById('qaEditorDelete').addEventListener('click', async () => {
+    if (!editingQuickAction) return;
+    await deleteQuickAction(editingQuickAction.id);
   });
 
   // Dynamic home welcome card — greets by time of day and surfaces the most useful
@@ -14541,6 +15555,15 @@
         ? `${limitCount} categor${limitCount !== 1 ? 'ies' : 'y'} with a monthly cap`
         : 'Set optional monthly caps per category — get warned when close.';
     }
+    // Quick Actions sub — show count of custom shortcuts
+    const qaSub = document.getElementById('manageQuickActionsSub');
+    if (qaSub) {
+      const list = getQuickActions(user);
+      const isDefaults = !Array.isArray(user.quickActions) || user.quickActions.length === 0;
+      qaSub.textContent = isDefaults
+        ? 'Using 3 defaults. Tap to customize.'
+        : `${list.length} shortcut${list.length !== 1 ? 's' : ''} set up`;
+    }
     // Notifications card sub — reflect current permission so the user sees
     // where they stand without having to tap
     const notifSub = document.getElementById('notificationsCardSub');
@@ -14611,6 +15634,77 @@
       const onKey    = (e) => {
         if (e.key === 'Escape') cleanup(false);
         else if (e.key === 'Enter') cleanup(true);
+      };
+      okBtn.addEventListener('click', onOk);
+      cancels.forEach(el => el.addEventListener('click', onCancel));
+      document.addEventListener('keydown', onKey);
+    });
+  }
+
+  // Type-to-confirm modal — used for irreversible destructive actions like
+  // account deletion. Requires the user to type an exact keyword (e.g. "DELETE")
+  // before the primary button unlocks. Prevents accidental taps, muscle
+  // memory, or "just wanted to see what this does" mistakes. Returns true
+  // if the user confirmed with the correct keyword, false otherwise.
+  function showTypeToConfirm(opts) {
+    const { title, bodyHtml, keyword, okText = 'Confirm' } = opts;
+    const modal   = document.getElementById('confirmModal');
+    const iconEl  = document.getElementById('confirmModalIcon');
+    const titleEl = document.getElementById('confirmModalTitle');
+    const bodyEl  = document.getElementById('confirmModalBody');
+    const okBtn   = document.getElementById('confirmModalOk');
+    const cancels = modal.querySelectorAll('[data-confirm-cancel]');
+
+    iconEl.textContent  = '🚨';
+    titleEl.textContent = title;
+    const inputId = 'typeConfirmInput_' + Date.now().toString(36);
+    bodyEl.innerHTML = `
+      <div style="font-size:13px; color:var(--muted); line-height:1.5; margin-bottom:14px;">${bodyHtml}</div>
+      <input class="input" type="text" id="${inputId}" placeholder="${escapeAttr(keyword)}" autocomplete="off" spellcheck="false" style="font-family:'Fraunces',serif; font-weight:700; letter-spacing:1.5px; text-align:center; text-transform:uppercase;" />
+    `;
+    okBtn.textContent = okText;
+    okBtn.className = 'btn btn-primary';
+    okBtn.style.background = 'var(--error)';
+    okBtn.style.opacity = '0.4';
+    okBtn.style.pointerEvents = 'none';   // disabled until keyword matches
+
+    const input = document.getElementById(inputId);
+    const validate = () => {
+      if (input.value.trim() === keyword) {
+        okBtn.style.opacity = '1';
+        okBtn.style.pointerEvents = 'auto';
+      } else {
+        okBtn.style.opacity = '0.4';
+        okBtn.style.pointerEvents = 'none';
+      }
+    };
+    input.addEventListener('input', validate);
+    setTimeout(() => input.focus(), 60);
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+
+    return new Promise(resolve => {
+      const cleanup = (result) => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        // Restore button visuals for next use
+        okBtn.style.background = '';
+        okBtn.style.opacity = '';
+        okBtn.style.pointerEvents = '';
+        okBtn.removeEventListener('click', onOk);
+        cancels.forEach(el => el.removeEventListener('click', onCancel));
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      const onOk = () => {
+        if (input.value.trim() !== keyword) return;   // safety
+        cleanup(true);
+      };
+      const onCancel = () => cleanup(false);
+      const onKey = (e) => {
+        if (e.key === 'Escape') cleanup(false);
+        else if (e.key === 'Enter' && input.value.trim() === keyword) { e.preventDefault(); onOk(); }
       };
       okBtn.addEventListener('click', onOk);
       cancels.forEach(el => el.addEventListener('click', onCancel));
@@ -14989,6 +16083,86 @@
     // Route via maybeEnterPreview so the sample-data preview kicks in, matching
     // the first-launch experience. User can Exit preview afterward if they want blank.
     maybeEnterPreview(data.user);
+  });
+
+  // Delete account — wipes every scrap of user data AND signs them out. Note:
+  // the auth.users record (email + password) stays because deleting that from
+  // the client would need a service_role key (not safe to expose). We wipe:
+  //   1. The row in user_data (JSONB blob with everything the app owns)
+  //   2. auth.users.raw_user_meta_data (name, etc.)
+  //   3. Any local backup snapshots on this device
+  // Then we sign them out and return to welcome. Users who want the auth
+  // record deleted for real can email support (documented in Privacy).
+  // Two-step confirmation + typed "DELETE" keyword — non-recoverable action.
+  document.getElementById('profileDeleteAccountBtn').addEventListener('click', async () => {
+    const { data: sess } = await auth.getSession();
+    if (!sess.session) { toast('Not signed in.', 'error'); return; }
+    if (DEV_OFFLINE_MODE) {
+      toast('Offline mode — use Reset all data instead.', 'error');
+      return;
+    }
+
+    // First confirm — explain the consequences plainly
+    const first = await showConfirm({
+      icon: '🗑️',
+      title: 'Delete your account?',
+      bodyHtml: `
+        This will permanently delete <strong>everything</strong> on your Silak Salapi account:
+        <ul>
+          <li>All transactions, wallets, budgets, goals, and loans</li>
+          <li>All assets and net-worth history</li>
+          <li>Your profile name and photo</li>
+          <li>All local backup snapshots on this device</li>
+        </ul>
+        <div class="note">This can't be undone. If you might want your data later, tap Cancel and use <strong>Export all data</strong> first.</div>
+      `,
+      okText: 'Continue',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!first) return;
+
+    // Second confirm — require typing "DELETE" to prevent accidents.
+    // Reuses showConfirm with a bodyHtml that includes an input, then
+    // reads the input value after the user taps the primary button.
+    const typedOk = await showTypeToConfirm({
+      title: 'Type DELETE to confirm',
+      bodyHtml: 'This is your last chance to back out. Enter <strong>DELETE</strong> in capital letters below and tap the button to permanently delete your account.',
+      keyword: 'DELETE',
+      okText: 'Delete my account',
+    });
+    if (!typedOk) return;
+
+    const btn = document.getElementById('profileDeleteAccountBtn');
+    setLoading(btn, true, 'Deleting…');
+    try {
+      const uid = sess.session.user.id;
+      // 1. Nuke the user_data row (main data blob)
+      const { error: dataErr } = await sb.from('user_data').delete().eq('user_id', uid);
+      if (dataErr) throw dataErr;
+      // 2. Clear auth.users.raw_user_meta_data — reset name, avatar, etc.
+      const { error: metaErr } = await sb.auth.updateUser({ data: {} });
+      if (metaErr) console.warn('[Silak] metadata clear failed:', metaErr);
+      // 3. Wipe local backup snapshots (not synced to server; live in localStorage)
+      try {
+        const keys = Object.keys(localStorage);
+        keys.forEach(k => {
+          if (k.startsWith('silak-salapi-backup-') || k === 'silak-salapi-last-email' || k === 'silak-budget-sort') {
+            localStorage.removeItem(k);
+          }
+        });
+      } catch (e) { /* localStorage might be blocked; not fatal */ }
+      // 4. Sign out — invalidates the session
+      await sb.auth.signOut();
+      setLoading(btn, false);
+      toast('Account deleted. Take care ✦', 'success');
+      // Belt + suspenders: force a fresh state before showing welcome
+      setTimeout(() => { goto('welcome'); }, 600);
+    } catch (err) {
+      setLoading(btn, false);
+      console.error('[Silak] Account deletion failed:', err);
+      toast(err?.message || 'Could not delete your account. Please try again.', 'error');
+    }
   });
 
   document.getElementById('exportCsvCard').addEventListener('click', async () => {
@@ -21159,6 +22333,12 @@
     };
     cancels.forEach(el => el.addEventListener('click', closeModal));
     document.getElementById('categoryLimitsSaveBtn').addEventListener('click', onSave);
+  });
+
+  document.getElementById('manageQuickActionsCard').addEventListener('click', async () => {
+    const { data: sess } = await auth.getSession();
+    if (!sess?.session) return;
+    showManageQuickActions(sess.session.user);
   });
 
   // Notifications test — runs through the full flow of "can this device
