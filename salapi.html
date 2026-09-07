@@ -5889,6 +5889,32 @@
   .manage-qa-row .mqa-btn.primary:hover { background: var(--blue); color: var(--white); border-color: var(--blue); }
   .manage-qa-row .mqa-btn.danger:hover  { background: var(--error); color: var(--white); border-color: var(--error); }
 
+  /* Sticky Save/Cancel bar at the bottom of the Quick Action editor screen.
+     Ensures Save is always tappable even when the keyboard is up on mobile,
+     and clears the iPhone home indicator via safe-area padding. */
+  .qa-editor-actions-bar {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0;
+    display: flex;
+    gap: 12px;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+    background: var(--cream);
+    border-top: 1px solid var(--sand);
+    box-shadow: 0 -4px 16px rgba(10, 37, 64, 0.06);
+    z-index: 50;
+  }
+  /* Constrain to app container width so it doesn't span wider than the screen on desktop */
+  @media (min-width: 481px) {
+    .qa-editor-actions-bar {
+      max-width: 480px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      border-radius: 0;
+    }
+  }
+
   /* Net Worth footer card */
   .nw-footer-card {
     background: var(--white);
@@ -8892,7 +8918,7 @@
   <!-- ============ MANAGE QUICK ACTIONS ============ -->
   <section class="screen" id="screen-manage-quick-actions" style="padding: 24px;">
     <div class="view-header">
-      <button class="nav-back" data-goto="home" style="padding:0;">← Back</button>
+      <button class="nav-back" id="qaManageBackBtn" style="padding:0;">← Back</button>
       <h1 style="margin-left:8px;">Quick Actions</h1>
     </div>
     <p style="font-size:13px; color:var(--muted); line-height:1.5; margin: 0 0 20px;">
@@ -8907,7 +8933,7 @@
   </section>
 
   <!-- ============ QUICK ACTION EDITOR ============ -->
-  <section class="screen" id="screen-quick-action-editor" style="padding: 24px;">
+  <section class="screen" id="screen-quick-action-editor" style="padding: 24px 24px 120px;">
     <div class="view-header">
       <button class="nav-back" data-goto="manage-quick-actions" style="padding:0;">← Back</button>
       <h1 id="qaEditorTitle" style="margin-left:8px;">New shortcut</h1>
@@ -8956,11 +8982,17 @@
       <!-- populated based on kind -->
     </div>
 
-    <div style="display:flex; gap:12px; margin-top:24px;">
+    <!-- Delete button sits inline (only shown when editing an existing shortcut).
+         Save/Cancel are pulled into a sticky bar below so they're always
+         reachable even when the keyboard is up. -->
+    <button type="button" class="single-delete-btn" id="qaEditorDelete" style="display:none;">Delete this shortcut</button>
+
+    <!-- Sticky action bar — Cancel + Save always visible at bottom. Uses
+         safe-area padding for iPhone home-indicator clearance. -->
+    <div class="qa-editor-actions-bar">
       <button type="button" class="btn btn-outline" data-goto="manage-quick-actions" style="flex:1;">Cancel</button>
       <button type="button" class="btn btn-primary" id="qaEditorSave" style="flex:2;">Save shortcut</button>
     </div>
-    <button type="button" class="single-delete-btn" id="qaEditorDelete" style="display:none;">Delete this shortcut</button>
   </section>
   <section class="screen legal-screen" id="screen-privacy" style="padding: 24px;">
     <div class="view-header">
@@ -9270,7 +9302,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.62';
+  const APP_VERSION = '2026-08-10.63';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -13457,6 +13489,8 @@
     [list[idx], list[target]] = [list[target], list[idx]];
     const { data, error } = await auth.updateUser({ data: { quickActions: list } });
     if (error) { toast(error.message, 'error'); return; }
+    userCache = data.user;
+    renderQuickActions(data.user);
     showManageQuickActions(data.user);
   }
 
@@ -13473,7 +13507,10 @@
     const list = getQuickActions(sess.session.user).filter(q => q.id !== id);
     const { data, error } = await auth.updateUser({ data: { quickActions: list } });
     if (error) { toast(error.message, 'error'); return; }
+    userCache = data.user;
     toast('Shortcut deleted', 'success');
+    // Refresh the Home strip too so it's up-to-date when the user goes back
+    renderQuickActions(data.user);
     showManageQuickActions(data.user);
   }
 
@@ -13707,7 +13744,10 @@
     else           list.push(qa);
     const { data, error } = await auth.updateUser({ data: { quickActions: list } });
     if (error) { toast(error.message, 'error'); return; }
+    userCache = data.user;
     toast(idx >= 0 ? 'Shortcut updated ✦' : 'Shortcut added ✦', 'success');
+    // Also refresh the Home strip so the change shows when the user goes back
+    renderQuickActions(data.user);
     showManageQuickActions(data.user);
   });
 
@@ -22363,6 +22403,14 @@
     const { data: sess } = await auth.getSession();
     if (!sess?.session) return;
     showManageQuickActions(sess.session.user);
+  });
+
+  // Back button on Manage screen — reload Home with fresh data so any
+  // shortcut changes are reflected immediately (not stale from initial load)
+  document.getElementById('qaManageBackBtn').addEventListener('click', async () => {
+    const { data: sess } = await auth.getSession();
+    if (sess?.session) showHome(sess.session.user);
+    else goto('home');
   });
 
   // Notifications test — runs through the full flow of "can this device
