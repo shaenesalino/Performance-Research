@@ -9302,7 +9302,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.64';
+  const APP_VERSION = '2026-08-10.65';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -18235,9 +18235,19 @@
         .slice()
         .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     } else if (kind === 'loan') {
-      // Loan payments are linked via linkedLoanId
+      // For fixed-term loans: only payments (linkedLoanId matches).
+      // For revolving loans: also include CHARGES (expenses where wallet is
+      // this credit account) and REFUNDS (income where wallet is this account),
+      // since those are the transactions that grow/shrink the balance.
+      const loan = (user.loans || []).find(l => l.id === id);
+      const isRev = !!loan?.isRevolving;
       related = txs
-        .filter(t => t.linkedLoanId === id)
+        .filter(t => {
+          if (t.linkedLoanId === id) return true;               // payments (both loan types)
+          if (isRev && t.wallet === id && t.type === 'expense') return true;   // charges
+          if (isRev && t.wallet === id && t.type === 'income')  return true;   // refunds
+          return false;
+        })
         .slice()
         .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     } else {
@@ -18411,12 +18421,42 @@
       if (!l) { toast('Loan not found.', 'error'); showLoansScreen(user); return; }
       const name = l.name || LOAN_LABEL[l.type] || 'Loan';
       titleEl.textContent = name;
-      const original = Number(l.originalAmount) || 0;
-      const remaining = Number(l.currentBalance) || 0;
-      const paid = Math.max(original - remaining, 0);
+      const isRevolving = !!l.isRevolving;
+      const txs = user.transactions || [];
+      // For revolving loans, the balance / original / paid math derives live
+      // from transactions (charges on the card, payments from other wallets).
+      // The stored currentBalance / originalAmount fields aren't meaningful
+      // for revolving accounts — they're only used for fixed-term loans.
+      let remaining, original, paid;
+      if (isRevolving) {
+        remaining = computeRevolvingBalance(l, txs);
+        // Sum of all charges (expenses where wallet is this credit account)
+        const charges = txs
+          .filter(t => t.wallet === l.id && t.type === 'expense')
+          .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        // Subtract refunds
+        const refunds = txs
+          .filter(t => t.wallet === l.id && t.type === 'income')
+          .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        // Payments toward this card from other wallets
+        const payments = txs
+          .filter(t => t.linkedLoanId === l.id && t.wallet !== l.id && t.type === 'expense')
+          .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        // "Original" for revolving = total charged this period (informational)
+        original = charges - refunds;
+        paid = payments;
+      } else {
+        original = Number(l.originalAmount) || 0;
+        remaining = Number(l.currentBalance) || 0;
+        paid = Math.max(original - remaining, 0);
+      }
       const pct = original > 0 ? Math.min(100, (paid / original) * 100) : 0;
       const monthly = loanMonthlyEquivalent(l);
-      const isPaid = l.status === 'paid' || (original > 0 && remaining === 0);
+      const isPaid = !isRevolving && (l.status === 'paid' || (original > 0 && remaining === 0));
+      // Count payments correctly for both loan types
+      const paymentsCount = isRevolving
+        ? txs.filter(t => t.linkedLoanId === l.id && t.wallet !== l.id && t.type === 'expense').length
+        : (l.payments || []).length;
       summaryEl.innerHTML = `
         <div class="entry-summary-card">
           <div class="head">
@@ -18427,17 +18467,19 @@
             </div>
           </div>
           <div class="entry-summary-stats">
-            <div class="stat"><div class="lbl">Remaining balance</div><div class="val">${peso(remaining)}</div></div>
-            <div class="stat"><div class="lbl">Original amount</div><div class="val">${peso(original)}</div></div>
-            <div class="stat"><div class="lbl">Paid so far</div><div class="val done">${peso(paid)}</div></div>
-            <div class="stat"><div class="lbl">Progress</div><div class="val">${pct.toFixed(0)}%</div></div>
+            <div class="stat"><div class="lbl">${isRevolving ? 'Current balance' : 'Remaining balance'}</div><div class="val">${peso(remaining)}</div></div>
+            <div class="stat"><div class="lbl">${isRevolving ? 'Total charged' : 'Original amount'}</div><div class="val">${peso(original)}</div></div>
+            <div class="stat"><div class="lbl">${isRevolving ? 'Payments made' : 'Paid so far'}</div><div class="val done">${peso(paid)}</div></div>
+            ${isRevolving
+              ? `<div class="stat"><div class="lbl">Credit used</div><div class="val">${l.creditLimit > 0 ? Math.min(100, Math.round((remaining / l.creditLimit) * 100)) + '%' : '—'}</div></div>`
+              : `<div class="stat"><div class="lbl">Progress</div><div class="val">${pct.toFixed(0)}%</div></div>`}
             ${l.frequency === 'one-time'
               ? `<div class="stat"><div class="lbl">Due date</div><div class="val">${l.dueDate ? new Date(l.dueDate + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</div></div>`
               : `<div class="stat"><div class="lbl">${(FREQ_LABEL[l.frequency || 'monthly'] || 'Monthly').replace(/^\w/, c => c.toUpperCase())} payment</div><div class="val">${peso(l.monthlyPayment || 0)}</div></div>`}
-            <div class="stat"><div class="lbl">Payments logged</div><div class="val">${(l.payments || []).length}</div></div>
+            <div class="stat"><div class="lbl">Payments logged</div><div class="val">${paymentsCount}</div></div>
           </div>
           <div class="entry-summary-progress">
-            <div class="bar"><div style="width:${pct.toFixed(1)}%; background: linear-gradient(90deg, var(--teal), var(--blue));"></div></div>
+            <div class="bar"><div style="width:${isRevolving && l.creditLimit > 0 ? Math.min(100, (remaining / l.creditLimit) * 100).toFixed(1) : pct.toFixed(1)}%; background: linear-gradient(90deg, ${isRevolving ? 'var(--error), var(--orange)' : 'var(--teal), var(--blue)'});"></div></div>
           </div>
         </div>
       `;
@@ -18466,6 +18508,16 @@
         let sign;
         if (tx.type === 'transfer') {
           sign = (kind === 'wallet' && tx.toWallet === id) ? '+' : '−';
+        } else if (kind === 'loan') {
+          // On loan detail: sign is from the loan's perspective (does it
+          // grow or shrink the debt/receivable).
+          //   Charge on card (wallet === loan.id, expense) → +  (owe more)
+          //   Refund on card (wallet === loan.id, income)  → −  (owe less)
+          //   Payment from wallet (linkedLoanId, expense)  → −  (owe less)
+          //   Collection (linkedLoanId, income)            → −  (receivable shrinks)
+          if (tx.wallet === id && tx.type === 'expense')       sign = '+';   // charge
+          else if (tx.wallet === id && tx.type === 'income')   sign = '−';   // refund
+          else                                                 sign = '−';   // payment/collection
         } else {
           sign = tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : '';
         }
