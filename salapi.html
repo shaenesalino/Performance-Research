@@ -9270,7 +9270,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.61';
+  const APP_VERSION = '2026-08-10.62';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -13115,10 +13115,17 @@
   function quickActionBrokenReason(qa, user) {
     if (!qa || qa.kind !== 'template') return '';
     const wallets = user.wallets || [];
-    if (qa.walletId && !wallets.some(w => w.id === qa.walletId)) return 'Wallet was deleted';
+    const loans   = user.loans   || [];
+    // Wallet can be a real wallet OR a revolving credit account (SPayLater,
+    // credit card). Check both. Broken if it references neither.
+    if (qa.walletId) {
+      const isWallet    = wallets.some(w => w.id === qa.walletId);
+      const isRevolving = loans.some(l => l.id === qa.walletId && l.isRevolving);
+      if (!isWallet && !isRevolving) return 'Source (wallet or credit) was deleted';
+    }
     if (qa.txType === 'expense'  && qa.linkedId    && !(user.expenses || []).some(e => e.id === qa.linkedId))    return 'Budget item was deleted';
     if (qa.txType === 'saving'   && qa.goalId      && !(user.goals    || []).some(g => g.id === qa.goalId))      return 'Goal was deleted';
-    if (qa.txType === 'pautang'  && qa.loanId      && !(user.loans    || []).some(l => l.id === qa.loanId))      return 'Loan was deleted';
+    if (qa.txType === 'pautang'  && qa.loanId      && !loans.some(l => l.id === qa.loanId))                      return 'Loan was deleted';
     if (qa.txType === 'transfer' && qa.toWalletId  && !wallets.some(w => w.id === qa.toWalletId))                return 'Destination wallet was deleted';
     return '';
   }
@@ -13227,8 +13234,11 @@
 
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
+    // Source can be either a wallet or a revolving credit account (SPayLater,
+    // credit card). Resolve which one for paymentMethod purposes.
     const wallet = (user.wallets || []).find(w => w.id === qa.walletId);
-    const paymentMethod = wallet ? wallet.method : 'cash';
+    const revolving = wallet ? null : (user.loans || []).find(l => l.id === qa.walletId && l.isRevolving);
+    const paymentMethod = wallet ? wallet.method : (revolving ? 'credit' : 'cash');
     const txId = 'tx_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
     let newTx;
@@ -13514,15 +13524,27 @@
     const cond = document.getElementById('qaEditConditional');
     cond.innerHTML = '';
     if (qa.kind === 'template') {
-      // Wallet picker (always needed for templates)
+      // Wallet picker — includes normal wallets AND revolving credit accounts
+      // (SPayLater, credit cards) since tx.wallet can be either. Grouped so
+      // it's clear which are cash sources vs. credit lines.
       const wallets = user.wallets || [];
+      const revolvingLoans = (user.loans || []).filter(l =>
+        l.isRevolving && l.status !== 'closed' && (l.direction || 'payable') !== 'receivable'
+      );
+      const walletOptionsHtml = wallets.map(w =>
+        `<option value="${w.id}" ${qa.walletId === w.id ? 'selected' : ''}>${escapeAttr((w.label && w.label.trim()) || PAYMENT_NAME[w.method] || 'Wallet')}</option>`
+      ).join('');
+      const revolvingOptionsHtml = revolvingLoans.map(l =>
+        `<option value="${l.id}" ${qa.walletId === l.id ? 'selected' : ''}>${escapeAttr(l.name || 'Credit')} · Credit</option>`
+      ).join('');
       cond.innerHTML += `
         <div class="field">
-          <label>Wallet</label>
+          <label>Pay with</label>
           <div class="select-wrap">
             <select class="input select" id="qaEditWallet">
-              <option value="">— Pick a wallet —</option>
-              ${wallets.map(w => `<option value="${w.id}" ${qa.walletId === w.id ? 'selected' : ''}>${escapeAttr((w.label && w.label.trim()) || PAYMENT_NAME[w.method] || 'Wallet')}</option>`).join('')}
+              <option value="">— Pick a source —</option>
+              ${wallets.length > 0 ? `<optgroup label="Wallets">${walletOptionsHtml}</optgroup>` : ''}
+              ${revolvingLoans.length > 0 ? `<optgroup label="Credit (SPayLater, cards)">${revolvingOptionsHtml}</optgroup>` : ''}
             </select>
             <span class="select-caret">▾</span>
           </div>
@@ -13572,6 +13594,8 @@
           </div>
         `;
       } else if (qa.txType === 'transfer') {
+        // Destination wallets only — transfers move money BETWEEN cash accounts,
+        // not TO credit lines (paying down a credit card is a Pay Bill action).
         const wallets2 = user.wallets || [];
         cond.innerHTML += `
           <div class="field">
