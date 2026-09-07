@@ -9302,7 +9302,7 @@
   // Bumped on every deploy — used by the update-checker to detect when a
   // newer HTML has landed on GitHub Pages so users can refresh without
   // force-closing the PWA. Format: YYYY-MM-DD.NN (NN increments per day).
-  const APP_VERSION = '2026-08-10.63';
+  const APP_VERSION = '2026-08-10.64';
 
   const REMEMBER_KEY = 'silak-salapi-last-email';      // client-only, pre-fills email on login
 
@@ -13247,21 +13247,29 @@
     }
   }
 
-  // Execute a template (pre-configured tx). Prompts for amount if not preset,
-  // then creates the tx directly — no form open, minimum friction.
+  // Execute a template (pre-configured tx). Prompts for amount + optional
+  // note. If defaultAmount is preset AND user didn't need to type anything,
+  // we still show a prompt so they can add a note — the amount is pre-filled
+  // and they just tap Save. Notes typed here override the template's default.
   async function runTemplateQuickAction(qa, user) {
-    // Get amount — either preset or prompt for it
-    let amount = Number(qa.defaultAmount) || 0;
-    if (!amount) {
-      const result = await showAmountPrompt({
-        title: qa.label ? qa.label.replace(/\n/g, ' ') : 'Quick log',
-        emoji: qa.emoji || '✦',
-        placeholder: 'How much?',
-        okText: 'Save',
-      });
-      if (!result || !result.confirmed) return;
-      amount = result.amount;
-    }
+    const promptTitle = qa.label ? qa.label.replace(/\n/g, ' ') : 'Quick log';
+    // Always show the prompt now (amount + optional note) so users can add
+    // per-instance context (e.g. "birthday gift" for a Shopee purchase).
+    // Amount pre-fills from template default if set — user can Save immediately,
+    // or edit if this specific purchase is different.
+    const result = await showAmountPrompt({
+      title: promptTitle,
+      emoji: qa.emoji || '✦',
+      placeholder: 'How much?',
+      okText: 'Save',
+      showNote: true,
+      defaultNote: qa.note || '',
+      defaultAmount: Number(qa.defaultAmount) || 0,
+    });
+    if (!result || !result.confirmed) return;
+    const amount = Number(result.amount) || Number(qa.defaultAmount) || 0;
+    // Note precedence: what the user typed > template default > empty
+    const note = result.note != null ? result.note : (qa.note || '');
     if (amount <= 0) { toast('Enter an amount greater than zero.', 'error'); return; }
 
     const now = new Date().toISOString();
@@ -13279,7 +13287,7 @@
       newTx = {
         id: txId, type: 'expense',
         source: qa.linkedId ? 'set' : 'outside',
-        amount, date: today, note: qa.note || '',
+        amount, date: today, note,
         paymentMethod, wallet: qa.walletId,
         linkedId: qa.linkedId || null,
         category: linkedExp?.category || 'other',
@@ -13291,7 +13299,7 @@
       newTx = {
         id: txId, type: 'income',
         source: qa.linkedId ? 'set' : 'extra',
-        amount, date: today, note: qa.note || '',
+        amount, date: today, note,
         paymentMethod, wallet: qa.walletId,
         linkedId: qa.linkedId || null,
         category: linkedInc?.category || 'other',
@@ -13302,7 +13310,7 @@
       newTx = {
         id: txId, type: 'saving',
         source: qa.goalId ? 'set' : 'other',
-        amount, date: today, note: qa.note || '',
+        amount, date: today, note,
         paymentMethod, wallet: qa.walletId,
         linkedId: qa.goalId || null,
         category: 'other',
@@ -13313,7 +13321,7 @@
       newTx = {
         id: txId, type: 'transfer',
         source: 'set',
-        amount, date: today, note: qa.note || '',
+        amount, date: today, note,
         paymentMethod, wallet: qa.walletId,
         toWallet: qa.toWalletId,
         linkedId: null, category: 'other', label: '',
@@ -13335,7 +13343,8 @@
       newTx = {
         id: txId, type: 'expense',
         source: 'outside',
-        amount, date: today, note: qa.note || `Lent to ${targetLoan?.name || 'pautang'}`,
+        amount, date: today,
+        note: note || `Lent to ${targetLoan?.name || 'pautang'}`,
         paymentMethod, wallet: qa.walletId,
         linkedLoanId: qa.loanId,
         category: 'other', label: '',
@@ -13368,9 +13377,16 @@
     showHome(data.user);
   }
 
-  // Simple amount-prompt modal — reused by Quick Action templates
+  // Simple amount-prompt modal — reused by Quick Action templates.
+  // Optionally shows a note field alongside the amount, pre-filled with
+  // the template's default note (if any). Returns { confirmed, amount, note }.
   function showAmountPrompt(opts) {
-    const { title, emoji = '💰', placeholder = 'Amount', okText = 'Save' } = opts;
+    const {
+      title, emoji = '💰',
+      placeholder = 'Amount', okText = 'Save',
+      showNote = false, defaultNote = '',
+      defaultAmount = 0,
+    } = opts;
     const modal   = document.getElementById('confirmModal');
     const iconEl  = document.getElementById('confirmModalIcon');
     const titleEl = document.getElementById('confirmModalTitle');
@@ -13381,11 +13397,18 @@
     iconEl.textContent  = emoji;
     titleEl.textContent = title;
     const inputId = 'amtPrompt_' + Date.now().toString(36);
+    const noteInputId = inputId + '_note';
     bodyEl.innerHTML = `
       <div class="amount-input-wrap">
         <span class="peso">₱</span>
-        <input class="input" type="number" min="0" step="0.01" id="${inputId}" placeholder="${escapeAttr(placeholder)}" style="text-align:right; font-family:'Fraunces',serif; font-size:24px; font-weight:700;" />
+        <input class="input" type="number" min="0" step="0.01" id="${inputId}" placeholder="${escapeAttr(placeholder)}" value="${defaultAmount > 0 ? defaultAmount : ''}" style="text-align:right; font-family:'Fraunces',serif; font-size:24px; font-weight:700;" />
       </div>
+      ${showNote ? `
+        <div style="margin-top:14px;">
+          <label style="display:block; font-family:'Inter',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--muted); margin-bottom:6px;">Note <span style="font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+          <input class="input" type="text" id="${noteInputId}" maxlength="120" placeholder="e.g. birthday gift, groceries" value="${escapeAttr(defaultNote || '')}" />
+        </div>
+      ` : ''}
     `;
     okBtn.textContent = okText;
     okBtn.className = 'btn btn-primary';
@@ -13393,7 +13416,16 @@
     modal.classList.add('open');
     modal.setAttribute('aria-hidden', 'false');
     const input = document.getElementById(inputId);
-    setTimeout(() => input.focus(), 60);
+    // If amount is pre-filled, focus the note field instead (user's most
+    // likely next action). Otherwise focus the amount input.
+    setTimeout(() => {
+      if (defaultAmount > 0 && showNote) {
+        const noteEl = document.getElementById(noteInputId);
+        if (noteEl) { noteEl.focus(); return; }
+      }
+      input.focus();
+      input.select();
+    }, 60);
 
     return new Promise(resolve => {
       const cleanup = (result) => {
@@ -13406,7 +13438,9 @@
       };
       const onOk = () => {
         const amount = Number(input.value) || 0;
-        cleanup({ confirmed: true, amount });
+        const noteEl = document.getElementById(noteInputId);
+        const note = noteEl ? noteEl.value.trim() : '';
+        cleanup({ confirmed: true, amount, note });
       };
       const onCancel = () => cleanup({ confirmed: false });
       const onKey = (e) => {
